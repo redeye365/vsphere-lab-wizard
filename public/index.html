@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>vSphere Lab Wizard</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="rail">
+    <div class="rail-brand">
+      <span class="rail-brand-name">vSphere Lab Wizard</span>
+      <span class="rail-brand-tag">v1 &middot; vSphere only, no VCF</span>
+    </div>
+    <ol class="rail-steps" id="rail-steps">
+      <li data-step="0"><span class="rail-num">01</span><span>Use case</span></li>
+      <li data-step="1"><span class="rail-num">02</span><span>Hardware</span></li>
+      <li data-step="2"><span class="rail-num">03</span><span>ESXi version</span></li>
+      <li data-step="3"><span class="rail-num">04</span><span>Virtual router</span></li>
+      <li data-step="4"><span class="rail-num">05</span><span>Domain controller</span></li>
+      <li data-step="5"><span class="rail-num">06</span><span>Existing network</span></li>
+      <li data-step="6"><span class="rail-num">07</span><span>Lab networks</span></li>
+      <li data-step="7"><span class="rail-num">08</span><span>Nested cluster</span></li>
+      <li data-step="8"><span class="rail-num">09</span><span>Nested disks</span></li>
+      <li data-step="9"><span class="rail-num">10</span><span>Workload VMs</span></li>
+      <li data-step="10"><span class="rail-num">11</span><span>Security &amp; access</span></li>
+      <li data-step="11"><span class="rail-num">12</span><span>Review &amp; generate</span></li>
+    </ol>
+  </aside>
+
+  <main class="main">
+
+    <div id="wizard-steps">
+
+      <!-- Step 0: Use case -->
+      <section class="step" data-step="0">
+        <h1>What's this lab for?</h1>
+        <p class="step-intro">This shapes the defaults for cluster size and sizing checks later. You can override anything.</p>
+        <div class="field">
+          <div class="radio-grid" id="useCase-options">
+            <label class="radio-card"><input type="radio" name="useCase" value="certification"><span class="radio-card-title">Certification study</span><span class="radio-card-sub">VCP / VCF exam practice</span></label>
+            <label class="radio-card"><input type="radio" name="useCase" value="feature_testing"><span class="radio-card-title">Feature testing</span><span class="radio-card-sub">vSAN, NSX, specific behaviour</span></label>
+            <label class="radio-card"><input type="radio" name="useCase" value="homelab"><span class="radio-card-title">General homelab</span><span class="radio-card-sub">Tinkering, no fixed goal</span></label>
+            <label class="radio-card"><input type="radio" name="useCase" value="demo"><span class="radio-card-title">Customer demo</span><span class="radio-card-sub">Something to show, not break</span></label>
+            <label class="radio-card"><input type="radio" name="useCase" value="devtest"><span class="radio-card-title">Dev/test sandbox</span><span class="radio-card-sub">Disposable, rebuilt often</span></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 1: Hardware -->
+      <section class="step" data-step="1">
+        <h1>What are you running this on?</h1>
+        <p class="step-intro">The physical host's specs decide how big the nested cluster can realistically be.</p>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="hostCount">Physical hosts</label>
+            <input type="number" id="hostCount" min="1" value="1">
+            <p class="hint">Most homelabs run this on a single box. If you've got more than one, the wizard still sizes against the total.</p>
+          </div>
+          <div class="field">
+            <label for="cpuCores">Logical CPU cores (total)</label>
+            <input type="number" id="cpuCores" min="1" placeholder="e.g. 36">
+            <p class="hint">Total threads across all physical hosts, not per-socket.</p>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="ramGB">RAM (GB, total)</label>
+            <input type="number" id="ramGB" min="1" placeholder="e.g. 256">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Storage devices</label>
+          <p class="hint">One entry per physical disk or disk group &mdash; drives sizing checks and script comments. Add as many as you have.</p>
+          <div id="storage-device-list"></div>
+          <button type="button" id="add-storage-device" class="btn btn-secondary" style="margin-top:4px;font-size:12.5px;padding:7px 12px;">+ Add device</button>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="nicCount">Physical NICs</label>
+            <input type="number" id="nicCount" min="1" placeholder="e.g. 2">
+          </div>
+          <div class="field">
+            <label for="nicSpeed">NIC speed</label>
+            <select id="nicSpeed">
+              <option value="">Select&hellip;</option>
+              <option value="1gbe">1GbE</option>
+              <option value="10gbe">10GbE</option>
+              <option value="25gbe">25GbE or faster</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 2: ESXi version -->
+      <section class="step" data-step="2">
+        <h1>Which ESXi version are you deploying?</h1>
+        <p class="step-intro">Sets the GuestId in the generated scripts and triggers version-specific minimum resource checks.</p>
+
+        <div class="field">
+          <label for="esxiVersion">ESXi / vSphere version</label>
+          <select id="esxiVersion">
+            <option value="">Select&hellip;</option>
+            <option value="9.0">ESXi 9.0 (latest)</option>
+            <option value="8.0u3">ESXi 8.0 Update 3</option>
+            <option value="8.0u2">ESXi 8.0 Update 2</option>
+            <option value="8.0u1">ESXi 8.0 Update 1</option>
+          </select>
+          <p class="hint">ESXi 8.0 needs at least 8GB vRAM per nested host. ESXi 7.0 and 6.7 need at least 4GB. The wizard will warn you if the nested host sizing falls below the minimum for the version you pick.</p>
+        </div>
+      </section>
+
+      <!-- Step 3: VyOS virtual router -->
+      <section class="step" data-step="3">
+        <h1>Top-of-rack virtual router?</h1>
+        <p class="step-intro">A VyOS VM acts as the lab's router and firewall — gives nested hosts a routable path and provides NAT, DHCP, and DNS forwarding.</p>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="vyosEnabled"><span>Deploy a VyOS virtual router/firewall for this lab</span></label>
+          <p class="hint">VyOS is free and open source. The script builds the VM shell and attaches the ISO; you configure it manually after boot. Very low overhead — 2 vCPU, 1GB RAM.</p>
+        </div>
+
+        <div id="vyos-mode-field" class="field" hidden>
+          <label>Network mode</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="vyosNetworkMode" value="basic"><span>Basic (NAT, DHCP, DNS forwarding)</span></label>
+            <label class="choice-pill"><input type="radio" name="vyosNetworkMode" value="bgp"><span>Include BGP peering setup</span></label>
+          </div>
+          <p class="hint">BGP adds the peering config to the markdown walkthrough. Both modes produce the same VM shell — it's the post-install config that differs.</p>
+        </div>
+      </section>
+
+      <!-- Step 4: Domain controller -->
+      <section class="step" data-step="4">
+        <h1>Domain controller?</h1>
+        <p class="step-intro">A Windows DC gives the lab DNS, NTP, and Active Directory — required before vCenter is deployed if you want valid FQDNs and certificates.</p>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="dcEnabled"><span>Deploy a domain controller for this lab</span></label>
+          <p class="hint">Sized at 2 vCPU / 4GB RAM / 80GB disk. Windows Server ISO install is manual — same pattern as the nested ESXi hosts.</p>
+        </div>
+
+        <div id="dc-fields" hidden>
+          <div class="field-row">
+            <div class="field">
+              <label for="dcDomainName">Domain name</label>
+              <input type="text" id="dcDomainName" placeholder="lab.yourdomain.com">
+              <p class="hint">e.g. <code>lab.acme.internal</code> — used in the DC promotion command and the vCenter FQDN.</p>
+            </div>
+            <div class="field">
+              <label for="dcIpAddress">DC IP address</label>
+              <input type="text" id="dcIpAddress" placeholder="e.g. 192.168.10.5">
+              <p class="hint">This is checked against the lab network ranges in the next steps to flag IP conflicts.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 5: Existing network -->
+      <section class="step" data-step="5">
+        <h1>What does the network around this look like?</h1>
+        <p class="step-intro">Not the lab itself yet &mdash; the network the physical host already sits on.</p>
+
+        <div class="field">
+          <label>Network type</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="networkType" value="flat"><span>Flat, no VLANs</span></label>
+            <label class="choice-pill"><input type="radio" name="networkType" value="vlans"><span>VLANs configured</span></label>
+            <label class="choice-pill"><input type="radio" name="networkType" value="unsure"><span>Not sure</span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Can your router/switch tag VLANs?</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="vlanCapable" value="yes"><span>Yes</span></label>
+            <label class="choice-pill"><input type="radio" name="vlanCapable" value="no"><span>No</span></label>
+            <label class="choice-pill"><input type="radio" name="vlanCapable" value="unsure"><span>Not sure</span></label>
+          </div>
+          <p class="hint">If no, the nested networks below will need to share a VLAN or run untagged.</p>
+        </div>
+
+        <div class="field">
+          <label>Is DHCP available, or static IPs only?</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="dhcpAvailable" value="yes"><span>DHCP available</span></label>
+            <label class="choice-pill"><input type="radio" name="dhcpAvailable" value="no"><span>Static only</span></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 6: Lab networks -->
+      <section class="step" data-step="6">
+        <h1>Lay out the lab's networks</h1>
+        <p class="step-intro">Each one becomes its own tagged port group on the physical vSwitch.</p>
+
+        <div id="dc-ip-notice" class="dc-ip-notice" hidden></div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="mgmtCidr">Management CIDR</label>
+            <input type="text" id="mgmtCidr" placeholder="192.168.10.0/24">
+          </div>
+          <div class="field">
+            <label for="mgmtVlan">Management VLAN ID</label>
+            <input type="number" id="mgmtVlan" min="0" max="4094" placeholder="optional">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="vmotionCidr">vMotion CIDR</label>
+            <input type="text" id="vmotionCidr" placeholder="192.168.11.0/24">
+          </div>
+          <div class="field">
+            <label for="vmotionVlan">vMotion VLAN ID</label>
+            <input type="number" id="vmotionVlan" min="0" max="4094" placeholder="optional">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="vmCidr">VM traffic CIDR</label>
+            <input type="text" id="vmCidr" placeholder="192.168.20.0/24">
+          </div>
+          <div class="field">
+            <label for="vmVlan">VM traffic VLAN ID</label>
+            <input type="number" id="vmVlan" min="0" max="4094" placeholder="optional">
+          </div>
+        </div>
+
+        <div class="field-row" id="vsan-network-row" hidden>
+          <div class="field">
+            <label for="vsanCidr">vSAN CIDR</label>
+            <input type="text" id="vsanCidr" placeholder="192.168.12.0/24">
+          </div>
+          <div class="field">
+            <label for="vsanVlan">vSAN VLAN ID</label>
+            <input type="number" id="vsanVlan" min="0" max="4094" placeholder="optional">
+          </div>
+        </div>
+        <p class="hint" id="vsan-network-hint" hidden>vSAN network appears here because it's switched on in the next step.</p>
+      </section>
+
+      <!-- Step 7: Nested cluster -->
+      <section class="step" data-step="7">
+        <h1>Size the nested cluster</h1>
+        <p class="step-intro">The wizard checks this against the physical RAM and CPU from step 2.</p>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="nestedHostCount">Nested ESXi hosts</label>
+            <input type="number" id="nestedHostCount" min="1" max="12" value="3">
+          </div>
+          <div class="field">
+            <label for="vcpuPerHost">vCPU per host</label>
+            <input type="number" id="vcpuPerHost" min="1" value="4">
+          </div>
+          <div class="field">
+            <label for="vramPerHostGB">vRAM per host (GB)</label>
+            <input type="number" id="vramPerHostGB" min="1" value="16">
+          </div>
+          <div class="field">
+            <label for="nestedDiskGB">Boot disk per host (GB)</label>
+            <input type="number" id="nestedDiskGB" min="8" value="32">
+          </div>
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="vsanEnabled"><span>Enable vSAN on this cluster</span></label>
+          <p class="hint">Needs at least 3 nested hosts to behave like a real vSAN cluster.</p>
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="legacyCpuCompat"><span>Apply legacy CPU compatibility (<code>monitor.allowLegacyCPU</code>)</span></label>
+          <p class="hint">Needed on some older host CPUs for nested ESXi to boot. Safe to enable even if you're not sure.</p>
+        </div>
+      </section>
+
+      <!-- Step 8: Nested host disk layout -->
+      <section class="step" data-step="8">
+        <h1>Nested host disk layout</h1>
+        <p class="step-intro">Virtual disks added to each nested ESXi host VM, on top of the boot disk. Configure vSAN capacity/cache and the local datastore for vCenter bootstrap here.</p>
+
+        <div class="field">
+          <p class="hint">Add one entry per disk role. vSAN capacity and cache disks are added to every nested host; the local datastore disk goes to host 1 only. Leave blank if your nested hosts only need a boot disk.</p>
+          <div id="nested-disk-list"></div>
+          <button type="button" id="add-nested-disk" class="btn btn-secondary" style="margin-top:4px;font-size:12.5px;padding:7px 12px;">+ Add disk</button>
+        </div>
+      </section>
+
+      <!-- Step 9: Workload VMs -->
+      <section class="step" data-step="9">
+        <h1>Deploy test workload VMs?</h1>
+        <p class="step-intro">Blank VM shells on the cluster for practising vMotion, DRS, and HA — no OS required, but you can install one later.</p>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="workloadVmsEnabled"><span>Deploy test workload VMs after the cluster is built</span></label>
+          <p class="hint">Generates a deploy-workloads.ps1 script that runs after vSAN is healthy. VMs have no OS but are useful for DRS/HA/vMotion practice.</p>
+        </div>
+
+        <div id="workload-fields" hidden>
+          <div class="field-row">
+            <div class="field">
+              <label for="workloadVmCount">Number of VMs</label>
+              <input type="number" id="workloadVmCount" min="1" max="20" value="3">
+            </div>
+            <div class="field">
+              <label>VM size</label>
+              <div class="choice-row">
+                <label class="choice-pill"><input type="radio" name="workloadVmSize" value="small"><span>Small &mdash; 2 vCPU / 4GB</span></label>
+                <label class="choice-pill"><input type="radio" name="workloadVmSize" value="medium"><span>Medium &mdash; 4 vCPU / 8GB</span></label>
+              </div>
+            </div>
+          </div>
+          <p class="hint" id="workload-sizing-note"></p>
+        </div>
+      </section>
+
+      <!-- Step 10: Security & access -->
+      <section class="step" data-step="10">
+        <h1>Security and remote access</h1>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="isolateLab"><span>Isolate the lab on its own segment</span></label>
+        </div>
+
+        <div class="field">
+          <label>Firewall policy</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="allow_all"><span>Allow all</span></label>
+            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="restricted"><span>Restrict to needed ports</span></label>
+            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="isolated"><span>Fully isolated</span></label>
+          </div>
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="internetAccess"><span>Nested VMs need outbound internet access</span></label>
+        </div>
+
+        <div class="field">
+          <label for="remoteAccessMethod">Remote access method</label>
+          <select id="remoteAccessMethod">
+            <option value="">Select&hellip;</option>
+            <option value="vpn">VPN into the home network</option>
+            <option value="ssh_jump">SSH jump host</option>
+            <option value="none">Local only, no remote access</option>
+            <option value="reverse_proxy">Reverse proxy</option>
+          </select>
+        </div>
+
+        <div class="field" id="vpn-type-field" hidden>
+          <label>VPN type</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="vpnType" value="wireguard"><span>WireGuard server VM</span></label>
+            <label class="choice-pill"><input type="radio" name="vpnType" value="vyos_site_to_site"><span>VyOS site-to-site</span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="vcenterSize">vCenter deployment size</label>
+          <select id="vcenterSize">
+            <option value="">Select&hellip;</option>
+            <option value="tiny">Tiny &mdash; up to 10 VMs</option>
+            <option value="small">Small &mdash; up to 100 VMs</option>
+            <option value="medium">Medium &mdash; up to 400 VMs</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Step 11: Review & generate -->
+      <section class="step" data-step="11">
+        <h1>Review and generate</h1>
+        <p class="step-intro">Checks out? Generate the spec, deployment scripts, and the design doc.</p>
+
+        <div id="review-summary" class="review-summary"></div>
+
+        <button type="button" id="btn-generate" class="btn btn-primary">Generate lab design</button>
+
+        <div id="results" class="results" hidden>
+          <div id="warnings-block" class="warnings-block" hidden></div>
+
+          <div class="downloads" id="downloads"></div>
+
+          <h2>Design doc preview</h2>
+          <pre id="markdown-preview" class="markdown-preview"></pre>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="nav">
+      <button type="button" id="btn-back" class="btn btn-ghost">Back</button>
+      <span id="step-error" class="step-error"></span>
+      <button type="button" id="btn-next" class="btn btn-primary">Next</button>
+    </div>
+
+  </main>
+
+  <aside class="topology" id="topology">
+    <h2>Live topology</h2>
+
+    <div class="topo-host" id="topo-host">
+      <div class="topo-host-label">Physical host</div>
+      <div class="topo-host-stats" id="topo-host-stats">
+        <span class="chip">&ndash; cores</span>
+        <span class="chip">&ndash; GB RAM</span>
+        <span class="chip">&ndash; storage</span>
+      </div>
+    </div>
+
+    <div id="topo-appliances" class="topo-appliances"></div>
+
+    <div class="topo-nested" id="topo-nested"></div>
+
+    <div class="topo-networks" id="topo-networks"></div>
+  </aside>
+
+</div>
+
+<script src="wizard.js"></script>
+</body>
+</html>
