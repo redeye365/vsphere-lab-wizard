@@ -267,6 +267,7 @@
           <div class="field">
             <label for="nestedHostCount">Nested ESXi hosts</label>
             <input type="number" id="nestedHostCount" min="1" max="12" value="3">
+            <p class="hint hint-info" id="host-count-vcf-note" hidden>VCF management domain designs typically need 4 hosts (3 minimum with vSAN ESA). Worth knowing now if you might layer VCF on top later.</p>
           </div>
           <div class="field">
             <label for="vcpuPerHost">vCPU per host</label>
@@ -285,6 +286,32 @@
         <div class="field checkbox-field">
           <label class="checkbox-row"><input type="checkbox" id="vsanEnabled"><span>Enable vSAN on this cluster</span></label>
           <p class="hint">Needs at least 3 nested hosts to behave like a real vSAN cluster.</p>
+        </div>
+
+        <div id="vsan-arch-field" hidden>
+          <div class="field">
+            <label>vSAN storage architecture</label>
+            <div class="radio-group">
+              <label class="radio-row"><input type="radio" name="vsanArch" value="esa" checked><span>ESA — Express Storage Architecture (recommended)</span></label>
+              <label class="radio-row"><input type="radio" name="vsanArch" value="osa"><span>OSA — Original Storage Architecture (legacy)</span></label>
+            </div>
+            <p class="hint" id="vsan-esa-hint">ESA is the current architecture: single storage tier, no cache/capacity split, requires all-flash (NVMe or fast SSD). OSA is being phased down in favour of ESA.</p>
+            <p class="hint" id="vsan-osa-hint" hidden>OSA uses a two-tier design: cache (SSD/NVMe) + capacity (any disk). Use this only if your storage can't meet ESA requirements.</p>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="clusterName">vSphere cluster name</label>
+            <input type="text" id="clusterName" value="mgmt-cluster">
+            <p class="hint">Used in all generated scripts. If you might layer VCF on top later, keep a professional name now — <code>mgmt-cluster</code> matches the VCF reference architecture.</p>
+          </div>
+          <div class="field">
+            <label for="ssoDomain">vCenter SSO domain</label>
+            <input type="text" id="ssoDomain" value="vsphere.local">
+            <p class="hint">Keep this distinct from your Active Directory domain. Colliding SSO and AD domain names have caused real VCF bring-up failures.</p>
+            <p class="hint hint-warning" id="sso-collision-warning" hidden>SSO domain matches or overlaps with the AD domain. Use a clearly distinct SSO domain (e.g. <code>vsphere.local</code>) and a separate AD domain (e.g. <code>lab.company.com</code>).</p>
+          </div>
         </div>
 
         <div class="field checkbox-field">

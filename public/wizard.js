@@ -76,6 +76,8 @@ const state = {
       vmCidr: null, vmVlan: null,
       vsanEnabled: false, vsanCidr: null, vsanVlan: null,
       nestedHostCount: 3, vcpuPerHost: 4, vramPerHostGB: 16, nestedDiskGB: 32,
+      clusterName: 'mgmt-cluster', datacenterName: 'Lab-DC', ssoDomain: 'vsphere.local',
+      vsanArch: 'esa',
       legacyCpuCompat: false,
       memTieringEnabled: false, nvmeSizeGB: 100, tierNvmePct: 25,
       workloadVmsEnabled: false, workloadVmCount: 3, workloadVmSize: 'small',
@@ -177,7 +179,7 @@ function wireForm() {
     document.getElementById('dc-fields').hidden = !g.dcEnabled;
     onChange();
   });
-  bindText('dcDomainName', g, 'dcDomainName', onChange);
+  bindText('dcDomainName', g, 'dcDomainName', () => { checkSsoCollision(); onChange(); });
   bindText('dcIpAddress', g, 'dcIpAddress', onChange);
 
   bindRadio('networkType', d, 'networkType', onChange);
@@ -217,7 +219,37 @@ function wireForm() {
     g.vsanEnabled = e.target.checked;
     document.getElementById('vsan-network-row').hidden = !g.vsanEnabled;
     document.getElementById('vsan-network-hint').hidden = !g.vsanEnabled;
+    document.getElementById('vsan-arch-field').hidden = !g.vsanEnabled;
     onChange();
+  });
+  bindRadio('vsanArch', g, 'vsanArch', () => {
+    const esa = g.vsanArch !== 'osa';
+    document.getElementById('vsan-esa-hint').hidden = !esa;
+    document.getElementById('vsan-osa-hint').hidden = esa;
+    onChange();
+  });
+
+  bindText('clusterName', g, 'clusterName', onChange);
+
+  function checkSsoCollision() {
+    const sso = (g.ssoDomain || '').toLowerCase().trim();
+    const ad = (g.dcDomainName || '').toLowerCase().trim();
+    const collides = ad.length > 0 && (
+      sso === ad || sso.endsWith('.' + ad) || ad.endsWith('.' + sso)
+    );
+    document.getElementById('sso-collision-warning').hidden = !collides;
+  }
+  const ssoDomainEl = document.getElementById('ssoDomain');
+  ssoDomainEl.addEventListener('input', () => {
+    g.ssoDomain = ssoDomainEl.value.trim() || 'vsphere.local';
+    checkSsoCollision();
+    onChange();
+  });
+
+  // host count → VCF headroom note
+  document.getElementById('nestedHostCount').addEventListener('input', () => {
+    const note = document.getElementById('host-count-vcf-note');
+    if (note) note.hidden = (g.nestedHostCount || 0) >= 3;
   });
   bindCheckbox('legacyCpuCompat', g, 'legacyCpuCompat', onChange);
 
@@ -718,7 +750,9 @@ function renderReview() {
     ['vCPU / host', val(g.vcpuPerHost)],
     ['vRAM / host', val(g.vramPerHostGB, 'GB')],
     ['Boot disk', val(g.nestedDiskGB, 'GB')],
-    ['vSAN', g.vsanEnabled ? 'Enabled' : 'Disabled'],
+    ['Cluster name', val(g.clusterName)],
+    ['SSO domain', val(g.ssoDomain)],
+    ['vSAN', g.vsanEnabled ? `Enabled (${g.vsanArch === 'osa' ? 'OSA' : 'ESA'})` : 'Disabled'],
     ['Legacy CPU compat', g.legacyCpuCompat ? 'Enabled' : 'Disabled'],
     ['Memory tiering', g.memTieringEnabled ? `${g.nvmeSizeGB}GB NVMe / ${g.tierNvmePct}%` : 'Disabled']
   ]));

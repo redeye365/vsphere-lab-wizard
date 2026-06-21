@@ -207,6 +207,12 @@ select:focus {
   color: var(--text-faint);
   margin: 6px 0 0;
 }
+.hint.hint-warning {
+  color: #b45309;
+}
+.hint.hint-info {
+  color: #1d4ed8;
+}
 
 /* radio cards (use case) */
 
