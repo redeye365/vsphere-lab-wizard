@@ -54,7 +54,8 @@ const SCRIPT_LABELS = {
   'deploy-workloads': 'deploy-workloads.ps1',
   'jumpbox-deploy': 'jumpbox-deploy.ps1',
   'wireguard-server': 'wireguard-server.sh',
-  'vyos-site-to-site': 'vyos-site-to-site.conf'
+  'vyos-site-to-site': 'vyos-site-to-site.conf',
+  'memory-tiering': 'configure-memory-tiering.ps1'
 };
 
 const state = {
@@ -70,12 +71,13 @@ const state = {
       esxiVersion: null,
       vyosEnabled: false, vyosNetworkMode: null,
       dcEnabled: false, dcDomainName: null, dcIpAddress: null,
-      mgmtCidr: null, mgmtVlan: null,
+      mgmtCidr: null, mgmtVlan: null, mgmtVlanMode: 'untagged',
       vmotionCidr: null, vmotionVlan: null,
       vmCidr: null, vmVlan: null,
       vsanEnabled: false, vsanCidr: null, vsanVlan: null,
       nestedHostCount: 3, vcpuPerHost: 4, vramPerHostGB: 16, nestedDiskGB: 32,
       legacyCpuCompat: false,
+      memTieringEnabled: false, nvmeSizeGB: 100, tierNvmePct: 25,
       workloadVmsEnabled: false, workloadVmCount: 3, workloadVmSize: 'small',
       nestedDisks: [],
       isolateLab: false, firewallPolicy: null, internetAccess: false,
@@ -183,6 +185,21 @@ function wireForm() {
   bindRadio('dhcpAvailable', d, 'dhcpAvailable', onChange, (v) => v === 'yes');
 
   bindText('mgmtCidr', g, 'mgmtCidr', onChange);
+
+  // VLAN mode radio — toggles VLAN ID field visibility
+  document.querySelectorAll('input[name="mgmtVlanMode"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (el.checked) {
+        g.mgmtVlanMode = el.value;
+        const tagged = el.value === 'tagged';
+        document.getElementById('mgmt-vlan-id-field').hidden = !tagged;
+        document.getElementById('mgmt-vlan-hint-untagged').hidden = tagged;
+        document.getElementById('mgmt-vlan-hint-tagged').hidden = !tagged;
+        if (!tagged) g.mgmtVlan = null;
+        onChange();
+      }
+    });
+  });
   bindNumber('mgmtVlan', g, 'mgmtVlan', onChange);
   bindText('vmotionCidr', g, 'vmotionCidr', onChange);
   bindNumber('vmotionVlan', g, 'vmotionVlan', onChange);
@@ -203,6 +220,15 @@ function wireForm() {
     onChange();
   });
   bindCheckbox('legacyCpuCompat', g, 'legacyCpuCompat', onChange);
+
+  // Memory tiering (step 7)
+  document.getElementById('memTieringEnabled').addEventListener('change', (e) => {
+    g.memTieringEnabled = e.target.checked;
+    document.getElementById('mem-tiering-fields').hidden = !g.memTieringEnabled;
+    onChange();
+  });
+  bindNumber('nvmeSizeGB', g, 'nvmeSizeGB', onChange);
+  bindNumber('tierNvmePct', g, 'tierNvmePct', onChange);
 
   // Nested disk list (step 8)
   renderNestedDisks(onChange);
@@ -414,7 +440,9 @@ function validateStep(n) {
       }
       return null;
     case 6:
-      return g.mgmtCidr ? null : 'Management CIDR is needed at minimum.';
+      if (!g.mgmtCidr) return 'Management CIDR is needed at minimum.';
+      if (g.mgmtVlanMode === 'tagged' && !g.mgmtVlan) return 'Tagged mode requires a management VLAN ID.';
+      return null;
     case 7:
       if (!g.nestedHostCount || !g.vcpuPerHost || !g.vramPerHostGB) {
         return 'Nested host count, vCPU, and vRAM per host are all needed.';
@@ -676,7 +704,7 @@ function renderReview() {
   ]));
 
   const netRows = [
-    ['Management', `${val(g.mgmtCidr)} ${g.mgmtVlan != null ? `(VLAN ${g.mgmtVlan})` : ''}`.trim()],
+    ['Management', `${val(g.mgmtCidr)} ${g.mgmtVlanMode === 'tagged' ? `VLAN ${g.mgmtVlan || '?'} (tagged)` : '(untagged)'}`.trim()],
     ['vMotion', `${val(g.vmotionCidr)} ${g.vmotionVlan != null ? `(VLAN ${g.vmotionVlan})` : ''}`.trim()],
     ['VM traffic', `${val(g.vmCidr)} ${g.vmVlan != null ? `(VLAN ${g.vmVlan})` : ''}`.trim()]
   ];
@@ -691,7 +719,8 @@ function renderReview() {
     ['vRAM / host', val(g.vramPerHostGB, 'GB')],
     ['Boot disk', val(g.nestedDiskGB, 'GB')],
     ['vSAN', g.vsanEnabled ? 'Enabled' : 'Disabled'],
-    ['Legacy CPU compat', g.legacyCpuCompat ? 'Enabled' : 'Disabled']
+    ['Legacy CPU compat', g.legacyCpuCompat ? 'Enabled' : 'Disabled'],
+    ['Memory tiering', g.memTieringEnabled ? `${g.nvmeSizeGB}GB NVMe / ${g.tierNvmePct}%` : 'Disabled']
   ]));
 
   const ndisks = g.nestedDisks || [];
@@ -790,7 +819,7 @@ function renderDownloads(id, generatedScripts, svgGenerated) {
   // Script files in deployment order
   const scriptOrder = [
     'vyos-deploy', 'dc-deploy', 'deploy-lab', 'vcenter-deploy',
-    'vsan-cluster', 'deploy-workloads',
+    'vsan-cluster', 'deploy-workloads', 'memory-tiering',
     'jumpbox-deploy', 'wireguard-server', 'vyos-site-to-site'
   ];
   for (const kind of scriptOrder) {

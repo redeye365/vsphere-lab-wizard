@@ -209,8 +209,17 @@
             <input type="text" id="mgmtCidr" placeholder="192.168.10.0/24">
           </div>
           <div class="field">
+            <label>Management VLAN mode</label>
+            <div class="radio-group">
+              <label class="radio-row"><input type="radio" name="mgmtVlanMode" value="untagged" checked><span>Untagged (simpler — VLAN 0)</span></label>
+              <label class="radio-row"><input type="radio" name="mgmtVlanMode" value="tagged"><span>Tagged (best practice)</span></label>
+            </div>
+            <p class="hint" id="mgmt-vlan-hint-untagged">Management traffic runs on native VLAN. Port group, VyOS, and nested vmk0 all untagged.</p>
+            <p class="hint" id="mgmt-vlan-hint-tagged" hidden>All three layers must use the same VLAN ID: physical port group, VyOS <code>eth1 vif N</code>, and nested vmk0.</p>
+          </div>
+          <div class="field" id="mgmt-vlan-id-field" hidden>
             <label for="mgmtVlan">Management VLAN ID</label>
-            <input type="number" id="mgmtVlan" min="0" max="4094" placeholder="optional">
+            <input type="number" id="mgmtVlan" min="1" max="4094" placeholder="e.g. 10">
           </div>
         </div>
 
@@ -281,6 +290,25 @@
         <div class="field checkbox-field">
           <label class="checkbox-row"><input type="checkbox" id="legacyCpuCompat"><span>Apply legacy CPU compatibility (<code>monitor.allowLegacyCPU</code>)</span></label>
           <p class="hint">Needed on some older host CPUs for nested ESXi to boot. Safe to enable even if you're not sure.</p>
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="memTieringEnabled"><span>Configure NVMe-based memory tiering</span></label>
+          <p class="hint">Adds a virtual NVMe disk to each nested host and generates a <code>configure-memory-tiering.ps1</code> script. Useful for practising the ESXi 8 memory tiering feature. The NVMe is virtual — no real performance benefit, but the config workflow is identical.</p>
+        </div>
+
+        <div id="mem-tiering-fields" hidden>
+          <div class="field-row">
+            <div class="field">
+              <label for="nvmeSizeGB">NVMe tier disk per host (GB)</label>
+              <input type="number" id="nvmeSizeGB" min="10" value="100">
+            </div>
+            <div class="field">
+              <label for="tierNvmePct">Memory tier percentage (%)</label>
+              <input type="number" id="tierNvmePct" min="1" max="100" value="25">
+              <p class="hint">Percentage of host memory that will be backed by the NVMe tier.</p>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -85,7 +85,8 @@ const SCRIPT_KINDS = {
   'deploy-workloads':    'deploy-workloads.ps1',
   'jumpbox-deploy':      'jumpbox-deploy.ps1',
   'wireguard-server':    'wireguard-server.sh',
-  'vyos-site-to-site':   'vyos-site-to-site.conf'
+  'vyos-site-to-site':   'vyos-site-to-site.conf',
+  'memory-tiering':      'configure-memory-tiering.ps1'
 };
 
 const ALL_OUTPUT_FILES = { ...FIXED_OUTPUT_FILES, ...SCRIPT_KINDS };

@@ -12,5 +12,8 @@
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.15.0"
   }
 }
