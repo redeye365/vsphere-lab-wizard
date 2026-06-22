@@ -15,6 +15,7 @@ const { buildPowerShellScripts } = require('./lib/generatePowerShell');
 const { buildMarkdown } = require('./lib/generateMarkdown');
 const { buildBuildGuide } = require('./lib/generateBuildGuide');
 const { buildPrerequisites } = require('./lib/generatePrerequisites');
+const { buildDepotFiles } = require('./lib/generateDepot');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { evaluateSizing } = require('./lib/sizing');
 
@@ -88,7 +89,11 @@ const SCRIPT_KINDS = {
   'jumpbox-deploy':      'jumpbox-deploy.ps1',
   'wireguard-server':    'wireguard-server.sh',
   'vyos-site-to-site':   'vyos-site-to-site.conf',
-  'memory-tiering':      'configure-memory-tiering.ps1'
+  'memory-tiering':      'configure-memory-tiering.ps1',
+  'depot-deploy':        'depot-deploy.ps1',
+  'depot-configure':     'depot-configure.sh',
+  'depot-iis':           'depot-iis.ps1',
+  'depot-instructions':  'depot-instructions.md'
 };
 
 const ALL_OUTPUT_FILES = { ...FIXED_OUTPUT_FILES, ...SCRIPT_KINDS };
@@ -108,6 +113,8 @@ app.post('/api/generate', (req, res) => {
     fs.mkdirSync(dir, { recursive: true });
 
     const prerequisites = buildPrerequisites(spec);
+    const depotFiles = buildDepotFiles(spec);
+    const generatedScripts = [];
 
     fs.writeFileSync(path.join(dir, 'lab-spec.json'), JSON.stringify(spec, null, 2));
     fs.writeFileSync(path.join(dir, 'design-doc.md'), designDoc);
@@ -118,9 +125,15 @@ app.post('/api/generate', (req, res) => {
     const mermaidDiagram = buildMermaidDiagram(spec);
     const svgGenerated = renderSvg(mermaidDiagram, path.join(dir, 'network-diagram.svg'));
 
-    // Write each generated script; track which kinds are present for the frontend
-    const generatedScripts = [];
+    // Write each generated PowerShell/bash script
     for (const [filename, content] of Object.entries(scripts)) {
+      fs.writeFileSync(path.join(dir, filename), content);
+      const kind = Object.entries(SCRIPT_KINDS).find(([, fn]) => fn === filename)?.[0];
+      if (kind) generatedScripts.push(kind);
+    }
+
+    // Depot files (only when depot is enabled and conditions met in spec)
+    for (const [filename, content] of Object.entries(depotFiles)) {
       fs.writeFileSync(path.join(dir, filename), content);
       const kind = Object.entries(SCRIPT_KINDS).find(([, fn]) => fn === filename)?.[0];
       if (kind) generatedScripts.push(kind);

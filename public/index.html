@@ -25,9 +25,10 @@
       <li data-step="6"><span class="rail-num">07</span><span>Lab networks</span></li>
       <li data-step="7"><span class="rail-num">08</span><span>Nested cluster</span></li>
       <li data-step="8"><span class="rail-num">09</span><span>Nested disks</span></li>
-      <li data-step="9"><span class="rail-num">10</span><span>Workload VMs</span></li>
-      <li data-step="10"><span class="rail-num">11</span><span>Security &amp; access</span></li>
-      <li data-step="11"><span class="rail-num">12</span><span>Review &amp; generate</span></li>
+      <li data-step="9"><span class="rail-num">10</span><span>Bundle depot</span></li>
+      <li data-step="10"><span class="rail-num">11</span><span>Workload VMs</span></li>
+      <li data-step="11"><span class="rail-num">12</span><span>Security &amp; access</span></li>
+      <li data-step="12"><span class="rail-num">13</span><span>Review &amp; generate</span></li>
     </ol>
   </aside>
 
@@ -198,6 +199,7 @@
 
       <!-- Step 6: Lab networks -->
       <section class="step" data-step="6">
+
         <h1>Lay out the lab's networks</h1>
         <p class="step-intro">Each one becomes its own tagged port group on the physical vSwitch.</p>
 
@@ -351,8 +353,38 @@
         </div>
       </section>
 
-      <!-- Step 9: Workload VMs -->
+      <!-- Step 9: Bundle depot (conditional — shown only when vSAN + local datastore both configured) -->
       <section class="step" data-step="9">
+        <h1>VCF bundle depot?</h1>
+        <p class="step-intro">A local HTTPS file server hosting VCF bundles on your LAN. During VCF bring-up, SDDC Manager downloads bundles from Broadcom's CDN — a local depot gives LAN-speed downloads instead and enables air-gapped deployments.</p>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="depotEnabled"><span>Deploy a local bundle depot for VCF offline deployments</span></label>
+          <p class="hint hint-info">This sets up the depot server infrastructure only. Downloading the actual VCF bundles from Broadcom's portal and populating the depot is a manual step covered in <code>depot-instructions.md</code>. VCF bring-up itself is out of scope for v1 of this wizard.</p>
+        </div>
+
+        <div id="depot-fields" hidden>
+          <div class="field">
+            <label>Deployment option</label>
+            <div class="radio-group">
+              <label class="radio-row"><input type="radio" name="depotMode" value="linux" checked><span>Dedicated Linux VM with nginx (recommended)</span></label>
+              <label class="radio-row"><input type="radio" name="depotMode" value="iis"><span>Use the existing DC with IIS (saves a VM — requires domain controller)</span></label>
+            </div>
+            <p class="hint" id="depot-linux-hint">Small Ubuntu VM: 2 vCPU / 4GB RAM / 100GB disk on host 1's local datastore. nginx serves bundles over HTTPS with a self-signed cert. Generates <code>depot-deploy.ps1</code> and <code>depot-configure.sh</code>.</p>
+            <p class="hint" id="depot-iis-hint" hidden>Installs IIS on the existing domain controller and configures HTTPS using a Windows self-signed cert. No extra VM needed. Generates <code>depot-iis.ps1</code>.</p>
+            <p class="hint hint-warning" id="depot-iis-no-dc-warning" hidden>IIS mode requires a domain controller — enable the DC in step 5 or switch to Linux/nginx mode.</p>
+          </div>
+
+          <div class="field">
+            <label for="depotIpAddress">Depot IP address</label>
+            <input type="text" id="depotIpAddress" placeholder="e.g. 192.168.10.20">
+            <p class="hint">Must be in the management network range. Used in the depot URL: <code>https://&lt;ip&gt;/depot/</code></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 10: Workload VMs -->
+      <section class="step" data-step="10">
         <h1>Deploy test workload VMs?</h1>
         <p class="step-intro">Blank VM shells on the cluster for practising vMotion, DRS, and HA — no OS required, but you can install one later.</p>
 
@@ -379,8 +411,8 @@
         </div>
       </section>
 
-      <!-- Step 10: Security & access -->
-      <section class="step" data-step="10">
+      <!-- Step 11: Security & access -->
+      <section class="step" data-step="11">
         <h1>Security and remote access</h1>
 
         <div class="field checkbox-field">
@@ -430,8 +462,8 @@
         </div>
       </section>
 
-      <!-- Step 11: Review & generate -->
-      <section class="step" data-step="11">
+      <!-- Step 12: Review & generate -->
+      <section class="step" data-step="12">
         <h1>Review and generate</h1>
         <p class="step-intro">Checks out? Generate the spec, deployment scripts, and the design doc.</p>
 

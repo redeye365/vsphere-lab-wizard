@@ -1,7 +1,8 @@
 // public/wizard.js
 // No build step, no dependencies. Runs entirely against the Express API.
 
-const TOTAL_STEPS = 12;
+const TOTAL_STEPS = 13;
+const DEPOT_STEP = 9; // skipped when vSAN + local datastore not both configured
 
 const USE_CASE_LABELS = {
   certification: 'Certification study',
@@ -56,7 +57,11 @@ const SCRIPT_LABELS = {
   'jumpbox-deploy': 'jumpbox-deploy.ps1',
   'wireguard-server': 'wireguard-server.sh',
   'vyos-site-to-site': 'vyos-site-to-site.conf',
-  'memory-tiering': 'configure-memory-tiering.ps1'
+  'memory-tiering': 'configure-memory-tiering.ps1',
+  'depot-deploy':       'depot-deploy.ps1',
+  'depot-configure':    'depot-configure.sh',
+  'depot-iis':          'depot-iis.ps1',
+  'depot-instructions': 'depot-instructions.md'
 };
 
 const state = {
@@ -76,6 +81,7 @@ const state = {
       vmotionCidr: null, vmotionVlan: null,
       vmCidr: null, vmVlan: null,
       vsanEnabled: false, vsanCidr: null, vsanVlan: null,
+      depotEnabled: false, depotMode: 'linux', depotIpAddress: null,
       nestedHostCount: 3, vcpuPerHost: 4, vramPerHostGB: 16, nestedDiskGB: 32,
       clusterName: 'mgmt-cluster', datacenterName: 'Lab-DC', ssoDomain: 'vsphere.local',
       vsanArch: 'esa',
@@ -137,6 +143,13 @@ function bindRadio(name, obj, key, onChange, transform) {
       }
     });
   });
+}
+
+// Depot step is only relevant when vSAN is enabled AND a local_datastore disk is configured.
+function depotStepVisible() {
+  const g = state.answers.design;
+  const hasLocalDs = (g.nestedDisks || []).some((d) => d.purpose === 'local_datastore');
+  return !!g.vsanEnabled && hasLocalDs;
 }
 
 function wireForm() {
@@ -298,6 +311,27 @@ function wireForm() {
   });
   bindRadio('vpnType', g, 'vpnType', onChange);
   bindSelect('vcenterSize', g, 'vcenterSize', onChange);
+
+  // Bundle depot (step 9)
+  const depotCheckbox = document.getElementById('depotEnabled');
+  depotCheckbox.addEventListener('change', () => {
+    g.depotEnabled = depotCheckbox.checked;
+    document.getElementById('depot-fields').hidden = !g.depotEnabled;
+    onChange();
+  });
+  document.querySelectorAll('input[name="depotMode"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (el.checked) {
+        g.depotMode = el.value;
+        const isIis = el.value === 'iis';
+        document.getElementById('depot-linux-hint').hidden = isIis;
+        document.getElementById('depot-iis-hint').hidden = !isIis;
+        document.getElementById('depot-iis-no-dc-warning').hidden = !(isIis && !g.dcEnabled);
+        onChange();
+      }
+    });
+  });
+  bindText('depotIpAddress', g, 'depotIpAddress', onChange);
 }
 
 function renderStorageDevices(onChange) {
@@ -505,12 +539,15 @@ function validateStep(n) {
       return null;
     }
     case 9:
+      // Depot step — only reached when depotStepVisible(); no required fields
+      return null;
+    case 10:
       if (g.workloadVmsEnabled) {
         if (!g.workloadVmCount || g.workloadVmCount < 1) return 'Enter the number of workload VMs.';
         if (!g.workloadVmSize) return 'Select a workload VM size.';
       }
       return null;
-    case 10:
+    case 11:
       if (g.remoteAccessMethod === 'vpn' && !g.vpnType) {
         return 'Select a VPN type (WireGuard or VyOS site-to-site) to continue.';
       }
@@ -539,6 +576,18 @@ function showStep(n) {
   updateDcNotice();
 }
 
+function getNextStep(n) {
+  const next = n + 1;
+  if (next === DEPOT_STEP && !depotStepVisible()) return next + 1;
+  return next;
+}
+
+function getPrevStep(n) {
+  const prev = n - 1;
+  if (prev === DEPOT_STEP && !depotStepVisible()) return prev - 1;
+  return prev;
+}
+
 function wireNav() {
   document.getElementById('btn-next').addEventListener('click', () => {
     const err = validateStep(state.step);
@@ -546,11 +595,11 @@ function wireNav() {
       document.getElementById('step-error').textContent = err;
       return;
     }
-    if (state.step < TOTAL_STEPS - 1) showStep(state.step + 1);
+    if (state.step < TOTAL_STEPS - 1) showStep(getNextStep(state.step));
   });
 
   document.getElementById('btn-back').addEventListener('click', () => {
-    if (state.step > 0) showStep(state.step - 1);
+    if (state.step > 0) showStep(getPrevStep(state.step));
   });
 
   document.querySelectorAll('#rail-steps li').forEach((li) => {
@@ -628,6 +677,12 @@ function renderTopology() {
     const a = document.createElement('div');
     a.className = 'topo-appliance';
     a.textContent = `dc${g.dcDomainName ? ' · ' + g.dcDomainName : ''}`;
+    appliancesEl.appendChild(a);
+  }
+  if (g.depotEnabled && depotStepVisible()) {
+    const a = document.createElement('div');
+    a.className = 'topo-appliance';
+    a.textContent = `depot${g.depotIpAddress ? ' · ' + g.depotIpAddress : ''} (${g.depotMode === 'iis' ? 'IIS' : 'nginx'})`;
     appliancesEl.appendChild(a);
   }
 
@@ -777,9 +832,14 @@ function renderReview() {
   }
 
   const localDsEnabled = (g.nestedDisks || []).some((d) => d.purpose === 'local_datastore');
-  container.appendChild(reviewGroup('Infrastructure', [
-    ['Local datastore on host 1', localDsEnabled ? 'Yes' : 'No']
-  ]));
+  const infraRows = [['Local datastore on host 1', localDsEnabled ? 'Yes' : 'No']];
+  if (depotStepVisible() && g.depotEnabled) {
+    infraRows.push(['Bundle depot', g.depotMode === 'iis' ? 'IIS on DC' : 'Linux/nginx VM']);
+    infraRows.push(['Depot IP', val(g.depotIpAddress)]);
+  } else if (depotStepVisible() && !g.depotEnabled) {
+    infraRows.push(['Bundle depot', 'Not deployed']);
+  }
+  container.appendChild(reviewGroup('Infrastructure', infraRows));
 
   const accessRows = [
     ['Isolated segment', g.isolateLab ? 'Yes' : 'No'],
@@ -799,7 +859,7 @@ function renderReview() {
     if (!hasVsanCapacity) {
       const warn = document.createElement('div');
       warn.className = 'review-warn';
-      warn.textContent = 'vSAN is enabled but no vSAN capacity disk is defined in the nested host disk layout. The cluster formation script will fail without a disk to claim. Go back to step 9 and add a vSAN capacity disk.';
+      warn.textContent = 'vSAN is enabled but no vSAN capacity disk is defined in the nested host disk layout. The cluster formation script will fail without a disk to claim. Go back to step 8 (Nested disks) and add a vSAN capacity disk.';
       container.appendChild(warn);
     }
   }
@@ -846,6 +906,9 @@ function renderDownloads(id, generatedScripts, svgGenerated) {
   container.appendChild(makeLink('spec'));
   container.appendChild(makeLink('design-doc'));
   container.appendChild(makeLink('build-guide'));
+  if (generatedScripts.includes('depot-instructions')) {
+    container.appendChild(makeLink('depot-instructions'));
+  }
 
   // SVG diagram — only when mmdc rendered it successfully
   if (svgGenerated) {
@@ -855,8 +918,9 @@ function renderDownloads(id, generatedScripts, svgGenerated) {
   // Script files in deployment order
   const scriptOrder = [
     'vyos-deploy', 'dc-deploy', 'deploy-lab', 'vcenter-deploy',
-    'vsan-cluster', 'deploy-workloads', 'memory-tiering',
-    'jumpbox-deploy', 'wireguard-server', 'vyos-site-to-site'
+    'vsan-cluster', 'memory-tiering',
+    'depot-deploy', 'depot-configure', 'depot-iis',
+    'deploy-workloads', 'jumpbox-deploy', 'wireguard-server', 'vyos-site-to-site'
   ];
   for (const kind of scriptOrder) {
     if (generatedScripts.includes(kind)) container.appendChild(makeLink(kind));
