@@ -45,6 +45,7 @@ const SCRIPT_LABELS = {
   'spec':             'lab-spec.json',
   'design-doc':       'design-doc.md',
   'build-guide':      'build-guide.md',
+  'prerequisites':    'PREREQUISITES.md',
   'network-diagram':  'network-diagram.svg',
   'deploy-lab':       'deploy-lab.ps1',
   'vyos-deploy': 'vyos-deploy.ps1',
@@ -841,6 +842,7 @@ function renderDownloads(id, generatedScripts, svgGenerated) {
   }
 
   // Always-present reference files
+  container.appendChild(makeLink('prerequisites'));
   container.appendChild(makeLink('spec'));
   container.appendChild(makeLink('design-doc'));
   container.appendChild(makeLink('build-guide'));

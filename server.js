@@ -14,6 +14,7 @@ const { buildSpec } = require('./lib/generateSpec');
 const { buildPowerShellScripts } = require('./lib/generatePowerShell');
 const { buildMarkdown } = require('./lib/generateMarkdown');
 const { buildBuildGuide } = require('./lib/generateBuildGuide');
+const { buildPrerequisites } = require('./lib/generatePrerequisites');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { evaluateSizing } = require('./lib/sizing');
 
@@ -72,6 +73,7 @@ const FIXED_OUTPUT_FILES = {
   spec:              'lab-spec.json',
   'design-doc':      'design-doc.md',
   'build-guide':     'build-guide.md',
+  'prerequisites':   'PREREQUISITES.md',
   'network-diagram': 'network-diagram.svg'
 };
 
@@ -105,9 +107,12 @@ app.post('/api/generate', (req, res) => {
     const dir = path.join(OUTPUT_DIR, id);
     fs.mkdirSync(dir, { recursive: true });
 
+    const prerequisites = buildPrerequisites(spec);
+
     fs.writeFileSync(path.join(dir, 'lab-spec.json'), JSON.stringify(spec, null, 2));
     fs.writeFileSync(path.join(dir, 'design-doc.md'), designDoc);
     fs.writeFileSync(path.join(dir, 'build-guide.md'), buildGuide);
+    fs.writeFileSync(path.join(dir, 'PREREQUISITES.md'), prerequisites);
 
     // Attempt SVG network diagram (requires mmdc / @mermaid-js/mermaid-cli)
     const mermaidDiagram = buildMermaidDiagram(spec);
