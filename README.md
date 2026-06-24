@@ -18,7 +18,7 @@ Run the wizard and click **Generate** — it writes the following to an output f
 | `design-doc.md` | Written explanation of every design decision and why it was made |
 | `build-guide.md` | Step-by-step deployment guide in order, with manual steps clearly flagged |
 | `lab-spec.json` | The full design as structured JSON — machine-readable, diff-able |
-| `network-diagram.svg` | Topology diagram (requires `@mermaid-js/mermaid-cli`, see below) |
+| `network-diagram.svg` | SVG topology diagram *(requires mmdc — see below; Mermaid source always in build-guide.md)* |
 | `deploy-lab.ps1` | Creates port groups on the physical vSwitch, deploys nested ESXi VM shells |
 | `vyos-deploy.ps1` | Deploys the VyOS virtual router VM *(if VyOS chosen)* |
 | `dc-deploy.ps1` | Deploys the Windows Server domain controller VM *(if DC chosen)* |
@@ -72,11 +72,21 @@ Required only to run the wizard itself — not needed on the machine where you r
 
 Download from [nodejs.org](https://nodejs.org) or `brew install node`.
 
-### @mermaid-js/mermaid-cli (optional)
+### @mermaid-js/mermaid-cli (optional — SVG export only)
 
-Required for SVG network diagram generation. Without it, the diagram step is silently skipped and the SVG download button does not appear.
+The Mermaid diagram source for your lab topology is **always included** in `build-guide.md` as a fenced code block. Paste it into [mermaid.live](https://mermaid.live) to view the diagram without any extra software.
 
-Already configured as a devDependency — `npm install` handles it automatically.
+`@mermaid-js/mermaid-cli` (mmdc) is only needed if you want the `network-diagram.svg` file download. Without it, the SVG download button does not appear — everything else works normally.
+
+**If running from source** (`npm start`): mmdc is already in devDependencies and is installed by `npm install` automatically.
+
+**If running the standalone executable** (`dist/vsphere-lab-wizard-*`): mmdc cannot be bundled into the executable. It uses Puppeteer which requires a headless Chromium binary (~170 MB per platform) — too large and platform-specific to embed. Install it separately if you want SVG export:
+
+```sh
+npm install -g @mermaid-js/mermaid-cli
+```
+
+Then restart the wizard — SVG export will be available on the next Generate. The startup log will confirm: `Network diagram: SVG generation enabled`.
 
 ---
 
@@ -183,7 +193,7 @@ The wizard runs entirely locally. No data leaves your machine.
 - **VCF / SDDC Manager out of scope.** The wizard is designed to produce a vSphere foundation that *could* have VCF layered on top later (correct SSO domain, DNS PTR records, NTP single-source, cluster naming, vSAN ESA) but does not deploy VCF itself.
 - **Interactive ESXi install is still manual.** `deploy-lab.ps1` creates the VM shells and attaches the ISO; you power on each VM and step through the installer.
 - **vCenter first-boot is still manual.** `vcenter-deploy.ps1` deploys the OVA; the ~20-minute first-boot configurator runs inside the appliance.
-- **SVG diagram requires mermaid-cli.** `npm install` handles this automatically as a devDependency.
+- **SVG diagram requires mmdc.** The Mermaid source is always in build-guide.md; SVG export requires mmdc installed separately (see above). Not bundled in the standalone executable.
 - **Single physical host assumed.** Nested VM shell placement across multiple physical hosts is not yet implemented.
 - **NSX, Aria, and HCX are out of scope.** Deliberate scope cut for v1.
 

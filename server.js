@@ -41,9 +41,18 @@ function findMmdc() {
 
 const MMDC = findMmdc();
 if (MMDC) {
-  console.log(`mmdc found at: ${MMDC} — SVG diagram generation enabled`);
+  console.log('Network diagram: SVG generation enabled (mmdc found)');
 } else {
-  console.log('mmdc not found — SVG generation skipped. Install @mermaid-js/mermaid-cli to enable it.');
+  // mmdc/mermaid-cli uses Puppeteer (headless Chromium) and cannot be bundled
+  // into the standalone executable — it must be installed separately.
+  // The Mermaid diagram source is always included in build-guide.md regardless.
+  const installHint = IS_PKG
+    ? 'npm install -g @mermaid-js/mermaid-cli'
+    : 'npm install (already in devDependencies) or npm install -g @mermaid-js/mermaid-cli';
+  console.log(`Network diagram: SVG export unavailable — mmdc not found.`);
+  console.log(`  The Mermaid diagram source is included in build-guide.md and can be`);
+  console.log(`  pasted into mermaid.live for a visual preview.`);
+  console.log(`  To enable SVG export: ${installHint}`);
 }
 
 // Attempt to render a Mermaid string to SVG via mmdc.
