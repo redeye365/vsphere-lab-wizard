@@ -109,12 +109,15 @@
           <label for="esxiVersion">ESXi / vSphere version</label>
           <select id="esxiVersion">
             <option value="">Select&hellip;</option>
-            <option value="9.0">ESXi 9.0 (latest)</option>
+            <option value="9.1">ESXi 9.1 (latest)</option>
+            <option value="9.0u2">ESXi 9.0 Update 2</option>
+            <option value="9.0u1">ESXi 9.0 Update 1</option>
+            <option value="9.0">ESXi 9.0</option>
             <option value="8.0u3">ESXi 8.0 Update 3</option>
             <option value="8.0u2">ESXi 8.0 Update 2</option>
             <option value="8.0u1">ESXi 8.0 Update 1</option>
           </select>
-          <p class="hint">ESXi 8.0 needs at least 8GB vRAM per nested host. ESXi 7.0 and 6.7 need at least 4GB. The wizard will warn you if the nested host sizing falls below the minimum for the version you pick.</p>
+          <p class="hint">ESXi 8.x and 9.x all require at least 8GB vRAM per nested host. The wizard warns if the nested host sizing falls below the minimum. ESXi 9.x requires a VCF/VVF subscription to download.</p>
         </div>
       </section>
 
@@ -283,6 +286,16 @@
             <label for="nestedDiskGB">Boot disk per host (GB)</label>
             <input type="number" id="nestedDiskGB" min="8" value="32">
           </div>
+        </div>
+
+        <div class="field">
+          <label>Deploy nested ESXi from</label>
+          <div class="radio-grid" id="esxi-deploy-method-options">
+            <label class="radio-card"><input type="radio" name="esxiDeployMethod" value="ova" checked><span class="radio-card-title">William Lam OVA</span><span class="radio-card-sub">Pre-built appliance &mdash; fully automated, faster</span></label>
+            <label class="radio-card"><input type="radio" name="esxiDeployMethod" value="iso"><span class="radio-card-title">ESXi ISO</span><span class="radio-card-sub">Interactive install &mdash; teaches the full process</span></label>
+          </div>
+          <p class="hint hint-info" id="esxi-ova-hint">William Lam's <strong>Nested ESXi Virtual Appliance</strong> — ESXi pre-installed, configured via OVF properties (hostname, IP, credentials). No manual install. Download for your version at <a href="https://williamlam.com/nested-virtualization/nested-esxi-virtual-appliance" target="_blank" rel="noopener">williamlam.com/nested-virtualization</a>. ESXi 8.x is free with a Broadcom account; 9.x requires a VCF/VVF subscription.</p>
+          <p class="hint" id="esxi-iso-hint" hidden>Standard ESXi ISO install. The script creates VM shells and attaches the ISO; you run through the ESXi installer on each host manually.</p>
         </div>
 
         <div class="field checkbox-field">

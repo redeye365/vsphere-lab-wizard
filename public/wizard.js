@@ -25,15 +25,17 @@ const REMOTE_LABELS = { vpn: 'VPN', ssh_jump: 'SSH jump host', none: 'Local only
 const VPN_TYPE_LABELS = { wireguard: 'WireGuard server VM', vyos_site_to_site: 'VyOS site-to-site' };
 
 const ESXI_VERSION_LABELS = {
+  '9.1':   'ESXi 9.1',
+  '9.0u2': 'ESXi 9.0 U2',
+  '9.0u1': 'ESXi 9.0 U1',
   '9.0':   'ESXi 9.0',
   '8.0u3': 'ESXi 8.0 U3',
   '8.0u2': 'ESXi 8.0 U2',
-  '8.0u1': 'ESXi 8.0 U1',
   '8.0u1': 'ESXi 8.0 U1'
 };
 
 // Minimum vRAM per nested host by ESXi version
-const ESXI_MIN_VRAM = { '9.0': 8, '8.0u3': 8, '8.0u2': 8, '8.0u1': 8 };
+const ESXI_MIN_VRAM = { '9.1': 8, '9.0u2': 8, '9.0u1': 8, '9.0': 8, '8.0u3': 8, '8.0u2': 8, '8.0u1': 8 };
 
 const NET_COLORS = {
   management: '#4fb3a4',
@@ -75,6 +77,7 @@ const state = {
     },
     design: {
       esxiVersion: null,
+      esxiDeployMethod: 'ova',
       vyosEnabled: false, vyosNetworkMode: null,
       dcEnabled: false, dcDomainName: null, dcIpAddress: null,
       mgmtCidr: null, mgmtVlan: null, mgmtVlanMode: 'untagged',
@@ -176,6 +179,18 @@ function wireForm() {
   bindSelect('nicSpeed', h, 'nicSpeed', onChange);
 
   bindSelect('esxiVersion', g, 'esxiVersion', onChange);
+
+  // OVA vs ISO deploy method
+  document.querySelectorAll('input[name="esxiDeployMethod"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (el.checked) {
+        g.esxiDeployMethod = el.value;
+        document.getElementById('esxi-ova-hint').hidden = el.value !== 'ova';
+        document.getElementById('esxi-iso-hint').hidden = el.value !== 'iso';
+        onChange();
+      }
+    });
+  });
 
   // VyOS
   const vyosCheckbox = document.getElementById('vyosEnabled');
@@ -727,20 +742,41 @@ function renderTopology() {
 
 // --- Review ---
 
-function reviewGroup(title, rows) {
-  const section = document.createElement('div');
-  const h3 = document.createElement('h3');
-  h3.textContent = title;
-  const dl = document.createElement('dl');
-  rows.forEach(([label, value]) => {
-    const dt = document.createElement('dt');
-    dt.textContent = label;
-    const dd = document.createElement('dd');
-    dd.textContent = value;
-    dl.append(dt, dd);
+function reviewCard(title, rows) {
+  const card = document.createElement('div');
+  card.className = 'review-card';
+
+  const header = document.createElement('div');
+  header.className = 'review-card-header';
+  const titleEl = document.createElement('span');
+  titleEl.className = 'review-card-title';
+  titleEl.textContent = title;
+  header.appendChild(titleEl);
+  card.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'review-card-body';
+
+  rows.forEach(([label, value, opts]) => {
+    const full = opts?.full;
+    const dim = value === '—' || value === 'Disabled' || value === 'No' || value === 'Local only';
+    const kv = document.createElement('div');
+    kv.className = full ? 'review-kv review-kv-full' : 'review-kv';
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'review-kv-label';
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement('div');
+    valueEl.className = 'review-kv-value' + (dim ? ' value-dim' : '');
+    valueEl.textContent = value;
+
+    kv.append(labelEl, valueEl);
+    body.appendChild(kv);
   });
-  section.append(h3, dl);
-  return section;
+
+  card.appendChild(body);
+  return card;
 }
 
 function renderReview() {
@@ -751,96 +787,93 @@ function renderReview() {
   const container = document.getElementById('review-summary');
   container.innerHTML = '';
 
-  container.appendChild(reviewGroup('Use case', [
-    ['Use case', USE_CASE_LABELS[d.useCase] || val(d.useCase)]
-  ]));
-
-  container.appendChild(reviewGroup('Hardware', [
+  // --- Use case + Hardware ---
+  const hwRows = [
+    ['Use case', USE_CASE_LABELS[d.useCase] || val(d.useCase)],
     ['Physical hosts', val(h.hostCount)],
     ['CPU cores', val(h.cpuCores)],
     ['RAM', val(h.ramGB, 'GB')],
-    ...((h.storageDevices || []).map((d, i) => [
+    ...((h.storageDevices || []).map((dev, i) => [
       `Disk ${i + 1}`,
-      `${d.capacityGB || '?'}${d.capacityUnit || 'GB'} ${DEVICE_TYPE_LABELS[d.type] || '?'}`
+      `${dev.capacityGB || '?'}${dev.capacityUnit || 'GB'} ${DEVICE_TYPE_LABELS[dev.type] || '?'}`
     ])),
-    ['NICs', `${val(h.nicCount)} × ${val(h.nicSpeed)}`]
+    ['NICs', h.nicCount ? `${h.nicCount} × ${h.nicSpeed || '?'}` : '—']
+  ];
+  container.appendChild(reviewCard('Hardware', hwRows));
+
+  // --- ESXi version + deploy method ---
+  const deployLabel = g.esxiDeployMethod === 'ova' ? 'William Lam OVA (automated)' : 'ISO (interactive install)';
+  container.appendChild(reviewCard('ESXi', [
+    ['Version', ESXI_VERSION_LABELS[g.esxiVersion] || val(g.esxiVersion)],
+    ['Deploy method', deployLabel]
   ]));
 
-  container.appendChild(reviewGroup('ESXi version', [
-    ['Version', ESXI_VERSION_LABELS[g.esxiVersion] || val(g.esxiVersion)]
-  ]));
-
-  if (g.vyosEnabled) {
-    container.appendChild(reviewGroup('VyOS router', [
-      ['Enabled', 'Yes'],
-      ['Network mode', g.vyosNetworkMode === 'bgp' ? 'Basic + BGP peering' : 'Basic (NAT, DHCP, DNS)']
-    ]));
+  // --- Infrastructure: VyOS, DC ---
+  const infraComponents = [];
+  infraComponents.push(['VyOS router', g.vyosEnabled ? (g.vyosNetworkMode === 'bgp' ? 'Enabled (BGP)' : 'Enabled') : 'No']);
+  if (g.vyosEnabled && g.vyosNetworkMode) {
+    infraComponents.push(['VyOS mode', g.vyosNetworkMode === 'bgp' ? 'Basic + BGP' : 'Basic (NAT, DHCP, DNS)']);
   }
-
+  infraComponents.push(['Domain controller', g.dcEnabled ? 'Yes' : 'No']);
   if (g.dcEnabled) {
-    container.appendChild(reviewGroup('Domain controller', [
-      ['Enabled', 'Yes'],
-      ['Domain', val(g.dcDomainName)],
-      ['DC IP', val(g.dcIpAddress)]
-    ]));
+    infraComponents.push(['DC domain', val(g.dcDomainName)]);
+    infraComponents.push(['DC IP', val(g.dcIpAddress)]);
   }
+  const localDsEnabled = (g.nestedDisks || []).some((dd) => dd.purpose === 'local_datastore');
+  infraComponents.push(['Local datastore (host 1)', localDsEnabled ? 'Yes' : 'No']);
+  if (depotStepVisible() && g.depotEnabled) {
+    infraComponents.push(['Bundle depot', g.depotMode === 'iis' ? 'IIS on DC' : 'Linux/nginx VM']);
+    infraComponents.push(['Depot IP', val(g.depotIpAddress)]);
+  }
+  container.appendChild(reviewCard('Infrastructure', infraComponents));
 
-  container.appendChild(reviewGroup('Existing network', [
-    ['Type', NETTYPE_LABELS[d.networkType] || val(d.networkType)],
-    ['VLAN capable', d.vlanCapable === null ? '—' : (d.vlanCapable ? 'Yes' : 'No')],
-    ['DHCP', d.dhcpAvailable === null ? '—' : (d.dhcpAvailable ? 'Available' : 'Static only')]
-  ]));
-
+  // --- Network ---
   const netRows = [
-    ['Management', `${val(g.mgmtCidr)} ${g.mgmtVlanMode === 'tagged' ? `VLAN ${g.mgmtVlan || '?'} (tagged)` : '(untagged)'}`.trim()],
-    ['vMotion', `${val(g.vmotionCidr)} ${g.vmotionVlan != null ? `(VLAN ${g.vmotionVlan})` : ''}`.trim()],
-    ['VM traffic', `${val(g.vmCidr)} ${g.vmVlan != null ? `(VLAN ${g.vmVlan})` : ''}`.trim()]
+    ['Existing network', NETTYPE_LABELS[d.networkType] || val(d.networkType)],
+    ['VLAN capable', d.vlanCapable === null ? '—' : (d.vlanCapable ? 'Yes' : 'No')],
+    ['Management', `${val(g.mgmtCidr)} ${g.mgmtVlanMode === 'tagged' ? `VLAN ${g.mgmtVlan || '?'}` : '(untagged)'}`.trim()],
+    ['vMotion', `${val(g.vmotionCidr)}${g.vmotionVlan != null ? ` VLAN ${g.vmotionVlan}` : ''}`.trim()]
   ];
   if (g.vsanEnabled) {
-    netRows.splice(2, 0, ['vSAN', `${val(g.vsanCidr)} ${g.vsanVlan != null ? `(VLAN ${g.vsanVlan})` : ''}`.trim()]);
+    netRows.push(['vSAN net', `${val(g.vsanCidr)}${g.vsanVlan != null ? ` VLAN ${g.vsanVlan}` : ''}`.trim()]);
   }
-  container.appendChild(reviewGroup('Lab networks', netRows));
+  netRows.push(['VM traffic', `${val(g.vmCidr)}${g.vmVlan != null ? ` VLAN ${g.vmVlan}` : ''}`.trim()]);
+  container.appendChild(reviewCard('Networking', netRows));
 
-  container.appendChild(reviewGroup('Nested cluster', [
-    ['Nested hosts', val(g.nestedHostCount)],
+  // --- Cluster ---
+  container.appendChild(reviewCard('Nested cluster', [
+    ['Hosts', val(g.nestedHostCount)],
     ['vCPU / host', val(g.vcpuPerHost)],
     ['vRAM / host', val(g.vramPerHostGB, 'GB')],
     ['Boot disk', val(g.nestedDiskGB, 'GB')],
     ['Cluster name', val(g.clusterName)],
     ['SSO domain', val(g.ssoDomain)],
-    ['vSAN', g.vsanEnabled ? `Enabled (${g.vsanArch === 'osa' ? 'OSA' : 'ESA'})` : 'Disabled'],
+    ['vSAN', g.vsanEnabled ? `Enabled — ${g.vsanArch === 'osa' ? 'OSA' : 'ESA'}` : 'Disabled'],
     ['Legacy CPU compat', g.legacyCpuCompat ? 'Enabled' : 'Disabled'],
     ['Memory tiering', g.memTieringEnabled ? `${g.nvmeSizeGB}GB NVMe / ${g.tierNvmePct}%` : 'Disabled']
   ]));
 
+  // --- Nested disks ---
   const ndisks = g.nestedDisks || [];
   if (ndisks.length > 0) {
-    container.appendChild(reviewGroup('Nested host disks',
-      ndisks.map((d, i) => [
+    container.appendChild(reviewCard('Nested host disks',
+      ndisks.map((dd, i) => [
         `Disk ${i + 1}`,
-        `${d.sizeGB || '?'}GB — ${NESTED_DISK_PURPOSE_LABELS[d.purpose] || '?'}`
+        `${dd.sizeGB || '?'}GB — ${NESTED_DISK_PURPOSE_LABELS[dd.purpose] || dd.purpose || '?'}`
       ])
     ));
   }
 
+  // --- Workload VMs ---
   if (g.workloadVmsEnabled) {
     const wlSpec = g.workloadVmSize === 'medium' ? '4 vCPU / 8GB' : '2 vCPU / 4GB';
-    container.appendChild(reviewGroup('Workload VMs', [
+    container.appendChild(reviewCard('Workload VMs', [
       ['Count', val(g.workloadVmCount)],
       ['Size', `${g.workloadVmSize || '—'} (${wlSpec})`]
     ]));
   }
 
-  const localDsEnabled = (g.nestedDisks || []).some((d) => d.purpose === 'local_datastore');
-  const infraRows = [['Local datastore on host 1', localDsEnabled ? 'Yes' : 'No']];
-  if (depotStepVisible() && g.depotEnabled) {
-    infraRows.push(['Bundle depot', g.depotMode === 'iis' ? 'IIS on DC' : 'Linux/nginx VM']);
-    infraRows.push(['Depot IP', val(g.depotIpAddress)]);
-  } else if (depotStepVisible() && !g.depotEnabled) {
-    infraRows.push(['Bundle depot', 'Not deployed']);
-  }
-  container.appendChild(reviewGroup('Infrastructure', infraRows));
-
+  // --- Security & access ---
   const accessRows = [
     ['Isolated segment', g.isolateLab ? 'Yes' : 'No'],
     ['Firewall policy', FIREWALL_LABELS[g.firewallPolicy] || val(g.firewallPolicy)],
@@ -851,17 +884,24 @@ function renderReview() {
     accessRows.push(['VPN type', VPN_TYPE_LABELS[g.vpnType] || val(g.vpnType)]);
   }
   accessRows.push(['vCenter size', val(g.vcenterSize)]);
-  container.appendChild(reviewGroup('Security & access', accessRows));
+  container.appendChild(reviewCard('Security & access', accessRows));
 
-  // vSAN nested disk validation warning
+  // --- Inline warnings ---
   if (g.vsanEnabled) {
-    const hasVsanCapacity = (g.nestedDisks || []).some((d) => d.purpose === 'vsan_capacity');
+    const hasVsanCapacity = ndisks.some((dd) => dd.purpose === 'vsan_capacity');
     if (!hasVsanCapacity) {
       const warn = document.createElement('div');
       warn.className = 'review-warn';
-      warn.textContent = 'vSAN is enabled but no vSAN capacity disk is defined in the nested host disk layout. The cluster formation script will fail without a disk to claim. Go back to step 8 (Nested disks) and add a vSAN capacity disk.';
+      warn.textContent = '⚠ vSAN is enabled but no vSAN capacity disk is defined. The cluster formation script will fail. Go back to step 8 (Nested disks) and add a vSAN capacity disk.';
       container.appendChild(warn);
     }
+  }
+
+  if (g.depotEnabled && g.depotMode === 'iis' && !g.dcEnabled) {
+    const warn = document.createElement('div');
+    warn.className = 'review-warn';
+    warn.textContent = '⚠ Bundle depot is set to IIS mode but no domain controller is included. Enable the DC (step 4) or switch to Linux/nginx mode.';
+    container.appendChild(warn);
   }
 
   document.getElementById('results').hidden = true;

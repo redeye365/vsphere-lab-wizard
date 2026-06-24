@@ -1,14 +1,20 @@
 // server.js
 //
 // Local-only server for the vSphere Lab Wizard. Run with `npm start`,
-// then open http://localhost:4173
+// then open http://localhost:3000
 
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 const os = require('os');
+
+// pkg bundles the app as a standalone executable. Detect that mode so we can
+// resolve writable output dirs relative to the executable rather than __dirname
+// (which points into the read-only snapshot FS when running under pkg).
+const IS_PKG = typeof process.pkg !== 'undefined';
+const BASE_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 
 const { buildSpec } = require('./lib/generateSpec');
 const { buildPowerShellScripts } = require('./lib/generatePowerShell');
@@ -61,13 +67,19 @@ function renderSvg(mermaidContent, outputPath) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 4173;
+const PORT = process.env.PORT || 3000;
 
-const OUTPUT_DIR = path.join(__dirname, 'output');
+const OUTPUT_DIR = path.join(BASE_DIR, 'output');
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+function openBrowser(url) {
+  const platform = process.platform;
+  const cmd = platform === 'win32' ? 'start' : platform === 'darwin' ? 'open' : 'xdg-open';
+  spawn(cmd, [url], { detached: true, stdio: 'ignore' }).unref();
+}
 
 // Static files always present in every output
 const FIXED_OUTPUT_FILES = {
@@ -167,5 +179,10 @@ app.get('/api/download/:id/:kind', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`vSphere Lab Wizard running at http://localhost:${PORT}`);
+  const url = `http://localhost:${PORT}`;
+  console.log(`vSphere Lab Wizard running at ${url}`);
+  if (IS_PKG) {
+    console.log('Opening browser...');
+    openBrowser(url);
+  }
 });
