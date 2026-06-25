@@ -681,6 +681,46 @@ select:focus {
   width: 100%;
 }
 
+/* --- Generate validation error block --- */
+
+.generate-error-block {
+  background: rgba(217, 105, 106, 0.1);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.generate-error-block strong {
+  display: block;
+  color: var(--danger);
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.generate-error-block ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.generate-error-block li { margin-bottom: 4px; }
+
+.generate-error-block .geb-section {
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-top: 6px;
+  list-style: none;
+  margin-left: -4px;
+}
+
+.generate-error-block .geb-section > ul {
+  font-weight: 400;
+  color: var(--text);
+}
+
 .review-warn {
   background: rgba(217, 105, 106, 0.12);
   border: 1px solid var(--danger);

@@ -1517,6 +1517,9 @@ function wireGenerate() {
     const originalText = btn.textContent;
     btn.textContent = 'Generating…';
 
+    const errBlock = document.getElementById('generate-error-block');
+    errBlock.hidden = true;
+
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -1524,8 +1527,51 @@ function wireGenerate() {
         body: JSON.stringify(state.answers)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Generation failed.');
+      if (!res.ok) {
+        const details = Array.isArray(data.details) && data.details.length ? data.details : null;
+        if (details) {
+          const sectionHint = (msg) => {
+            const map = [
+              [/^(cpuCores|ramGB|nicCount|nicSpeed|hostCount|storageDevice)/,  'Physical host (step 3)'],
+              [/^(mgmtCidr|mgmtVlan|vmotionCidr|vmotionVlan|vsanCidr|vsanVlan|vmCidr|vmVlan)/, 'Networks (step 4)'],
+              [/^(dcIpAddress|dcDomainName)/,                                  'Domain controller (step 5)'],
+              [/^(vyosNetworkMode)/,                                            'VyOS router (step 6)'],
+              [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering)/, 'Nested cluster (step 7)'],
+              [/^(nsxSize|nsxTopology|nsxIpAddress|nsxBgp)/,                   'NSX-T (step 8)'],
+              [/^nestedDisk/,                                                   'Nested disks (step 9)'],
+              [/^depot/,                                                        'Bundle depot (step 10)'],
+              [/^workloadVm/,                                                   'Workload VMs (step 11)'],
+              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            'Security & access (step 12)'],
+            ];
+            for (const [re, label] of map) {
+              if (re.test(msg)) return label;
+            }
+            return null;
+          };
 
+          const groups = {};
+          for (const msg of details) {
+            const section = sectionHint(msg) || 'General';
+            (groups[section] = groups[section] || []).push(msg);
+          }
+
+          let html = '<strong>Fix the following before generating:</strong><ul>';
+          for (const [section, msgs] of Object.entries(groups)) {
+            html += `<li class="geb-section">${section}<ul>`;
+            for (const m of msgs) html += `<li>${m}</li>`;
+            html += '</ul></li>';
+          }
+          html += '</ul>';
+          errBlock.innerHTML = html;
+        } else {
+          errBlock.textContent = data.error || 'Generation failed.';
+        }
+        errBlock.hidden = false;
+        errBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        throw new Error('');
+      }
+
+      errBlock.hidden = true;
       state.generated = data;
 
       renderWarnings(data.warnings);
@@ -1534,7 +1580,7 @@ function wireGenerate() {
       document.getElementById('results').hidden = false;
       document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
-      document.getElementById('step-error').textContent = err.message;
+      if (err.message) document.getElementById('step-error').textContent = err.message;
     } finally {
       btn.disabled = false;
       btn.textContent = originalText;
