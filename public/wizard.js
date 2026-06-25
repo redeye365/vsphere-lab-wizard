@@ -1,8 +1,10 @@
 // public/wizard.js
 // No build step, no dependencies. Runs entirely against the Express API.
 
-const TOTAL_STEPS = 13;
-const DEPOT_STEP = 9; // skipped when vSAN + local datastore not both configured
+const TOTAL_STEPS = 15;
+const DEPOT_STEP = 10;      // skipped when vSAN + local datastore not both configured
+const NSX_STEP = 8;         // always shown
+const TROUBLESHOOT_STEP = 14; // only reachable when troubleshooting mode is active
 
 const USE_CASE_LABELS = {
   certification: 'Certification study',
@@ -44,6 +46,12 @@ const NET_COLORS = {
   vmTraffic: '#9b86d9'
 };
 
+const NSX_TOPOLOGY_LABELS = {
+  T0T1:    'T0 + T1 Gateways',
+  T0T1DFW: 'T0 + T1 + DFW',
+  full:    'Full (T0/T1/DFW/LB)'
+};
+
 const SCRIPT_LABELS = {
   'spec':             'lab-spec.json',
   'design-doc':       'design-doc.md',
@@ -63,11 +71,23 @@ const SCRIPT_LABELS = {
   'depot-deploy':       'depot-deploy.ps1',
   'depot-configure':    'depot-configure.sh',
   'depot-iis':          'depot-iis.ps1',
-  'depot-instructions': 'depot-instructions.md'
+  'depot-instructions': 'depot-instructions.md',
+  'nsx-deploy':     'nsx-deploy.ps1',
+  'nsx-configure':  'nsx-configure.ps1',
+  'nsx-bgp':        'nsx-bgp.ps1'
 };
 
 const state = {
   step: 0,
+  troubleshootingMode: false,
+  troubleshootSpec: null,       // spec loaded/used for troubleshooting quiz
+  troubleshootQuiz: null,       // quiz questions from server
+  troubleshootAnswers: {},      // user's quiz answers {questionIndex: optionIndex}
+  troubleshootScore: null,      // {correct, total} after submission
+  troubleshootTicket: null,     // submitted ticket {symptom, tried, cause, impact}
+  troubleshootHintLevel: 0,     // 0 = no hints shown, 1-5 = hint level revealed
+  extendMode: false,
+  originalSpec: null,           // spec loaded from file in extend mode
   answers: {
     discovery: { useCase: null, networkType: null, vlanCapable: null, dhcpAvailable: null },
     hardware: {
@@ -84,6 +104,8 @@ const state = {
       vmotionCidr: null, vmotionVlan: null,
       vmCidr: null, vmVlan: null,
       vsanEnabled: false, vsanCidr: null, vsanVlan: null,
+      nsxEnabled: false, nsxSize: 'small', nsxTopology: 'T0T1',
+      nsxIpAddress: null, nsxBgpLocalAs: 65001, nsxBgpPeerAs: 65002,
       depotEnabled: false, depotMode: 'linux', depotIpAddress: null,
       nestedHostCount: 3, vcpuPerHost: 4, vramPerHostGB: 16, nestedDiskGB: 32,
       clusterName: 'mgmt-cluster', datacenterName: 'Lab-DC', ssoDomain: 'vsphere.local',
@@ -291,7 +313,74 @@ function wireForm() {
   bindNumber('nvmeSizeGB', g, 'nvmeSizeGB', onChange);
   bindNumber('tierNvmePct', g, 'tierNvmePct', onChange);
 
-  // Nested disk list (step 8)
+  // NSX step (step 8)
+  const nsxCheckbox = document.getElementById('nsxEnabled');
+  if (nsxCheckbox) {
+    nsxCheckbox.addEventListener('change', () => {
+      g.nsxEnabled = nsxCheckbox.checked;
+      document.getElementById('nsx-fields').hidden = !g.nsxEnabled;
+      updateNsxBgpVisibility();
+      onChange();
+    });
+  }
+  bindRadio('nsxSize', g, 'nsxSize', onChange);
+  bindRadio('nsxTopology', g, 'nsxTopology', onChange);
+  bindText('nsxIpAddress', g, 'nsxIpAddress', onChange);
+  bindNumber('nsxBgpLocalAs', g, 'nsxBgpLocalAs', onChange);
+  bindNumber('nsxBgpPeerAs', g, 'nsxBgpPeerAs', onChange);
+
+  function updateNsxBgpVisibility() {
+    const bgpSection = document.getElementById('nsx-bgp-section');
+    if (!bgpSection) return;
+    const show = g.nsxEnabled && g.vyosEnabled && g.vyosNetworkMode === 'bgp';
+    bgpSection.hidden = !show;
+  }
+  // Re-run when VyOS BGP changes
+  const origVyosHandler = () => { updateNsxBgpVisibility(); };
+  document.querySelectorAll('input[name="vyosNetworkMode"]').forEach((el) => {
+    el.addEventListener('change', origVyosHandler);
+  });
+  document.getElementById('vyosEnabled').addEventListener('change', origVyosHandler);
+
+  // Spec versioning — "Extend existing lab" file picker
+  const extendRadios = document.querySelectorAll('input[name="labMode"]');
+  const specFileField = document.getElementById('spec-file-field');
+  const specFileInput = document.getElementById('spec-file-input');
+  if (extendRadios.length && specFileField && specFileInput) {
+    extendRadios.forEach((el) => {
+      el.addEventListener('change', () => {
+        state.extendMode = el.value === 'extend';
+        document.getElementById('extend-mode-indicator').hidden = !state.extendMode;
+        specFileField.hidden = !state.extendMode;
+        if (!state.extendMode) {
+          state.originalSpec = null;
+          state.answers.extendMode = false;
+        }
+        onChange();
+      });
+    });
+    specFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const spec = JSON.parse(ev.target.result);
+          state.originalSpec = spec;
+          state.answers.extendMode = true;
+          loadSpecIntoState(spec);
+          document.getElementById('spec-load-status').textContent = `Loaded: ${file.name}`;
+          document.getElementById('spec-load-status').className = 'spec-load-ok';
+        } catch {
+          document.getElementById('spec-load-status').textContent = 'Invalid JSON — could not load spec.';
+          document.getElementById('spec-load-status').className = 'spec-load-error';
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  // Nested disk list (step 9)
   renderNestedDisks(onChange);
   document.getElementById('add-nested-disk').addEventListener('click', () => {
     g.nestedDisks.push({ sizeGB: null, purpose: '' });
@@ -540,7 +629,10 @@ function validateStep(n) {
         }
       }
       return null;
-    case 8: {
+    case 8:
+      // NSX step — no required fields (nsxEnabled is optional)
+      return null;
+    case 9: {
       const ndisks = g.nestedDisks || [];
       if (g.vsanEnabled) {
         const hasCapacity = ndisks.some((d) => d.purpose === 'vsan_capacity');
@@ -553,16 +645,16 @@ function validateStep(n) {
       }
       return null;
     }
-    case 9:
+    case 10:
       // Depot step — only reached when depotStepVisible(); no required fields
       return null;
-    case 10:
+    case 11:
       if (g.workloadVmsEnabled) {
         if (!g.workloadVmCount || g.workloadVmCount < 1) return 'Enter the number of workload VMs.';
         if (!g.workloadVmSize) return 'Select a workload VM size.';
       }
       return null;
-    case 11:
+    case 12:
       if (g.remoteAccessMethod === 'vpn' && !g.vpnType) {
         return 'Select a VPN type (WireGuard or VyOS site-to-site) to continue.';
       }
@@ -580,14 +672,20 @@ function showStep(n) {
   document.querySelectorAll('#rail-steps li').forEach((li) => {
     const s = Number(li.dataset.step);
     li.classList.toggle('active', s === n);
-    li.classList.toggle('done', s < n);
+    li.classList.toggle('done', s < n && s !== TROUBLESHOOT_STEP);
   });
 
   document.getElementById('btn-back').style.visibility = n === 0 ? 'hidden' : 'visible';
-  document.getElementById('btn-next').style.display = n === TOTAL_STEPS - 1 ? 'none' : 'inline-flex';
+
+  // The review step (TOTAL_STEPS-2) is the effective last step in normal mode.
+  // When troubleshootingMode is on, the user can navigate one step further to TROUBLESHOOT_STEP.
+  const reviewStep = TOTAL_STEPS - 2;  // step 13
+  const isLastVisible = state.troubleshootingMode ? n === TROUBLESHOOT_STEP : n === reviewStep;
+  document.getElementById('btn-next').style.display = isLastVisible ? 'none' : 'inline-flex';
   document.getElementById('step-error').textContent = '';
 
-  if (n === TOTAL_STEPS - 1) renderReview();
+  if (n === reviewStep) renderReview();
+  if (n === TROUBLESHOOT_STEP) initTroubleshootStep();
   updateDcNotice();
 }
 
@@ -873,6 +971,19 @@ function renderReview() {
     ]));
   }
 
+  // --- NSX ---
+  if (g.nsxEnabled) {
+    const bgpLabel = (g.vyosEnabled && g.vyosNetworkMode === 'bgp')
+      ? `AS ${g.nsxBgpLocalAs} ↔ VyOS AS ${g.nsxBgpPeerAs}`
+      : 'Disabled';
+    container.appendChild(reviewCard('NSX-T', [
+      ['Size', g.nsxSize === 'medium' ? 'Medium (6 vCPU / 24GB)' : 'Small (3 vCPU / 12GB)'],
+      ['Topology', NSX_TOPOLOGY_LABELS[g.nsxTopology] || val(g.nsxTopology)],
+      ['Manager IP', val(g.nsxIpAddress)],
+      ['BGP peering', bgpLabel]
+    ]));
+  }
+
   // --- Security & access ---
   const accessRows = [
     ['Isolated segment', g.isolateLab ? 'Yes' : 'No'],
@@ -905,6 +1016,437 @@ function renderReview() {
   }
 
   document.getElementById('results').hidden = true;
+}
+
+// --- Spec loading (extend mode) ---
+
+function loadSpecIntoState(spec) {
+  const d = state.answers.discovery;
+  const h = state.answers.hardware;
+  const g = state.answers.design;
+
+  if (spec.useCase) d.useCase = spec.useCase;
+  if (spec.existingNetwork) {
+    if (spec.existingNetwork.type) d.networkType = spec.existingNetwork.type;
+    if (spec.existingNetwork.vlanCapableRouter != null) d.vlanCapable = spec.existingNetwork.vlanCapableRouter;
+    if (spec.existingNetwork.dhcpAvailable != null) d.dhcpAvailable = spec.existingNetwork.dhcpAvailable;
+  }
+  if (spec.physicalHost) {
+    const ph = spec.physicalHost;
+    if (ph.hostCount) h.hostCount = ph.hostCount;
+    if (ph.cpuCores) h.cpuCores = ph.cpuCores;
+    if (ph.ramGB) h.ramGB = ph.ramGB;
+    if (ph.nicCount) h.nicCount = ph.nicCount;
+    if (ph.nicSpeed) h.nicSpeed = ph.nicSpeed;
+    if (ph.storageDevices && ph.storageDevices.length) {
+      h.storageDevices = ph.storageDevices.map((d) => ({
+        type: d.type || '',
+        capacityGB: d.capacityGB || null,
+        capacityUnit: 'GB'
+      }));
+    }
+  }
+  if (spec.esxiVersion?.version) g.esxiVersion = spec.esxiVersion.version;
+  if (spec.esxiDeployMethod) g.esxiDeployMethod = spec.esxiDeployMethod;
+  if (spec.vyos) {
+    g.vyosEnabled = !!spec.vyos.enabled;
+    if (spec.vyos.networkMode) g.vyosNetworkMode = spec.vyos.networkMode;
+  }
+  if (spec.domainController) {
+    g.dcEnabled = !!spec.domainController.enabled;
+    if (spec.domainController.domainName) g.dcDomainName = spec.domainController.domainName;
+    if (spec.domainController.ipAddress) g.dcIpAddress = spec.domainController.ipAddress;
+  }
+  if (spec.networks) {
+    const nets = spec.networks;
+    if (nets.management) {
+      if (nets.management.cidr) g.mgmtCidr = nets.management.cidr;
+      if (nets.management.vlanId != null) g.mgmtVlan = nets.management.vlanId;
+      if (nets.management.mode) g.mgmtVlanMode = nets.management.mode;
+    }
+    if (nets.vMotion) {
+      if (nets.vMotion.cidr) g.vmotionCidr = nets.vMotion.cidr;
+      if (nets.vMotion.vlanId != null) g.vmotionVlan = nets.vMotion.vlanId;
+    }
+    if (nets.vsan) {
+      g.vsanEnabled = true;
+      if (nets.vsan.cidr) g.vsanCidr = nets.vsan.cidr;
+      if (nets.vsan.vlanId != null) g.vsanVlan = nets.vsan.vlanId;
+    }
+    if (nets.vmTraffic) {
+      if (nets.vmTraffic.cidr) g.vmCidr = nets.vmTraffic.cidr;
+      if (nets.vmTraffic.vlanId != null) g.vmVlan = nets.vmTraffic.vlanId;
+    }
+  }
+  if (spec.nestedCluster) {
+    const nc = spec.nestedCluster;
+    if (nc.hostCount) g.nestedHostCount = nc.hostCount;
+    if (nc.vcpuPerHost) g.vcpuPerHost = nc.vcpuPerHost;
+    if (nc.vramPerHostGB) g.vramPerHostGB = nc.vramPerHostGB;
+    if (nc.bootDiskGB) g.nestedDiskGB = nc.bootDiskGB;
+    if (nc.clusterName) g.clusterName = nc.clusterName;
+    if (nc.datacenterName) g.datacenterName = nc.datacenterName;
+    if (nc.ssoDomain) g.ssoDomain = nc.ssoDomain;
+    if (nc.vsanArchitecture) g.vsanArch = nc.vsanArchitecture;
+    g.legacyCpuCompat = !!nc.legacyCpuCompatibility;
+    if (nc.memoryTiering) {
+      g.memTieringEnabled = !!nc.memoryTiering.enabled;
+      if (nc.memoryTiering.nvmeSizeGB) g.nvmeSizeGB = nc.memoryTiering.nvmeSizeGB;
+      if (nc.memoryTiering.tierNvmePct) g.tierNvmePct = nc.memoryTiering.tierNvmePct;
+    }
+    if (nc.additionalDisks && nc.additionalDisks.length) {
+      g.nestedDisks = nc.additionalDisks.map((d) => ({ sizeGB: d.sizeGB, purpose: d.purpose }));
+    }
+    g.vsanEnabled = !!nc.vsanEnabled;
+  }
+  if (spec.nsx) {
+    g.nsxEnabled = !!spec.nsx.enabled;
+    if (spec.nsx.size) g.nsxSize = spec.nsx.size;
+    if (spec.nsx.topology) g.nsxTopology = spec.nsx.topology;
+    if (spec.nsx.ipAddress) g.nsxIpAddress = spec.nsx.ipAddress;
+    if (spec.nsx.bgpLocalAs) g.nsxBgpLocalAs = spec.nsx.bgpLocalAs;
+    if (spec.nsx.bgpPeerAs) g.nsxBgpPeerAs = spec.nsx.bgpPeerAs;
+  }
+  if (spec.workloadVms) {
+    g.workloadVmsEnabled = !!spec.workloadVms.enabled;
+    if (spec.workloadVms.count) g.workloadVmCount = spec.workloadVms.count;
+    if (spec.workloadVms.size) g.workloadVmSize = spec.workloadVms.size;
+  }
+  if (spec.security) {
+    g.isolateLab = !!spec.security.isolateLabSegment;
+    if (spec.security.firewallPolicy) g.firewallPolicy = spec.security.firewallPolicy;
+    g.internetAccess = !!spec.security.internetAccess;
+  }
+  if (spec.remoteAccess) {
+    if (spec.remoteAccess.method) g.remoteAccessMethod = spec.remoteAccess.method;
+    if (spec.remoteAccess.vpnType) g.vpnType = spec.remoteAccess.vpnType;
+    if (spec.remoteAccess.vcenterDeploymentSize) g.vcenterSize = spec.remoteAccess.vcenterDeploymentSize;
+  }
+  if (spec.bundleDepot) {
+    g.depotEnabled = !!spec.bundleDepot.enabled;
+    if (spec.bundleDepot.mode) g.depotMode = spec.bundleDepot.mode;
+    if (spec.bundleDepot.ipAddress) g.depotIpAddress = spec.bundleDepot.ipAddress;
+  }
+  renderStorageDevices(() => {});
+  renderNestedDisks(() => {});
+}
+
+// --- Troubleshooting mode ---
+
+function toggleTroubleshootingMode() {
+  state.troubleshootingMode = !state.troubleshootingMode;
+  const badge = document.getElementById('ts-badge');
+  if (badge) badge.hidden = !state.troubleshootingMode;
+
+  // Show/hide the troubleshoot rail item
+  const tsRailItem = document.querySelector('#rail-steps li[data-step="' + TROUBLESHOOT_STEP + '"]');
+  if (tsRailItem) tsRailItem.hidden = !state.troubleshootingMode;
+
+  // If deactivating while on troubleshoot step, go back to review
+  if (!state.troubleshootingMode && state.step === TROUBLESHOOT_STEP) {
+    showStep(TOTAL_STEPS - 2);
+  }
+  // Update btn-next visibility if currently on review step
+  if (state.step === TOTAL_STEPS - 2) {
+    const isLastVisible = !state.troubleshootingMode;
+    document.getElementById('btn-next').style.display = isLastVisible ? 'none' : 'inline-flex';
+  }
+}
+
+function initTroubleshootStep() {
+  // Reset quiz state for fresh visit
+  state.troubleshootSpec = null;
+  state.troubleshootQuiz = null;
+  state.troubleshootAnswers = {};
+  state.troubleshootScore = null;
+  state.troubleshootTicket = null;
+  state.troubleshootHintLevel = 0;
+
+  const specSection  = document.getElementById('ts-spec-section');
+  const ticketSection = document.getElementById('ts-ticket-section');
+  const quizSection  = document.getElementById('ts-quiz-section');
+  const hintSection  = document.getElementById('ts-hint-section');
+  const resultSection = document.getElementById('ts-result-section');
+
+  if (specSection)   specSection.hidden   = false;
+  if (ticketSection) ticketSection.hidden = true;
+  if (quizSection)   quizSection.hidden   = true;
+  if (hintSection)   hintSection.hidden   = true;
+  if (resultSection) resultSection.hidden = true;
+
+  const useCurrentBtn = document.getElementById('ts-use-current');
+  const loadFileBtn   = document.getElementById('ts-load-spec-btn');
+  const specFileInput = document.getElementById('ts-spec-file-input');
+  const specStatus    = document.getElementById('ts-spec-status');
+
+  if (useCurrentBtn) {
+    useCurrentBtn.onclick = () => {
+      const specFromGenerated = state.generated?.spec;
+      if (!specFromGenerated) {
+        if (specStatus) specStatus.textContent = 'No generated spec found — complete the wizard and click Generate first.';
+        return;
+      }
+      state.troubleshootSpec = specFromGenerated;
+      if (specStatus) specStatus.textContent = '';
+      if (specSection) specSection.hidden = true;
+      showTsTicketForm();
+    };
+  }
+  if (specFileInput) {
+    specFileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          state.troubleshootSpec = JSON.parse(ev.target.result);
+          if (specStatus) specStatus.textContent = '';
+          if (specSection) specSection.hidden = true;
+          showTsTicketForm();
+        } catch {
+          if (specStatus) specStatus.textContent = 'Invalid JSON — check the file.';
+        }
+      };
+      reader.readAsText(file);
+    };
+  }
+}
+
+function showTsTicketForm() {
+  const ticketSection = document.getElementById('ts-ticket-section');
+  if (!ticketSection) return;
+  ticketSection.hidden = false;
+
+  const submitBtn = document.getElementById('ts-ticket-submit');
+  if (submitBtn) {
+    submitBtn.onclick = () => {
+      const symptom = document.getElementById('ts-symptom').value.trim();
+      const tried   = document.getElementById('ts-tried').value.trim();
+      const cause   = document.getElementById('ts-cause').value.trim();
+      const impact  = document.getElementById('ts-impact').value.trim();
+
+      if (!symptom) {
+        document.getElementById('ts-ticket-error').textContent = 'Symptom is required.';
+        return;
+      }
+      document.getElementById('ts-ticket-error').textContent = '';
+
+      state.troubleshootTicket = { symptom, tried, cause, impact };
+
+      // Ticket quality affects starting hint level:
+      // All 4 fields = start at hint 0 (no bonus)
+      // 3 fields = start at hint 1 (skip first hint)
+      // <3 fields = start at hint 2 (skip two hints)
+      const filledFields = [symptom, tried, cause, impact].filter(Boolean).length;
+      state.troubleshootHintLevel = filledFields >= 4 ? 0 : filledFields === 3 ? 1 : 2;
+
+      ticketSection.hidden = true;
+      document.getElementById('ts-ticket-logged').hidden = false;
+      startTsQuiz();
+    };
+  }
+}
+
+async function startTsQuiz() {
+  if (!state.troubleshootSpec) return;
+
+  const quizSection = document.getElementById('ts-quiz-section');
+  const loadingEl   = document.getElementById('ts-quiz-loading');
+
+  if (quizSection) quizSection.hidden = false;
+  if (loadingEl) loadingEl.hidden = false;
+
+  try {
+    const res = await fetch('/api/troubleshoot/generate-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spec: state.troubleshootSpec })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Quiz generation failed');
+    state.troubleshootQuiz = data.questions;
+    renderTsQuiz(0);
+  } catch (err) {
+    if (loadingEl) loadingEl.textContent = 'Could not load quiz: ' + err.message;
+  }
+}
+
+function renderTsQuiz(questionIndex) {
+  const quiz    = state.troubleshootQuiz;
+  const loadingEl = document.getElementById('ts-quiz-loading');
+  if (loadingEl) loadingEl.hidden = true;
+
+  if (!quiz || quiz.length === 0) {
+    document.getElementById('ts-quiz-container').innerHTML = '<p>No questions available for this spec.</p>';
+    return;
+  }
+
+  if (questionIndex >= quiz.length) {
+    showTsResults();
+    return;
+  }
+
+  const q = quiz[questionIndex];
+  const container = document.getElementById('ts-quiz-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  const progress = document.createElement('p');
+  progress.className = 'ts-quiz-progress';
+  progress.textContent = `Question ${questionIndex + 1} of ${quiz.length}`;
+  container.appendChild(progress);
+
+  const questionEl = document.createElement('p');
+  questionEl.className = 'ts-quiz-question';
+  questionEl.textContent = q.question;
+  container.appendChild(questionEl);
+
+  const optsList = document.createElement('div');
+  optsList.className = 'ts-quiz-options';
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ts-quiz-option';
+    btn.textContent = opt.text;
+    btn.onclick = () => {
+      state.troubleshootAnswers[questionIndex] = i;
+      // Show feedback
+      optsList.querySelectorAll('.ts-quiz-option').forEach((b, bi) => {
+        b.disabled = true;
+        if (q.options[bi].correct) b.classList.add('ts-opt-correct');
+        else if (bi === i && !q.options[bi].correct) b.classList.add('ts-opt-wrong');
+      });
+      const expEl = document.createElement('p');
+      expEl.className = 'ts-quiz-explanation';
+      expEl.textContent = q.explanation;
+      container.appendChild(expEl);
+      const nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.className = 'btn btn-primary';
+      nextBtn.style.marginTop = '12px';
+      nextBtn.textContent = questionIndex + 1 < quiz.length ? 'Next question' : 'See results';
+      nextBtn.onclick = () => renderTsQuiz(questionIndex + 1);
+      container.appendChild(nextBtn);
+    };
+    optsList.appendChild(btn);
+  });
+  container.appendChild(optsList);
+}
+
+function showTsResults() {
+  document.getElementById('ts-quiz-section').hidden = true;
+
+  const quiz = state.troubleshootQuiz;
+  const answers = state.troubleshootAnswers;
+  let correct = 0;
+  quiz.forEach((q, i) => {
+    const chosen = answers[i];
+    if (chosen !== undefined && q.options[chosen]?.correct) correct++;
+  });
+  const total = quiz.length;
+  const pct = Math.round((correct / total) * 100);
+  state.troubleshootScore = { correct, total, pct };
+
+  const resultSection = document.getElementById('ts-result-section');
+  if (!resultSection) return;
+  resultSection.hidden = false;
+
+  document.getElementById('ts-score-display').textContent = `${correct} / ${total} (${pct}%)`;
+
+  const resultMsg = document.getElementById('ts-result-message');
+  if (pct >= 70) {
+    resultMsg.textContent = 'Environment verified. Your lab knowledge checks out.';
+    resultMsg.className = 'ts-result-pass';
+    document.getElementById('ts-hint-section').hidden = true;
+  } else {
+    resultMsg.textContent = 'Score below 70% — some areas need review. Use the hint system below for guidance.';
+    resultMsg.className = 'ts-result-fail';
+    initHintSystem();
+  }
+}
+
+// --- Hint system ---
+
+const HINT_LEVELS = [
+  { label: 'Nudge',        description: 'A gentle pointer to the right area.' },
+  { label: 'Direction',    description: 'Tells you what category to investigate.' },
+  { label: 'Clue',         description: 'Narrows it to a specific component or setting.' },
+  { label: 'Near-answer',  description: 'Tells you what to check without giving the exact value.' },
+  { label: 'Full solution',description: 'Shows the exact spec value and what to verify.' }
+];
+
+function initHintSystem() {
+  const hintSection = document.getElementById('ts-hint-section');
+  if (!hintSection) return;
+  hintSection.hidden = false;
+
+  renderHints();
+}
+
+function renderHints() {
+  const container = document.getElementById('ts-hints-container');
+  if (!container) return;
+
+  const spec = state.troubleshootSpec;
+  const nc   = spec?.nestedCluster || {};
+  const nets = spec?.networks || {};
+
+  // Generate hint text for each level based on actual spec values
+  const hints = [
+    // Level 1: Nudge
+    `Check your network configuration — something doesn't match the design spec.`,
+    // Level 2: Direction
+    `Focus on the management network. The CIDR, VLAN settings, or gateway may not match what's in the spec.`,
+    // Level 3: Clue
+    `The management network is ${nets.management?.cidr || 'not set'}.${nets.management?.vlanId != null ? ` It uses VLAN ${nets.management.vlanId}.` : ' It runs untagged.'} Check all three layers: port group, VyOS interface, and nested vmk0.`,
+    // Level 4: Near-answer
+    `Verify these specific values match your running environment:\n• Mgmt CIDR: ${nets.management?.cidr || '?'}\n• VLAN: ${nets.management?.vlanId ?? 'untagged'}\n• vCenter SSO domain: ${nc.ssoDomain || '?'}\n• Cluster name: ${nc.clusterName || '?'}`,
+    // Level 5: Full solution
+    `Full spec summary for verification:\n• Mgmt: ${nets.management?.cidr || '?'} VLAN ${nets.management?.vlanId ?? 'native'}\n• vMotion: ${nets.vMotion?.cidr || '?'} VLAN ${nets.vMotion?.vlanId ?? 'native'}\n• Nested hosts: ${nc.hostCount || '?'} × ${nc.vcpuPerHost || '?'} vCPU / ${nc.vramPerHostGB || '?'}GB\n• Cluster: ${nc.clusterName || '?'} · SSO: ${nc.ssoDomain || '?'}\n• NTP: ${spec?.ntp?.source || '?'}`
+  ];
+
+  container.innerHTML = '';
+
+  const startLevel = state.troubleshootHintLevel;
+
+  HINT_LEVELS.forEach((level, i) => {
+    const revealed = i < startLevel || (i === state.troubleshootHintLevel && state.troubleshootHintLevel > 0);
+    const div = document.createElement('div');
+    div.className = 'ts-hint-card' + (revealed ? ' ts-hint-revealed' : '');
+
+    const header = document.createElement('div');
+    header.className = 'ts-hint-header';
+    const levelBadge = document.createElement('span');
+    levelBadge.className = 'ts-hint-level-badge';
+    levelBadge.textContent = `Level ${i + 1}: ${level.label}`;
+    header.appendChild(levelBadge);
+    div.appendChild(header);
+
+    if (revealed) {
+      const body = document.createElement('div');
+      body.className = 'ts-hint-body';
+      body.textContent = hints[i];
+      div.appendChild(body);
+    } else {
+      const lockBtn = document.createElement('button');
+      lockBtn.type = 'button';
+      lockBtn.className = 'btn btn-secondary ts-hint-unlock';
+      lockBtn.textContent = `Reveal ${level.label}`;
+      lockBtn.disabled = i > state.troubleshootHintLevel;
+      lockBtn.onclick = () => {
+        state.troubleshootHintLevel = i + 1;
+        renderHints();
+      };
+      div.appendChild(lockBtn);
+      const desc = document.createElement('span');
+      desc.className = 'ts-hint-desc';
+      desc.textContent = level.description;
+      div.appendChild(desc);
+    }
+
+    container.appendChild(div);
+  });
 }
 
 // --- Generate ---
@@ -960,7 +1502,8 @@ function renderDownloads(id, generatedScripts, svgGenerated) {
     'vyos-deploy', 'dc-deploy', 'deploy-lab', 'vcenter-deploy',
     'vsan-cluster', 'memory-tiering',
     'depot-deploy', 'depot-configure', 'depot-iis',
-    'deploy-workloads', 'jumpbox-deploy', 'wireguard-server', 'vyos-site-to-site'
+    'deploy-workloads', 'jumpbox-deploy', 'wireguard-server', 'vyos-site-to-site',
+    'nsx-deploy', 'nsx-configure', 'nsx-bgp'
   ];
   for (const kind of scriptOrder) {
     if (generatedScripts.includes(kind)) container.appendChild(makeLink(kind));
@@ -998,6 +1541,17 @@ function wireGenerate() {
     }
   });
 }
+
+// --- Keyboard shortcut: Ctrl+Shift+T / Cmd+Shift+T → toggle troubleshooting mode ---
+
+document.addEventListener('keydown', (e) => {
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  const modifier = isMac ? e.metaKey : e.ctrlKey;
+  if (modifier && e.shiftKey && e.key === 'T') {
+    e.preventDefault();
+    toggleTroubleshootingMode();
+  }
+});
 
 // --- Init ---
 

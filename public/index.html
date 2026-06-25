@@ -8,6 +8,8 @@
 </head>
 <body>
 
+<div id="ts-badge" class="ts-badge" hidden>Troubleshooting Mode</div>
+
 <div class="app">
 
   <aside class="rail">
@@ -24,11 +26,13 @@
       <li data-step="5"><span class="rail-num">06</span><span>Existing network</span></li>
       <li data-step="6"><span class="rail-num">07</span><span>Lab networks</span></li>
       <li data-step="7"><span class="rail-num">08</span><span>Nested cluster</span></li>
-      <li data-step="8"><span class="rail-num">09</span><span>Nested disks</span></li>
-      <li data-step="9"><span class="rail-num">10</span><span>Bundle depot</span></li>
-      <li data-step="10"><span class="rail-num">11</span><span>Workload VMs</span></li>
-      <li data-step="11"><span class="rail-num">12</span><span>Security &amp; access</span></li>
-      <li data-step="12"><span class="rail-num">13</span><span>Review &amp; generate</span></li>
+      <li data-step="8"><span class="rail-num">09</span><span>NSX-T</span></li>
+      <li data-step="9"><span class="rail-num">10</span><span>Nested disks</span></li>
+      <li data-step="10"><span class="rail-num">11</span><span>Bundle depot</span></li>
+      <li data-step="11"><span class="rail-num">12</span><span>Workload VMs</span></li>
+      <li data-step="12"><span class="rail-num">13</span><span>Security &amp; access</span></li>
+      <li data-step="13"><span class="rail-num">14</span><span>Review &amp; generate</span></li>
+      <li data-step="14" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
     </ol>
   </aside>
 
@@ -40,7 +44,28 @@
       <section class="step" data-step="0">
         <h1>What's this lab for?</h1>
         <p class="step-intro">This shapes the defaults for cluster size and sizing checks later. You can override anything.</p>
+
         <div class="field">
+          <label>Lab session</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="labMode" value="new" checked><span>New lab</span></label>
+            <label class="choice-pill"><input type="radio" name="labMode" value="extend"><span>Extend existing lab</span></label>
+          </div>
+          <p class="hint">Load a previously generated <code>lab-spec.json</code> to pre-fill the wizard with your current lab&rsquo;s settings — then change only what you&rsquo;re adding.</p>
+        </div>
+
+        <div id="spec-file-field" class="field" hidden>
+          <label>Load existing spec</label>
+          <input type="file" id="spec-file-input" accept=".json" style="width:auto;font-family:var(--mono);font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;">
+          <span id="spec-load-status" class="hint"></span>
+        </div>
+
+        <div id="extend-mode-indicator" class="extend-indicator" hidden>
+          Extending existing lab — wizard pre-filled from spec. Modify what you want to add or change.
+        </div>
+
+        <div class="field">
+          <label>Use case</label>
           <div class="radio-grid" id="useCase-options">
             <label class="radio-card"><input type="radio" name="useCase" value="certification"><span class="radio-card-title">Certification study</span><span class="radio-card-sub">VCP / VCF exam practice</span></label>
             <label class="radio-card"><input type="radio" name="useCase" value="feature_testing"><span class="radio-card-title">Feature testing</span><span class="radio-card-sub">vSAN, NSX, specific behaviour</span></label>
@@ -354,8 +379,64 @@
         </div>
       </section>
 
-      <!-- Step 8: Nested host disk layout -->
+      <!-- Step 8: NSX-T -->
       <section class="step" data-step="8">
+        <h1>Add NSX-T to this lab?</h1>
+        <p class="step-intro">NSX-T adds software-defined networking, micro-segmentation, and optional BGP routing on top of the vSphere cluster. Deployment is after the cluster is healthy.</p>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="nsxEnabled"><span>Deploy NSX-T Manager for this lab</span></label>
+          <p class="hint">NSX Manager deploys as a VM on the cluster. Small size works for most labs.</p>
+        </div>
+
+        <div id="nsx-fields" hidden>
+          <div class="field-row">
+            <div class="field">
+              <label>NSX Manager size</label>
+              <div class="radio-group">
+                <label class="radio-row"><input type="radio" name="nsxSize" value="small" checked><span>Small &mdash; 3 vCPU / 12GB RAM (lab/POC)</span></label>
+                <label class="radio-row"><input type="radio" name="nsxSize" value="medium"><span>Medium &mdash; 6 vCPU / 24GB RAM (small production)</span></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Gateway topology</label>
+            <div class="radio-group">
+              <label class="radio-row"><input type="radio" name="nsxTopology" value="T0T1" checked><span>T0 + T1 Gateways only</span></label>
+              <label class="radio-row"><input type="radio" name="nsxTopology" value="T0T1DFW"><span>T0 + T1 Gateways + Distributed Firewall (DFW)</span></label>
+              <label class="radio-row"><input type="radio" name="nsxTopology" value="full"><span>Full &mdash; T0 / T1 / DFW + NSX Advanced LB profile</span></label>
+            </div>
+            <p class="hint hint-info" id="nsx-vcf-note">For VCF: NSX must be configured to Broadcom&rsquo;s BOM sizing and topology requirements. This lab topology is suitable for learning and practice, not for a VCF management domain bring-up.</p>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="nsxIpAddress">NSX Manager IP address</label>
+              <input type="text" id="nsxIpAddress" placeholder="e.g. 192.168.10.30">
+              <p class="hint">Must be in the management network range. Used in generated scripts.</p>
+            </div>
+          </div>
+
+          <div id="nsx-bgp-section" class="field" hidden>
+            <label>BGP peering (VyOS detected in BGP mode)</label>
+            <div class="field-row">
+              <div class="field">
+                <label for="nsxBgpLocalAs">NSX T0 AS number</label>
+                <input type="number" id="nsxBgpLocalAs" min="1" max="65535" value="65001">
+              </div>
+              <div class="field">
+                <label for="nsxBgpPeerAs">VyOS AS number</label>
+                <input type="number" id="nsxBgpPeerAs" min="1" max="65535" value="65002">
+              </div>
+            </div>
+            <p class="hint">NSX T0 (AS 65001) will peer with VyOS (AS 65002). These are auto-populated from the VyOS BGP selection. Adjust if you use different ASNs.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 9: Nested host disk layout -->
+      <section class="step" data-step="9">
         <h1>Nested host disk layout</h1>
         <p class="step-intro">Virtual disks added to each nested ESXi host VM, on top of the boot disk. Configure vSAN capacity/cache and the local datastore for vCenter bootstrap here.</p>
 
@@ -366,8 +447,8 @@
         </div>
       </section>
 
-      <!-- Step 9: Bundle depot (conditional — shown only when vSAN + local datastore both configured) -->
-      <section class="step" data-step="9">
+      <!-- Step 10: Bundle depot (conditional — shown only when vSAN + local datastore both configured) -->
+      <section class="step" data-step="10">
         <h1>VCF bundle depot?</h1>
         <p class="step-intro">A local HTTPS file server hosting VCF bundles on your LAN. During VCF bring-up, SDDC Manager downloads bundles from Broadcom's CDN — a local depot gives LAN-speed downloads instead and enables air-gapped deployments.</p>
 
@@ -396,8 +477,8 @@
         </div>
       </section>
 
-      <!-- Step 10: Workload VMs -->
-      <section class="step" data-step="10">
+      <!-- Step 11: Workload VMs -->
+      <section class="step" data-step="11">
         <h1>Deploy test workload VMs?</h1>
         <p class="step-intro">Blank VM shells on the cluster for practising vMotion, DRS, and HA — no OS required, but you can install one later.</p>
 
@@ -424,8 +505,8 @@
         </div>
       </section>
 
-      <!-- Step 11: Security & access -->
-      <section class="step" data-step="11">
+      <!-- Step 12: Security & access -->
+      <section class="step" data-step="12">
         <h1>Security and remote access</h1>
 
         <div class="field checkbox-field">
@@ -475,8 +556,8 @@
         </div>
       </section>
 
-      <!-- Step 12: Review & generate -->
-      <section class="step" data-step="12">
+      <!-- Step 13: Review & generate -->
+      <section class="step" data-step="13">
         <h1>Review and generate</h1>
         <p class="step-intro">Checks out? Generate the spec, deployment scripts, and the design doc.</p>
 
@@ -491,6 +572,76 @@
 
           <h2>Design doc preview</h2>
           <pre id="markdown-preview" class="markdown-preview"></pre>
+        </div>
+      </section>
+
+      <!-- Step 14: Troubleshooting mode (hidden — activate with Ctrl+Shift+T / Cmd+Shift+T) -->
+      <section class="step" data-step="14">
+        <h1>Troubleshooting Mode</h1>
+        <p class="step-intro">Test your knowledge of this lab&rsquo;s configuration. Load a spec to generate personalised quiz questions.</p>
+
+        <!-- Part 1: Spec selection -->
+        <div id="ts-spec-section" class="ts-section">
+          <p>Choose a spec to quiz against:</p>
+          <div class="ts-spec-options">
+            <button type="button" id="ts-use-current" class="btn btn-secondary">Use current answers</button>
+            <span class="ts-or">or</span>
+            <label class="btn btn-secondary" style="cursor:pointer;">
+              Load spec.json
+              <input type="file" id="ts-spec-file-input" accept=".json" style="display:none;">
+            </label>
+          </div>
+          <p id="ts-spec-status" class="hint" style="color:var(--danger);margin-top:8px;"></p>
+        </div>
+
+        <!-- Ticket form (shown after spec is selected, before quiz) -->
+        <div id="ts-ticket-section" class="ts-section" hidden>
+          <h2 style="font-size:15px;text-transform:none;letter-spacing:0;color:var(--text);margin-bottom:12px;">Log the issue first</h2>
+          <p class="hint" style="margin-bottom:14px;">A complete ticket unlocks hints faster. All fields except Symptom are optional.</p>
+          <div class="field">
+            <label for="ts-symptom">Symptom <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="ts-symptom" placeholder="What are you observing? (e.g. vMotion fails with error X)">
+          </div>
+          <div class="field">
+            <label for="ts-tried">What have you tried?</label>
+            <input type="text" id="ts-tried" placeholder="Steps already taken">
+          </div>
+          <div class="field">
+            <label for="ts-cause">Suspected cause</label>
+            <input type="text" id="ts-cause" placeholder="Your hypothesis">
+          </div>
+          <div class="field">
+            <label for="ts-impact">Impact / urgency</label>
+            <input type="text" id="ts-impact" placeholder="How is this affecting the lab?">
+          </div>
+          <p id="ts-ticket-error" class="hint" style="color:var(--danger);"></p>
+          <button type="button" id="ts-ticket-submit" class="btn btn-primary">Submit ticket &amp; start quiz</button>
+        </div>
+
+        <div id="ts-ticket-logged" class="ts-ticket-logged" hidden>
+          Ticket logged. Hint system ready.
+        </div>
+
+        <!-- Part 2: Quiz -->
+        <div id="ts-quiz-section" class="ts-section" hidden>
+          <p id="ts-quiz-loading" class="hint">Loading quiz questions&hellip;</p>
+          <div id="ts-quiz-container"></div>
+        </div>
+
+        <!-- Results -->
+        <div id="ts-result-section" class="ts-section" hidden>
+          <div class="ts-score-card">
+            <span class="ts-score-label">Score</span>
+            <span id="ts-score-display" class="ts-score-value"></span>
+          </div>
+          <p id="ts-result-message"></p>
+        </div>
+
+        <!-- Hint system -->
+        <div id="ts-hint-section" class="ts-section" hidden>
+          <h2 style="font-size:15px;text-transform:none;letter-spacing:0;color:var(--text);margin-bottom:12px;">Hint system</h2>
+          <p class="hint" style="margin-bottom:14px;">Hints are personalised to your actual spec values. Reveal them one level at a time.</p>
+          <div id="ts-hints-container"></div>
         </div>
       </section>
 

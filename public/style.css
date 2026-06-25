@@ -690,3 +690,216 @@ select:focus {
   padding: 10px 14px;
   margin-top: 12px;
 }
+
+/* --- Spec extend-mode indicator --- */
+
+.extend-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(79, 179, 164, 0.3);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--accent-text);
+  margin-top: 8px;
+}
+
+.spec-load-ok  { color: var(--accent-text); font-size: 12.5px; margin-top: 6px; }
+.spec-load-err { color: var(--danger);      font-size: 12.5px; margin-top: 6px; }
+
+/* --- Troubleshooting mode badge --- */
+
+.ts-badge {
+  position: fixed;
+  top: 14px;
+  right: 18px;
+  z-index: 9999;
+  background: rgba(217, 154, 78, 0.18);
+  border: 1px solid rgba(217, 154, 78, 0.55);
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* --- Troubleshooting step layout --- */
+
+.ts-section { margin-bottom: 24px; }
+
+.ts-spec-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.ts-or {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.ts-ticket-logged {
+  display: inline-block;
+  background: var(--accent-soft);
+  border: 1px solid rgba(79, 179, 164, 0.3);
+  border-radius: var(--radius);
+  color: var(--accent-text);
+  font-size: 13px;
+  padding: 8px 14px;
+  margin-bottom: 18px;
+}
+
+/* --- Troubleshooting quiz --- */
+
+.ts-quiz-progress {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  margin-bottom: 12px;
+}
+
+.ts-quiz-question {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.ts-quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ts-quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.ts-quiz-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+.ts-quiz-option.correct {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.ts-quiz-option.wrong {
+  border-color: var(--danger);
+  background: rgba(217, 105, 106, 0.1);
+  color: var(--danger);
+}
+
+.ts-quiz-explanation {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  padding: 8px 12px;
+  border-left: 3px solid var(--border);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* --- Troubleshooting results --- */
+
+.ts-score-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.ts-score-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.ts-score-value {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+/* --- Hint system --- */
+
+.ts-hint-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.ts-hint-card.revealed { border-color: rgba(79, 179, 164, 0.35); }
+
+.ts-hint-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.ts-hint-level {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  width: 72px;
+}
+
+.ts-hint-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.ts-hint-body {
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  display: none;
+}
+
+.ts-hint-card.revealed .ts-hint-body { display: block; }
+
+.ts-hint-unlock {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.ts-hint-unlock:hover { border-color: var(--warn); color: var(--warn); }
+.ts-hint-card.revealed .ts-hint-unlock { display: none; }
