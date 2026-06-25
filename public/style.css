@@ -871,6 +871,7 @@ select:focus {
 .ts-quiz-question {
   font-size: 15px;
   font-weight: 500;
+  color: var(--text);
   margin-bottom: 16px;
   line-height: 1.5;
 }
@@ -890,20 +891,21 @@ select:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  color: var(--text);
   cursor: pointer;
   font-size: 13.5px;
   transition: border-color 0.12s, background 0.12s;
 }
 
-.ts-quiz-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+.ts-quiz-option:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
 
-.ts-quiz-option.correct {
+.ts-quiz-option.ts-opt-correct {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent-text);
 }
 
-.ts-quiz-option.wrong {
+.ts-quiz-option.ts-opt-wrong {
   border-color: var(--danger);
   background: rgba(217, 105, 106, 0.1);
   color: var(--danger);
@@ -980,8 +982,12 @@ select:focus {
 .ts-hint-name {
   font-size: 13px;
   font-weight: 600;
+  color: var(--text);
   flex: 1;
 }
+
+.ts-result-pass { color: var(--accent-text); font-size: 14px; margin-top: 8px; }
+.ts-result-fail { color: var(--warn);        font-size: 14px; margin-top: 8px; }
 
 .ts-hint-body {
   padding: 12px 14px;
