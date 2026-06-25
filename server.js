@@ -24,6 +24,7 @@ const { buildPrerequisites } = require('./lib/generatePrerequisites');
 const { buildDepotFiles } = require('./lib/generateDepot');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { evaluateSizing } = require('./lib/sizing');
+const { validateAnswers } = require('./lib/validateAnswers');
 
 // Locate mmdc (mermaid-cli) — checks local node_modules first, then PATH.
 // Returns the path string if found and executable, otherwise null.
@@ -123,6 +124,11 @@ app.post('/api/generate', (req, res) => {
   try {
     const answers = req.body || {};
 
+    const validationErrors = validateAnswers(answers);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: validationErrors });
+    }
+
     const sizing = evaluateSizing(answers);
     const spec = buildSpec(answers, sizing);
     const scripts = buildPowerShellScripts(spec);
@@ -170,7 +176,7 @@ app.post('/api/generate', (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(400).json({ error: err.message || 'Generation failed.' });
+    res.status(500).json({ error: 'Generation failed. Check the server log for details.' });
   }
 });
 
@@ -182,6 +188,14 @@ app.get('/api/download/:id/:kind', (req, res) => {
   if (!filename) return res.status(404).send('Unknown file kind');
 
   const filePath = path.join(OUTPUT_DIR, id, filename);
+
+  // Defense in depth: verify the resolved path hasn't escaped OUTPUT_DIR.
+  // The regex on id and allowlist on kind already prevent this, but be explicit.
+  const resolvedOutput = path.resolve(OUTPUT_DIR);
+  if (!path.resolve(filePath).startsWith(resolvedOutput + path.sep)) {
+    return res.status(400).send('Invalid path');
+  }
+
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
 
   res.download(filePath, filename);
