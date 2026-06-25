@@ -1694,12 +1694,12 @@ function wireGenerate() {
   });
 }
 
-// --- Keyboard shortcut: Ctrl+Shift+T (all platforms) → toggle troubleshooting mode ---
-// Using Ctrl (not Cmd/Meta on Mac) avoids the "reopen closed tab" browser shortcut
-// that intercepts Cmd+Shift+T before the JS event can fire.
+// --- Keyboard shortcut: Ctrl+Shift+X / Cmd+Shift+X → toggle troubleshooting mode ---
+// X is not reserved by any major browser on any platform.
 
 document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 't') {
+  const modifier = e.ctrlKey || e.metaKey;
+  if (modifier && e.shiftKey && e.key.toLowerCase() === 'x') {
     e.preventDefault();
     toggleTroubleshootingMode();
   }

@@ -53,7 +53,7 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 | 11 | Workload VMs | |
 | 12 | Security & access | |
 | 13 | Review & generate | `TOTAL_STEPS - 2` |
-| 14 | Troubleshooting | Hidden; activated via Ctrl+Shift+T / Cmd+Shift+T |
+| 14 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
 
 `TOTAL_STEPS = 15`, `DEPOT_STEP = 10`, `NSX_STEP = 8`, `TROUBLESHOOT_STEP = 14`
 
@@ -91,7 +91,7 @@ network diagram, prerequisites.
   Generates: nsx-deploy.ps1, nsx-configure.ps1, nsx-bgp.ps1
 - Spec versioning: "Extend existing lab" option loads a prior spec.json back into the
   wizard; only new/changed scripts are regenerated.
-- Troubleshooting mode (hidden, Ctrl+Shift+T / Cmd+Shift+T):
+- Troubleshooting mode (hidden, Ctrl+Shift+X / Cmd+Shift+X):
   - Amber fixed badge; step 14 added to rail (hidden by default)
   - Part 1: choose spec source (current answers or load spec.json)
   - Ticket logging form (symptom / tried / cause / impact); completeness gates hint level
