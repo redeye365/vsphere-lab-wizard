@@ -85,24 +85,29 @@
           <div class="field">
             <label for="hostCount">Physical hosts</label>
             <input type="number" id="hostCount" min="1" value="1">
-            <p class="hint">Most homelabs run this on a single box. If you've got more than one, the wizard still sizes against the total.</p>
+            <p class="hint">Each physical host can run several nested ESXi VMs. If you have more than one, the wizard will ask for each host's IP and can distribute nested VMs across them.</p>
           </div>
           <div class="field">
-            <label for="cpuCores">Logical CPU cores (total)</label>
-            <input type="number" id="cpuCores" min="1" placeholder="e.g. 36">
-            <p class="hint">Total threads across all physical hosts, not per-socket.</p>
+            <label for="host1Ip">Host 1 management IP</label>
+            <input type="text" id="host1Ip" placeholder="e.g. 192.168.1.10">
+            <p class="hint">IP address of the physical ESXi host — used as the deploy target in generated scripts.</p>
           </div>
         </div>
 
         <div class="field-row">
           <div class="field">
-            <label for="ramGB">RAM (GB, total)</label>
+            <label for="cpuCores">Logical CPU cores (per host)</label>
+            <input type="number" id="cpuCores" min="1" placeholder="e.g. 36">
+            <p class="hint">Logical threads on a single physical host, not the total across all hosts.</p>
+          </div>
+          <div class="field">
+            <label for="ramGB">RAM (GB, per host)</label>
             <input type="number" id="ramGB" min="1" placeholder="e.g. 256">
           </div>
         </div>
 
         <div class="field">
-          <label>Storage devices</label>
+          <label>Storage devices (per host)</label>
           <p class="hint">One entry per physical disk or disk group &mdash; drives sizing checks and script comments. Add as many as you have.</p>
           <div id="storage-device-list"></div>
           <button type="button" id="add-storage-device" class="btn btn-secondary" style="margin-top:4px;font-size:12.5px;padding:7px 12px;">+ Add device</button>
@@ -110,7 +115,7 @@
 
         <div class="field-row">
           <div class="field">
-            <label for="nicCount">Physical NICs</label>
+            <label for="nicCount">Physical NICs (per host)</label>
             <input type="number" id="nicCount" min="1" placeholder="e.g. 2">
           </div>
           <div class="field">
@@ -122,6 +127,13 @@
               <option value="25gbe">25GbE or faster</option>
             </select>
           </div>
+        </div>
+
+        <!-- Additional physical hosts (shown dynamically when hostCount > 1) -->
+        <div id="additional-hosts-section" hidden>
+          <hr style="margin:18px 0;border-color:var(--border);">
+          <h3 style="font-size:14px;margin-bottom:12px;color:var(--text-muted);">Additional physical hosts</h3>
+          <div id="additional-hosts-list"></div>
         </div>
       </section>
 
@@ -311,6 +323,18 @@
             <label for="nestedDiskGB">Boot disk per host (GB)</label>
             <input type="number" id="nestedDiskGB" min="8" value="32">
           </div>
+        </div>
+
+        <!-- Nested host placement (shown when hostCount > 1) -->
+        <div id="placement-section" hidden>
+          <div class="field">
+            <label>Distribute nested hosts across physical hosts</label>
+            <div class="radio-group">
+              <label class="radio-row"><input type="radio" name="nestedHostPlacement" value="auto" checked><span>Automatic &mdash; distribute evenly (round-robin)</span></label>
+              <label class="radio-row"><input type="radio" name="nestedHostPlacement" value="manual"><span>Manual &mdash; assign each nested host myself</span></label>
+            </div>
+          </div>
+          <div id="manual-placement-rows" hidden></div>
         </div>
 
         <div class="field">

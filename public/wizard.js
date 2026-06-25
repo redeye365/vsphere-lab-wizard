@@ -92,9 +92,12 @@ const state = {
   answers: {
     discovery: { useCase: null, networkType: null, vlanCapable: null, dhcpAvailable: null },
     hardware: {
-      hostCount: 1, cpuCores: null, ramGB: null,
+      hostCount: 1,
+      ipAddress: null,
+      cpuCores: null, ramGB: null,
       storageDevices: [{ type: '', capacityGB: null, capacityUnit: 'GB' }],
-      nicCount: null, nicSpeed: null
+      nicCount: null, nicSpeed: null,
+      additionalHosts: []
     },
     design: {
       esxiVersion: null,
@@ -115,6 +118,7 @@ const state = {
       memTieringEnabled: false, nvmeSizeGB: 100, tierNvmePct: 25, nvmeTieringDiskIndex: null,
       workloadVmsEnabled: false, workloadVmCount: 3, workloadVmSize: 'small',
       nestedDisks: [],
+      nestedHostPlacement: 'auto', nestedHostAssignments: [],
       isolateLab: false, firewallPolicy: null, internetAccess: false,
       remoteAccessMethod: null, vpnType: null, vcenterSize: null
     }
@@ -186,7 +190,18 @@ function wireForm() {
 
   bindRadio('useCase', d, 'useCase', onChange);
 
-  bindNumber('hostCount', h, 'hostCount', onChange);
+  bindText('host1Ip', h, 'ipAddress', onChange);
+  document.getElementById('hostCount').addEventListener('input', () => {
+    h.hostCount = Number(document.getElementById('hostCount').value) || 1;
+    syncAdditionalHosts();
+    renderAdditionalHosts(onChange);
+    renderPlacementRows(onChange);
+    onChange();
+  });
+  // initial render for multi-host sections
+  syncAdditionalHosts();
+  renderAdditionalHosts(onChange);
+
   bindNumber('cpuCores', h, 'cpuCores', onChange);
   bindNumber('ramGB', h, 'ramGB', onChange);
 
@@ -312,7 +327,21 @@ function wireForm() {
   document.getElementById('nestedHostCount').addEventListener('input', () => {
     const note = document.getElementById('host-count-vcf-note');
     if (note) note.hidden = (g.nestedHostCount || 0) >= 3;
+    renderPlacementRows(onChange);
   });
+
+  // Nested host placement (step 7, shown when physCount > 1)
+  document.querySelectorAll('input[name="nestedHostPlacement"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (el.checked) {
+        g.nestedHostPlacement = el.value;
+        renderPlacementRows(onChange);
+        onChange();
+      }
+    });
+  });
+  renderPlacementRows(onChange);
+
   bindCheckbox('legacyCpuCompat', g, 'legacyCpuCompat', onChange);
 
   // Memory tiering (step 7)
@@ -511,6 +540,153 @@ function renderStorageDevices(onChange) {
   if (state.answers.design.memTieringEnabled) renderNvmeDiskPicker(onChange);
 }
 
+function syncAdditionalHosts() {
+  const h = state.answers.hardware;
+  const count = Number(h.hostCount) || 1;
+  const target = Math.max(0, count - 1);
+  while (h.additionalHosts.length < target) {
+    h.additionalHosts.push({
+      ipAddress: null, sameAsFirst: true,
+      cpuCores: null, ramGB: null,
+      storageDevices: [{ type: '', capacityGB: null, capacityUnit: 'GB' }],
+      nicCount: null, nicSpeed: null
+    });
+  }
+  h.additionalHosts.length = target;
+}
+
+function renderAdditionalHosts(onChange) {
+  const h = state.answers.hardware;
+  const section = document.getElementById('additional-hosts-section');
+  const list = document.getElementById('additional-hosts-list');
+  if (!section || !list) return;
+
+  const count = Number(h.hostCount) || 1;
+  section.hidden = count < 2;
+  if (count < 2) return;
+
+  list.innerHTML = '';
+  h.additionalHosts.forEach((host, idx) => {
+    const hostNum = idx + 2;
+    const block = document.createElement('div');
+    block.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:14px;';
+
+    const titleRow = document.createElement('div');
+    titleRow.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:10px;';
+    const title = document.createElement('strong');
+    title.style.cssText = 'font-size:13px;color:var(--text);';
+    title.textContent = `Physical host ${hostNum}`;
+    titleRow.appendChild(title);
+    block.appendChild(titleRow);
+
+    // IP address
+    const ipRow = document.createElement('div');
+    ipRow.style.cssText = 'margin-bottom:10px;';
+    const ipLabel = document.createElement('label');
+    ipLabel.textContent = `Host ${hostNum} management IP`;
+    ipLabel.style.cssText = 'display:block;font-size:12px;margin-bottom:4px;color:var(--text-muted);';
+    const ipInput = document.createElement('input');
+    ipInput.type = 'text'; ipInput.placeholder = 'e.g. 192.168.1.11';
+    ipInput.style.cssText = 'width:220px;';
+    if (host.ipAddress) ipInput.value = host.ipAddress;
+    ipInput.addEventListener('input', () => {
+      h.additionalHosts[idx].ipAddress = ipInput.value.trim() || null;
+      onChange();
+    });
+    ipRow.append(ipLabel, ipInput);
+    block.appendChild(ipRow);
+
+    // Same specs checkbox
+    const sameRow = document.createElement('label');
+    sameRow.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);cursor:pointer;';
+    const sameCheck = document.createElement('input');
+    sameCheck.type = 'checkbox'; sameCheck.checked = host.sameAsFirst !== false;
+    const sameLabel = document.createElement('span');
+    sameLabel.textContent = 'Same CPU, RAM, storage, and NIC specs as host 1';
+    sameRow.append(sameCheck, sameLabel);
+    block.appendChild(sameRow);
+
+    // Extra specs section (hidden unless sameAsFirst = false)
+    const extraSpecs = document.createElement('div');
+    extraSpecs.hidden = host.sameAsFirst !== false;
+    extraSpecs.style.cssText = 'margin-top:12px;';
+
+    const extraCpuRam = document.createElement('div');
+    extraCpuRam.style.cssText = 'display:flex;gap:12px;margin-bottom:10px;';
+
+    const cpuF = document.createElement('div');
+    const cpuL = document.createElement('label');
+    cpuL.textContent = 'CPU cores'; cpuL.style.cssText = 'display:block;font-size:12px;margin-bottom:3px;color:var(--text-muted);';
+    const cpuI = document.createElement('input');
+    cpuI.type = 'number'; cpuI.min = '1'; cpuI.placeholder = 'e.g. 36'; cpuI.style.width = '100px';
+    if (host.cpuCores) cpuI.value = host.cpuCores;
+    cpuI.addEventListener('input', () => { h.additionalHosts[idx].cpuCores = Number(cpuI.value) || null; onChange(); });
+    cpuF.append(cpuL, cpuI);
+
+    const ramF = document.createElement('div');
+    const ramL = document.createElement('label');
+    ramL.textContent = 'RAM (GB)'; ramL.style.cssText = 'display:block;font-size:12px;margin-bottom:3px;color:var(--text-muted);';
+    const ramI = document.createElement('input');
+    ramI.type = 'number'; ramI.min = '1'; ramI.placeholder = 'e.g. 256'; ramI.style.width = '100px';
+    if (host.ramGB) ramI.value = host.ramGB;
+    ramI.addEventListener('input', () => { h.additionalHosts[idx].ramGB = Number(ramI.value) || null; onChange(); });
+    ramF.append(ramL, ramI);
+
+    extraCpuRam.append(cpuF, ramF);
+    extraSpecs.appendChild(extraCpuRam);
+
+    sameCheck.addEventListener('change', () => {
+      h.additionalHosts[idx].sameAsFirst = sameCheck.checked;
+      extraSpecs.hidden = sameCheck.checked;
+      onChange();
+    });
+
+    block.append(extraSpecs);
+    list.appendChild(block);
+  });
+}
+
+function renderPlacementRows(onChange) {
+  const h = state.answers.hardware;
+  const g = state.answers.design;
+  const physCount = Number(h.hostCount) || 1;
+  const nestedCount = Number(g.nestedHostCount) || 0;
+  const placementSection = document.getElementById('placement-section');
+  const manualRows = document.getElementById('manual-placement-rows');
+  if (!placementSection || !manualRows) return;
+
+  placementSection.hidden = physCount < 2;
+  if (physCount < 2) return;
+
+  const isManual = g.nestedHostPlacement === 'manual';
+  manualRows.hidden = !isManual;
+  if (!isManual) return;
+
+  // Ensure assignments array is sized correctly
+  while (g.nestedHostAssignments.length < nestedCount) g.nestedHostAssignments.push(0);
+  g.nestedHostAssignments.length = nestedCount;
+
+  manualRows.innerHTML = '';
+  for (let i = 0; i < nestedCount; i++) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px;';
+    const lbl = document.createElement('span');
+    lbl.textContent = `nested-esxi-${String(i + 1).padStart(2, '0')}`;
+    lbl.style.cssText = 'min-width:140px;color:var(--text);';
+    const sel = document.createElement('select');
+    sel.style.width = '180px';
+    for (let p = 0; p < physCount; p++) {
+      const o = document.createElement('option');
+      o.value = p; o.textContent = `Physical host ${p + 1}`;
+      o.selected = (g.nestedHostAssignments[i] === p);
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => { g.nestedHostAssignments[i] = Number(sel.value); onChange(); });
+    row.append(lbl, sel);
+    manualRows.appendChild(row);
+  }
+}
+
 function renderNvmeDiskPicker(onChange) {
   const container = document.getElementById('nvme-disk-options');
   const warningEl = document.getElementById('nvme-disk-warning');
@@ -679,6 +855,12 @@ function validateStep(n) {
       if (devs.length === 0) return 'Add at least one storage device.';
       if (devs.some((d) => !d.type || !d.capacityGB)) {
         return 'Each storage device needs a type and capacity before continuing.';
+      }
+      if ((h.hostCount || 1) > 1) {
+        const addl = h.additionalHosts || [];
+        for (let i = 0; i < addl.length; i++) {
+          if (!addl[i].ipAddress) return `Enter an IP address for physical host ${i + 2}.`;
+        }
       }
       return null;
     }
@@ -979,13 +1161,18 @@ function renderReview() {
   const hwRows = [
     ['Use case', USE_CASE_LABELS[d.useCase] || val(d.useCase)],
     ['Physical hosts', val(h.hostCount)],
-    ['CPU cores', val(h.cpuCores)],
-    ['RAM', val(h.ramGB, 'GB')],
+    ['Host 1 IP', val(h.ipAddress)],
+    ['CPU cores / host', val(h.cpuCores)],
+    ['RAM / host', val(h.ramGB, 'GB')],
     ...((h.storageDevices || []).map((dev, i) => [
       `Disk ${i + 1}`,
       `${dev.capacityGB || '?'}${dev.capacityUnit || 'GB'} ${DEVICE_TYPE_LABELS[dev.type] || '?'}`
     ])),
-    ['NICs', h.nicCount ? `${h.nicCount} × ${h.nicSpeed || '?'}` : '—']
+    ['NICs / host', h.nicCount ? `${h.nicCount} × ${h.nicSpeed || '?'}` : '—'],
+    ...((h.additionalHosts || []).map((ah, i) => [
+      `Host ${i + 2} IP`,
+      val(ah.ipAddress) + (ah.sameAsFirst !== false ? ' (same specs as host 1)' : ` — ${ah.cpuCores || '?'} cores / ${ah.ramGB || '?'}GB`)
+    ]))
   ];
   container.appendChild(reviewCard('Hardware', hwRows));
 
@@ -1136,7 +1323,33 @@ function loadSpecIntoState(spec) {
     if (spec.existingNetwork.vlanCapableRouter != null) d.vlanCapable = spec.existingNetwork.vlanCapableRouter;
     if (spec.existingNetwork.dhcpAvailable != null) d.dhcpAvailable = spec.existingNetwork.dhcpAvailable;
   }
-  if (spec.physicalHost) {
+  if (spec.physicalHosts && spec.physicalHosts.length) {
+    // New multi-host format
+    h.hostCount = spec.physicalHosts.length;
+    const ph0 = spec.physicalHosts[0];
+    if (ph0.ipAddress) h.ipAddress = ph0.ipAddress;
+    if (ph0.cpuCores) h.cpuCores = ph0.cpuCores;
+    if (ph0.ramGB) h.ramGB = ph0.ramGB;
+    if (ph0.nicCount) h.nicCount = ph0.nicCount;
+    if (ph0.nicSpeed) h.nicSpeed = ph0.nicSpeed;
+    if (ph0.storageDevices && ph0.storageDevices.length) {
+      h.storageDevices = ph0.storageDevices.map((d) => ({
+        type: d.type || '', capacityGB: d.capacityGB || null, capacityUnit: 'GB'
+      }));
+    }
+    h.additionalHosts = spec.physicalHosts.slice(1).map((ph) => ({
+      ipAddress: ph.ipAddress || null,
+      sameAsFirst: false,
+      cpuCores: ph.cpuCores || null,
+      ramGB: ph.ramGB || null,
+      storageDevices: (ph.storageDevices || []).map((d) => ({
+        type: d.type || '', capacityGB: d.capacityGB || null, capacityUnit: 'GB'
+      })),
+      nicCount: ph.nicCount || null,
+      nicSpeed: ph.nicSpeed || null
+    }));
+  } else if (spec.physicalHost) {
+    // Legacy single-host format
     const ph = spec.physicalHost;
     if (ph.hostCount) h.hostCount = ph.hostCount;
     if (ph.cpuCores) h.cpuCores = ph.cpuCores;
@@ -1145,9 +1358,7 @@ function loadSpecIntoState(spec) {
     if (ph.nicSpeed) h.nicSpeed = ph.nicSpeed;
     if (ph.storageDevices && ph.storageDevices.length) {
       h.storageDevices = ph.storageDevices.map((d) => ({
-        type: d.type || '',
-        capacityGB: d.capacityGB || null,
-        capacityUnit: 'GB'
+        type: d.type || '', capacityGB: d.capacityGB || null, capacityUnit: 'GB'
       }));
     }
   }
