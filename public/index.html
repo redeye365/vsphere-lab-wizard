@@ -34,6 +34,9 @@
       <li data-step="13"><span class="rail-num">14</span><span>Review &amp; generate</span></li>
       <li data-step="14" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
     </ol>
+    <div class="rail-footer">
+      <a href="/diagram" target="_blank" rel="noopener" class="rail-diagram-btn" id="rail-diagram-btn">&#x1F5A7; View Diagram</a>
+    </div>
   </aside>
 
   <main class="main">
@@ -593,6 +596,18 @@
 
         <div id="review-summary" class="review-summary"></div>
 
+        <!-- Live network diagram preview -->
+        <div id="review-diagram-section" class="review-diagram-section" hidden>
+          <div class="review-diagram-header">
+            <h2>Network diagram</h2>
+            <a href="/diagram" target="_blank" rel="noopener" class="review-diagram-open">Open in viewer &rarr;</a>
+          </div>
+          <div id="review-diagram-wrap" class="review-diagram-wrap">
+            <div id="review-diagram-inner" class="review-diagram-inner"></div>
+            <div id="review-diagram-empty" class="review-diagram-empty">Rendering&hellip;</div>
+          </div>
+        </div>
+
         <div id="generate-error-block" class="generate-error-block" hidden></div>
 
         <button type="button" id="btn-generate" class="btn btn-primary">Generate lab design</button>
@@ -708,6 +723,7 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script src="wizard.js"></script>
 </body>
 </html>

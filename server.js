@@ -24,6 +24,7 @@ const { buildPrerequisites } = require('./lib/generatePrerequisites');
 const { buildDepotFiles } = require('./lib/generateDepot');
 const { buildNsxScripts } = require('./lib/generateNsx');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
+const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
 const { evaluateSizing } = require('./lib/sizing');
 const { validateAnswers } = require('./lib/validateAnswers');
 
@@ -98,7 +99,8 @@ const FIXED_OUTPUT_FILES = {
   'design-doc':      'design-doc.md',
   'build-guide':     'build-guide.md',
   'prerequisites':   'PREREQUISITES.md',
-  'network-diagram': 'network-diagram.svg'
+  'network-diagram': 'network-diagram.svg',
+  'diagram-html':    'diagram.html'
 };
 
 // Dynamic script filenames -- the key is the download URL kind
@@ -156,6 +158,9 @@ app.post('/api/generate', (req, res) => {
     const mermaidDiagram = buildMermaidDiagram(spec);
     const svgGenerated = renderSvg(mermaidDiagram, path.join(dir, 'network-diagram.svg'));
 
+    // Standalone diagram.html (renders from CDN, no server required)
+    fs.writeFileSync(path.join(dir, 'diagram.html'), buildDiagramHtml(spec, mermaidDiagram));
+
     // Write each generated PowerShell/bash script
     for (const [filename, content] of Object.entries(scripts)) {
       fs.writeFileSync(path.join(dir, filename), content);
@@ -211,6 +216,48 @@ app.get('/api/download/:id/:kind', (req, res) => {
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
 
   res.download(filePath, filename);
+});
+
+// ── Diagram endpoints ──────────────────────────────────────────────────────
+
+// GET /api/diagram/:id — returns { mermaid: "...", spec: {...} } for a saved output
+app.get('/api/diagram/:id', (req, res) => {
+  const { id } = req.params;
+  if (!/^[a-f0-9]{8}$/.test(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  const specPath = path.join(OUTPUT_DIR, id, 'lab-spec.json');
+  const resolvedOutput = path.resolve(OUTPUT_DIR);
+  if (!path.resolve(specPath).startsWith(resolvedOutput + path.sep)) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+  if (!fs.existsSync(specPath)) return res.status(404).json({ error: 'Not found' });
+
+  try {
+    const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+    const mermaid = buildMermaidDiagram(spec);
+    res.json({ mermaid, spec });
+  } catch {
+    res.status(500).json({ error: 'Failed to read spec' });
+  }
+});
+
+// POST /api/diagram/from-spec — build mermaid source from a posted spec object
+app.post('/api/diagram/from-spec', (req, res) => {
+  try {
+    const { spec } = req.body || {};
+    if (!spec || typeof spec !== 'object') {
+      return res.status(400).json({ error: 'spec object required' });
+    }
+    const mermaid = buildMermaidDiagram(spec);
+    res.json({ mermaid });
+  } catch (err) {
+    res.status(500).json({ error: 'Diagram generation failed' });
+  }
+});
+
+// GET /diagram — serve the standalone diagram viewer page
+app.get('/diagram', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'diagram.html'));
 });
 
 // ── Troubleshooting mode endpoints ─────────────────────────────────────────

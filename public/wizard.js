@@ -58,6 +58,7 @@ const SCRIPT_LABELS = {
   'design-doc':       'design-doc.md',
   'build-guide':      'build-guide.md',
   'prerequisites':    'PREREQUISITES.md',
+  'diagram-html':     'diagram.html',
   'network-diagram':  'network-diagram.svg',
   'deploy-lab':       'deploy-lab.ps1',
   'vyos-deploy': 'vyos-deploy.ps1',
@@ -1308,6 +1309,105 @@ function renderReview() {
   }
 
   document.getElementById('results').hidden = true;
+
+  renderReviewDiagram();
+}
+
+// ── Live diagram preview on review screen ─────────────────────────────────
+
+let reviewMermaidInit = false;
+let reviewDiagramPending = false;
+
+function renderReviewDiagram() {
+  const section = document.getElementById('review-diagram-section');
+  const inner   = document.getElementById('review-diagram-inner');
+  const empty   = document.getElementById('review-diagram-empty');
+
+  section.hidden = false;
+  inner.innerHTML = '';
+  empty.textContent = 'Rendering…';
+  empty.style.display = 'flex';
+
+  if (!reviewMermaidInit) {
+    if (typeof mermaid === 'undefined') return;
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', darkMode: true, securityLevel: 'loose' });
+    reviewMermaidInit = true;
+  }
+
+  // Build spec from current state and request mermaid source from server
+  fetch('/api/diagram/from-spec', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ spec: buildReviewSpec() })
+  })
+    .then((r) => r.json())
+    .then(async (data) => {
+      if (!data.mermaid) throw new Error('No mermaid source returned');
+      const id = 'review-diag-' + Date.now();
+      const { svg } = await mermaid.render(id, data.mermaid);
+      inner.innerHTML = svg;
+      const svgEl = inner.querySelector('svg');
+      if (svgEl) { svgEl.style.maxWidth = '100%'; svgEl.style.height = 'auto'; }
+      empty.style.display = 'none';
+    })
+    .catch((err) => {
+      empty.textContent = 'Diagram preview unavailable';
+    });
+}
+
+function buildReviewSpec() {
+  // Minimal spec build from current answers — mirrors what the server does in generateSpec.js
+  // We only need enough for buildMermaidDiagram; full spec is built server-side on generate.
+  const h = state.answers.hardware || {};
+  const g = state.answers.design || {};
+
+  const host1 = {
+    ipAddress: h.ipAddress || null,
+    cpuCores: Number(h.cpuCores) || null,
+    ramGB: Number(h.ramGB) || null
+  };
+  const physicalHosts = [
+    host1,
+    ...(h.additionalHosts || []).map((ah) => ({
+      ipAddress: ah.ipAddress || null,
+      cpuCores: ah.sameAsFirst !== false ? host1.cpuCores : (Number(ah.cpuCores) || null),
+      ramGB: ah.sameAsFirst !== false ? host1.ramGB : (Number(ah.ramGB) || null)
+    }))
+  ];
+  const physCount = physicalHosts.length;
+  const nestedCount = Number(g.nestedHostCount) || 0;
+  let placement;
+  if (g.nestedHostPlacement === 'manual' && Array.isArray(g.nestedHostAssignments)
+      && g.nestedHostAssignments.length === nestedCount) {
+    placement = g.nestedHostAssignments.map((v) => Math.min(Number(v) || 0, physCount - 1));
+  } else {
+    placement = Array.from({ length: nestedCount }, (_, i) => i % physCount);
+  }
+
+  return {
+    physicalHost: host1,
+    physicalHosts,
+    esxiVersion: { label: ESXI_VERSION_LABELS[g.esxiVersion] || 'ESXi' },
+    vyos: { enabled: !!g.vyosEnabled, networkMode: g.vyosNetworkMode || 'basic' },
+    domainController: { enabled: !!g.dcEnabled, domainName: g.dcDomainName || null, ipAddress: g.dcIpAddress || null },
+    networks: {
+      management: { cidr: g.mgmtCidr || null, vlanId: g.mgmtVlan != null ? Number(g.mgmtVlan) : null, mode: g.mgmtVlanMode || 'untagged' },
+      vMotion: { cidr: g.vmotionCidr || null, vlanId: g.vmotionVlan != null ? Number(g.vmotionVlan) : null },
+      vsan: g.vsanEnabled ? { cidr: g.vsanCidr || null, vlanId: g.vsanVlan != null ? Number(g.vsanVlan) : null } : null,
+      vmTraffic: { cidr: g.vmCidr || null, vlanId: g.vmVlan != null ? Number(g.vmVlan) : null }
+    },
+    nestedCluster: {
+      hostCount: nestedCount,
+      vcpuPerHost: Number(g.vcpuPerHost) || 0,
+      vramPerHostGB: Number(g.vramPerHostGB) || 0,
+      vsanEnabled: !!g.vsanEnabled,
+      clusterName: g.clusterName || 'mgmt-cluster',
+      hosts: placement.map((pi, i) => ({ index: i + 1, physicalHostIndex: pi }))
+    },
+    workloadVms: { enabled: !!g.workloadVmsEnabled, count: Number(g.workloadVmCount) || 0, vcpu: 2, vramGB: 4 },
+    remoteAccess: { method: g.remoteAccessMethod || null },
+    nsx: { enabled: !!g.nsxEnabled, bgpEnabled: !!(g.nsxEnabled && g.vyosEnabled && g.vyosNetworkMode === 'bgp') }
+  };
 }
 
 // --- Spec loading (extend mode) ---
@@ -1805,6 +1905,7 @@ function renderDownloads(id, generatedScripts, svgGenerated) {
   container.appendChild(makeLink('spec'));
   container.appendChild(makeLink('design-doc'));
   container.appendChild(makeLink('build-guide'));
+  container.appendChild(makeLink('diagram-html'));
   if (generatedScripts.includes('depot-instructions')) {
     container.appendChild(makeLink('depot-instructions'));
   }
@@ -1896,6 +1997,12 @@ function wireGenerate() {
       document.getElementById('markdown-preview').textContent = data.markdownPreview;
       document.getElementById('results').hidden = false;
       document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Update "View Diagram" rail button to link directly to this session
+      const railDiagramBtn = document.getElementById('rail-diagram-btn');
+      if (railDiagramBtn && data.id) {
+        railDiagramBtn.href = `/diagram?id=${data.id}`;
+      }
     } catch (err) {
       if (err.message) document.getElementById('step-error').textContent = err.message;
     } finally {

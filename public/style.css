@@ -93,6 +93,8 @@ code {
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .rail-brand-name {
@@ -146,6 +148,89 @@ code {
   font-size: 11px;
   color: var(--text-faint);
   width: 18px;
+}
+
+.rail-footer {
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.rail-diagram-btn {
+  display: block;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  text-decoration: none;
+  text-align: center;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.rail-diagram-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* --- Review diagram preview --- */
+
+.review-diagram-section {
+  margin: 28px 0 24px;
+}
+
+.review-diagram-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.review-diagram-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.review-diagram-open {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  margin-left: auto;
+}
+.review-diagram-open:hover { text-decoration: underline; }
+
+.review-diagram-wrap {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  min-height: 260px;
+  max-height: 400px;
+}
+
+.review-diagram-inner {
+  padding: 16px;
+  overflow: auto;
+  max-height: 400px;
+}
+
+.review-diagram-inner svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.review-diagram-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: 13px;
 }
 
 /* --- Main --- */

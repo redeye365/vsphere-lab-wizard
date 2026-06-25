@@ -13,10 +13,11 @@ document, network diagram, and build guide. No framework (React/Vue/etc.) — pl
 HTML/CSS/JS in `public/`. Server-side generation only (no client-side bundling).
 
 Key files:
-- `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, quiz endpoint
+- `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/from-spec`, `/diagram`, quiz endpoint
 - `public/index.html` — all wizard steps in one HTML file
 - `public/wizard.js` — all client state, step logic, form wiring
 - `public/style.css` — all styles
+- `public/diagram.html` — standalone diagram viewer (live Mermaid, zoom/pan, download SVG/PNG, file picker, session load)
 - `lib/generateSpec.js` — builds the canonical spec object from wizard answers
 - `lib/sizing.js` — resource maths (vCPU / vRAM totals, warnings)
 - `lib/validateAnswers.js` — server-side input validation
@@ -25,6 +26,7 @@ Key files:
 - `lib/generateBuildGuide.js` — step-by-step human build guide
 - `lib/generateMarkdown.js` — design-doc.md
 - `lib/generateNetworkDiagram.js` — Mermaid flowchart
+- `lib/generateDiagramHtml.js` — standalone diagram.html with embedded mermaid source
 - `lib/generatePrerequisites.js` — PREREQUISITES.md
 - `lib/generateDepot.js` — optional local depot scripts
 
@@ -35,24 +37,24 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 
 ---
 
-## Step numbering (as of v0.4-beta)
+## Step numbering (as of v0.4.8-beta)
 
 | # | Step name | Notes |
 |---|-----------|-------|
-| 0 | Lab mode | New lab vs extend existing; spec file picker |
-| 1 | Use case | |
+| 0 | Use case | |
+| 1 | Hardware | Per-host specs when hostCount > 1 |
 | 2 | ESXi version | |
-| 3 | Physical host | |
-| 4 | Networks | |
-| 5 | Domain controller | |
-| 6 | VyOS router | |
-| 7 | Nested cluster | |
-| 8 | NSX-T | Only shown when nsxEnabled; new in v0.4 |
-| 9 | Nested host disk layout | |
+| 3 | Virtual router (VyOS) | |
+| 4 | Domain controller | |
+| 5 | Existing network | |
+| 6 | Lab networks | |
+| 7 | Nested cluster | Placement section shown when hostCount > 1 |
+| 8 | NSX-T | Always shown |
+| 9 | Nested disks | |
 | 10 | Bundle depot | `depotStepVisible()` gates on vSAN + local_datastore |
 | 11 | Workload VMs | |
 | 12 | Security & access | |
-| 13 | Review & generate | `TOTAL_STEPS - 2` |
+| 13 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
 | 14 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
 
 `TOTAL_STEPS = 15`, `DEPOT_STEP = 10`, `NSX_STEP = 8`, `TROUBLESHOOT_STEP = 14`
@@ -75,6 +77,7 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 | 1 | v0.1 | Initial |
 | 2 | v0.2 | remoteAccess, workloadVms |
 | 3 | v0.4 | nsx section, extendMode flag |
+| 4 | v0.4.8-beta | `physicalHosts[]` array (multi-host); `nestedCluster.hosts[]` placement; `nestedCluster.hostPlacement` ('auto'/'manual') |
 
 ---
 
@@ -85,7 +88,22 @@ Core wizard: physical host → networks → DC → VyOS → nested cluster → d
 workloads → security → review. Generates PowerShell scripts, design doc, build guide,
 network diagram, prerequisites.
 
-### v1.5 → v0.4-beta (current build)
+### v0.4.9-beta (current build — diagram viewer)
+- **Network diagram viewer** (`/diagram` route, `public/diagram.html`):
+  - Live Mermaid render in review screen (step 13) — auto-updates on entry, "Open in viewer" link
+  - Standalone `/diagram` viewer: file picker for spec.json, session ID load, zoom/pan, fullscreen, download SVG/PNG, component key
+  - "View Diagram" button in left rail (always visible); updates to `?id=<session>` after generate
+  - `diagram.html` included in every generated output (CDN Mermaid, embedded source, standalone)
+  - New endpoints: `GET /api/diagram/:id`, `POST /api/diagram/from-spec`, `GET /diagram`
+- **Multi-host support** (v0.4.8-beta):
+  - Per-host hardware collection (step 1) when hostCount > 1
+  - Nested VM placement: auto (round-robin) or manual assignment
+  - deploy-lab.ps1: `$physicalHostGroups` loop; per-host port group creation
+  - sizing.js: per-host RAM/CPU checks
+  - Network diagram: PHYS1/PHYS2 subgraphs
+  - schemaVersion 4
+
+### v1.5 → v0.4-beta
 - NSX-T wizard step (step 8): Small/Medium sizing; T0T1 / T0T1DFW / Full topology;
   BGP peering auto-populated from VyOS config (AS 65001/65002).
   Generates: nsx-deploy.ps1, nsx-configure.ps1, nsx-bgp.ps1
