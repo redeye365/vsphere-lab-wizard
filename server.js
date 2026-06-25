@@ -372,7 +372,7 @@ function buildQuizFromSpec(spec) {
     );
   }
 
-  return questions.slice(0, 10);
+  return shuffle(questions).slice(0, 10);
 }
 
 app.listen(PORT, () => {
