@@ -484,7 +484,11 @@ async function renderDiagram(mermaidSrc, spec) {
 
     const nc = spec?.nestedCluster || {};
     const phCount = (spec?.physicalHosts || []).length || 1;
-    statusMsg.textContent = `Loaded: ${nc.hostCount || 0} nested hosts across ${phCount} physical host${phCount > 1 ? 's' : ''} · ${nc.clusterName || ''} · ${spec?.esxiVersion?.label || ''}`;
+    const label = spec?.esxiVersion?.label || spec?.meta?.esxiVersionLabel || '';
+    const cluster = nc.clusterName || spec?.meta?.clusterName || '';
+    const hosts = nc.hostCount || spec?.meta?.nestedHostCount || 0;
+    const phosts = phCount !== 1 ? phCount : (spec?.meta?.physicalHostCount || phCount);
+    statusMsg.textContent = `Loaded: ${hosts} nested hosts across ${phosts} physical host${phosts > 1 ? 's' : ''} · ${cluster} · ${label}`;
   } catch (err) {
     statusMsg.textContent = 'Render error: ' + err.message;
     emptyState.style.display = 'flex';
@@ -541,7 +545,7 @@ document.getElementById('btn-load-session').addEventListener('click', async () =
     const res = await fetch(`/api/diagram/${id}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Not found');
-    await renderDiagram(data.mermaid, data.spec);
+    await renderDiagram(data.mermaid, { meta: data.meta });
   } catch (err) {
     statusMsg.textContent = 'Error: ' + err.message;
     showToast('Session not found: ' + err.message);

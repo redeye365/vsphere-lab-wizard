@@ -259,7 +259,15 @@ app.get('/api/diagram/:id', (req, res) => {
   try {
     const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
     const mermaid = buildMermaidDiagram(spec);
-    res.json({ mermaid, spec });
+    // Return only the fields the viewer needs for its status line — not the full spec.
+    const nc = spec.nestedCluster || {};
+    const meta = {
+      nestedHostCount:   nc.hostCount    || 0,
+      physicalHostCount: (spec.physicalHosts || []).length || 1,
+      esxiVersionLabel:  spec.esxiVersion?.label || '',
+      clusterName:       nc.clusterName  || ''
+    };
+    res.json({ mermaid, meta });
   } catch {
     res.status(500).json({ error: 'Failed to read spec' });
   }
