@@ -111,7 +111,7 @@ const state = {
       clusterName: 'mgmt-cluster', datacenterName: 'Lab-DC', ssoDomain: 'vsphere.local',
       vsanArch: 'esa',
       legacyCpuCompat: false,
-      memTieringEnabled: false, nvmeSizeGB: 100, tierNvmePct: 25,
+      memTieringEnabled: false, nvmeSizeGB: 100, tierNvmePct: 25, nvmeTieringDiskIndex: null,
       workloadVmsEnabled: false, workloadVmCount: 3, workloadVmSize: 'small',
       nestedDisks: [],
       isolateLab: false, firewallPolicy: null, internetAccess: false,
@@ -308,9 +308,9 @@ function wireForm() {
   document.getElementById('memTieringEnabled').addEventListener('change', (e) => {
     g.memTieringEnabled = e.target.checked;
     document.getElementById('mem-tiering-fields').hidden = !g.memTieringEnabled;
+    if (g.memTieringEnabled) renderNvmeDiskPicker(onChange);
     onChange();
   });
-  bindNumber('nvmeSizeGB', g, 'nvmeSizeGB', onChange);
   bindNumber('tierNvmePct', g, 'tierNvmePct', onChange);
 
   // NSX step (step 8)
@@ -494,6 +494,70 @@ function renderStorageDevices(onChange) {
 
     entry.append(typeSelect, capacityInput, unitSelect, removeBtn);
     listEl.appendChild(entry);
+  });
+
+  // Keep the memory-tiering disk picker in sync when the hardware list changes
+  if (state.answers.design.memTieringEnabled) renderNvmeDiskPicker(onChange);
+}
+
+function renderNvmeDiskPicker(onChange) {
+  const container = document.getElementById('nvme-disk-options');
+  const warningEl = document.getElementById('nvme-disk-warning');
+  if (!container) return;
+
+  const g = state.answers.design;
+  const h = state.answers.hardware;
+  const nvmeDisks = (h.storageDevices || [])
+    .map((dev, idx) => ({ dev, idx }))
+    .filter(({ dev }) => dev.type === 'nvme' && dev.capacityGB);
+
+  container.innerHTML = '';
+
+  if (nvmeDisks.length === 0) {
+    if (warningEl) warningEl.hidden = false;
+    return;
+  }
+  if (warningEl) warningEl.hidden = true;
+
+  // Auto-select first NVMe if nothing selected (or selection no longer valid)
+  if (g.nvmeTieringDiskIndex === null || !nvmeDisks.find(({ idx }) => idx === g.nvmeTieringDiskIndex)) {
+    g.nvmeTieringDiskIndex = nvmeDisks[0].idx;
+  }
+
+  nvmeDisks.forEach(({ dev, idx }) => {
+    const raw = Number(dev.capacityGB) || 0;
+    const sizeGB = dev.capacityUnit === 'TB' ? raw * 1000 : raw;
+    const sizeLabel = sizeGB >= 1000
+      ? (sizeGB / 1000).toFixed(1).replace(/\.0$/, '') + ' TB'
+      : sizeGB + ' GB';
+
+    const label = document.createElement('label');
+    label.className = 'nvme-disk-option';
+
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'nvmeTieringDisk';
+    radio.value = String(idx);
+    radio.checked = g.nvmeTieringDiskIndex === idx;
+    radio.addEventListener('change', () => {
+      g.nvmeTieringDiskIndex = idx;
+      if (onChange) onChange();
+    });
+
+    const badge = document.createElement('span');
+    badge.className = 'nvme-disk-badge';
+    badge.textContent = 'NVMe';
+
+    const size = document.createElement('span');
+    size.className = 'nvme-disk-size';
+    size.textContent = sizeLabel;
+
+    const desc = document.createElement('span');
+    desc.className = 'nvme-disk-desc';
+    desc.textContent = `Disk #${idx + 1} — memory tiering VMDKs will be provisioned from this device`;
+
+    label.append(radio, badge, size, desc);
+    container.appendChild(label);
   });
 }
 
@@ -948,7 +1012,17 @@ function renderReview() {
     ['SSO domain', val(g.ssoDomain)],
     ['vSAN', g.vsanEnabled ? `Enabled — ${g.vsanArch === 'osa' ? 'OSA' : 'ESA'}` : 'Disabled'],
     ['Legacy CPU compat', g.legacyCpuCompat ? 'Enabled' : 'Disabled'],
-    ['Memory tiering', g.memTieringEnabled ? `${g.nvmeSizeGB}GB NVMe / ${g.tierNvmePct}%` : 'Disabled']
+    ['Memory tiering', g.memTieringEnabled ? (() => {
+      const devs = state.answers.hardware.storageDevices || [];
+      const disk = g.nvmeTieringDiskIndex != null ? devs[g.nvmeTieringDiskIndex] : null;
+      if (disk && disk.capacityGB) {
+        const raw = Number(disk.capacityGB) || 0;
+        const sizeGB = disk.capacityUnit === 'TB' ? raw * 1000 : raw;
+        const lbl = sizeGB >= 1000 ? (sizeGB / 1000).toFixed(1).replace(/\.0$/, '') + ' TB' : sizeGB + ' GB';
+        return `Disk #${g.nvmeTieringDiskIndex + 1} (NVMe ${lbl}) · ${g.tierNvmePct}%`;
+      }
+      return `${g.nvmeSizeGB || 100}GB NVMe · ${g.tierNvmePct}%`;
+    })() : 'Disabled']
   ]));
 
   // --- Nested disks ---
@@ -1093,6 +1167,7 @@ function loadSpecIntoState(spec) {
       g.memTieringEnabled = !!nc.memoryTiering.enabled;
       if (nc.memoryTiering.nvmeSizeGB) g.nvmeSizeGB = nc.memoryTiering.nvmeSizeGB;
       if (nc.memoryTiering.tierNvmePct) g.tierNvmePct = nc.memoryTiering.tierNvmePct;
+      if (nc.memoryTiering.physicalDiskIndex != null) g.nvmeTieringDiskIndex = nc.memoryTiering.physicalDiskIndex;
     }
     if (nc.additionalDisks && nc.additionalDisks.length) {
       g.nestedDisks = nc.additionalDisks.map((d) => ({ sizeGB: d.sizeGB, purpose: d.purpose }));

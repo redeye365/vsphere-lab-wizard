@@ -365,16 +365,18 @@
         </div>
 
         <div id="mem-tiering-fields" hidden>
-          <div class="field-row">
-            <div class="field">
-              <label for="nvmeSizeGB">NVMe tier disk per host (GB)</label>
-              <input type="number" id="nvmeSizeGB" min="10" value="100">
-            </div>
-            <div class="field">
-              <label for="tierNvmePct">Memory tier percentage (%)</label>
-              <input type="number" id="tierNvmePct" min="1" max="100" value="25">
-              <p class="hint">Percentage of host memory that will be backed by the NVMe tier.</p>
-            </div>
+          <div class="field">
+            <label>Which physical NVMe disk to dedicate to memory tiering?</label>
+            <div id="nvme-disk-options" class="nvme-disk-options"></div>
+            <p id="nvme-disk-warning" class="hint" style="color:var(--danger);" hidden>
+              Memory tiering requires an NVMe device — none were found in your hardware inventory.
+              Go back to Physical host (step 3) to add one.
+            </p>
+          </div>
+          <div class="field">
+            <label for="tierNvmePct">Memory tier percentage (%)</label>
+            <input type="number" id="tierNvmePct" min="1" max="400" value="25">
+            <p class="hint">Percentage of host RAM to back with the NVMe tier. VMware supports up to 4× DRAM (400%).</p>
           </div>
         </div>
       </section>

@@ -681,6 +681,68 @@ select:focus {
   width: 100%;
 }
 
+/* --- NVMe disk picker (memory tiering step) --- */
+
+.nvme-disk-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.nvme-disk-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.nvme-disk-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+.nvme-disk-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.nvme-disk-option input[type=radio] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.nvme-disk-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--accent-text);
+  flex-shrink: 0;
+}
+
+.nvme-disk-size {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.nvme-disk-desc {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  flex: 1;
+}
+
 /* --- Generate validation error block --- */
 
 .generate-error-block {
