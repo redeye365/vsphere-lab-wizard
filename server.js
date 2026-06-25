@@ -16,6 +16,18 @@ const os = require('os');
 const IS_PKG = typeof process.pkg !== 'undefined';
 const BASE_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 
+// ── Quiz session store ─────────────────────────────────────────────────────
+// Keyed by a 32-char hex token. Stores the answer key server-side so correct
+// answers are never sent to the browser. Sessions expire after 2 hours.
+const quizSessions = new Map(); // token → { answerKey, answers, createdAt }
+
+setInterval(() => {
+  const cutoff = Date.now() - 7200000; // 2 hours
+  for (const [token, session] of quizSessions) {
+    if (session.createdAt < cutoff) quizSessions.delete(token);
+  }
+}, 300000); // prune every 5 minutes
+
 const { buildSpec } = require('./lib/generateSpec');
 const { buildPowerShellScripts } = require('./lib/generatePowerShell');
 const { buildMarkdown } = require('./lib/generateMarkdown');
@@ -86,6 +98,18 @@ if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve mermaid.js locally so wizard pages don't depend on CDN
+app.get('/vendor/mermaid.min.js', (req, res) => {
+  const localPath = path.join(__dirname, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js');
+  if (fs.existsSync(localPath)) {
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.sendFile(localPath);
+  } else {
+    res.status(404).send('mermaid not found');
+  }
+});
 
 function openBrowser(url) {
   const platform = process.platform;
@@ -192,7 +216,7 @@ app.post('/api/generate', (req, res) => {
       generatedScripts
     });
   } catch (err) {
-    console.error(err);
+    console.error('Generate failed:', err.message);
     res.status(500).json({ error: 'Generation failed. Check the server log for details.' });
   }
 });
@@ -264,22 +288,65 @@ app.get('/diagram', (req, res) => {
 // These endpoints are intentionally not documented in README/UI — they are
 // activated via a hidden keyboard shortcut (Ctrl+Shift+T / Cmd+Shift+T).
 
+// POST /api/troubleshoot/generate-quiz
+// Returns questions with NO correct-answer flags. The answer key is stored
+// server-side keyed by a session token so it never reaches the browser.
 app.post('/api/troubleshoot/generate-quiz', (req, res) => {
   try {
     const { spec } = req.body || {};
     if (!spec || typeof spec !== 'object') {
       return res.status(400).json({ error: 'spec object required' });
     }
-    const questions = buildQuizFromSpec(spec);
-    res.json({ questions });
+    const { clientQuestions, answerKey } = buildQuizFromSpec(spec);
+    const token = crypto.randomBytes(16).toString('hex');
+    quizSessions.set(token, { answerKey, answers: {}, createdAt: Date.now() });
+    res.json({ token, questions: clientQuestions });
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
     res.status(500).json({ error: 'Quiz generation failed.' });
   }
 });
 
+// POST /api/troubleshoot/check-answer
+// Called after user selects an option. Returns correct/wrong + explanation.
+// The correctIndex is returned here (not on load) because the user has already
+// committed their answer — revealing it now is expected feedback, not pre-disclosure.
+app.post('/api/troubleshoot/check-answer', (req, res) => {
+  const { token, questionIndex, answerIndex } = req.body || {};
+  if (!token || typeof questionIndex !== 'number' || typeof answerIndex !== 'number') {
+    return res.status(400).json({ error: 'token, questionIndex, and answerIndex required' });
+  }
+  if (!/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
+  const session = quizSessions.get(token);
+  if (!session) return res.status(404).json({ error: 'Session not found or expired' });
+  const key = session.answerKey[questionIndex];
+  if (!key) return res.status(400).json({ error: 'Invalid question index' });
+  session.answers[questionIndex] = answerIndex;
+  const correct = answerIndex === key.correctIndex;
+  res.json({ correct, explanation: key.explanation, correctIndex: key.correctIndex });
+});
+
+// POST /api/troubleshoot/score-quiz
+// Called after all questions are answered. Computes the final score server-side
+// from the recorded answers, then deletes the session.
+app.post('/api/troubleshoot/score-quiz', (req, res) => {
+  const { token } = req.body || {};
+  if (!token) return res.status(400).json({ error: 'token required' });
+  if (!/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
+  const session = quizSessions.get(token);
+  if (!session) return res.status(404).json({ error: 'Session not found or expired' });
+  const total = session.answerKey.length;
+  let correct = 0;
+  for (let i = 0; i < total; i++) {
+    if (session.answers[i] !== undefined && session.answers[i] === session.answerKey[i].correctIndex) correct++;
+  }
+  quizSessions.delete(token);
+  const pct = Math.round((correct / total) * 100);
+  res.json({ correct, total, pct });
+});
+
 function buildQuizFromSpec(spec) {
-  const questions = [];
+  const rawQuestions = []; // { question, opts: string[], correctIndex, explanation }
   const nc  = spec.nestedCluster || {};
   const nets = spec.networks || {};
   const dc  = spec.domainController || {};
@@ -293,10 +360,6 @@ function buildQuizFromSpec(spec) {
     if (!Number.isFinite(n)) return [];
     return [n + 10, n - 10, n + 20, n + 5].filter((x) => x > 0 && x < 4095 && x !== n).slice(0, 3);
   }
-  function distract4(correct, pool) {
-    const others = pool.filter((x) => x !== correct).slice(0, 3);
-    return shuffle([correct, ...others]);
-  }
   function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -306,7 +369,8 @@ function buildQuizFromSpec(spec) {
   }
   function q(question, correct, distractors, explanation) {
     const opts = shuffle([correct, ...distractors.slice(0, 3)]);
-    questions.push({ question, options: opts.map((t) => ({ text: String(t), correct: t === correct })), explanation });
+    const correctIndex = opts.indexOf(correct);
+    rawQuestions.push({ question, opts: opts.map(String), correctIndex, explanation });
   }
 
   // Q: How many nested ESXi hosts?
@@ -419,7 +483,18 @@ function buildQuizFromSpec(spec) {
     );
   }
 
-  return shuffle(questions).slice(0, 10);
+  const selected = shuffle(rawQuestions).slice(0, 10);
+
+  // clientQuestions: sent to browser — no correct flags, no explanations
+  const clientQuestions = selected.map(({ question, opts }) => ({
+    question,
+    options: opts.map((text) => ({ text }))
+  }));
+
+  // answerKey: stays on server
+  const answerKey = selected.map(({ correctIndex, explanation }) => ({ correctIndex, explanation }));
+
+  return { clientQuestions, answerKey };
 }
 
 app.listen(PORT, () => {

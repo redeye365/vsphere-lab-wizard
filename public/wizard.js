@@ -1,6 +1,23 @@
 // public/wizard.js
 // No build step, no dependencies. Runs entirely against the Express API.
 
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Basic structural check — a valid spec must be a plain object with at least
+// the top-level keys the wizard generates. Rejects arrays, strings, or
+// completely unrelated JSON files.
+function isValidSpecStructure(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const required = ['nestedCluster', 'networks', 'esxiVersion'];
+  return required.every((k) => k in obj);
+}
+
 const TOTAL_STEPS = 15;
 const DEPOT_STEP = 10;      // skipped when vSAN + local datastore not both configured
 const NSX_STEP = 8;         // always shown
@@ -83,9 +100,10 @@ const state = {
   step: 0,
   troubleshootingMode: false,
   troubleshootSpec: null,       // spec loaded/used for troubleshooting quiz
-  troubleshootQuiz: null,       // quiz questions from server
-  troubleshootAnswers: {},      // user's quiz answers {questionIndex: optionIndex}
-  troubleshootScore: null,      // {correct, total} after submission
+  troubleshootToken: null,      // server-issued quiz session token
+  troubleshootQuiz: null,       // quiz questions from server (no correct flags)
+  troubleshootAnswers: {},      // {questionIndex: {answerIndex, correct}} — filled by check-answer
+  troubleshootScore: null,      // {correct, total, pct} from server score-quiz
   troubleshootTicket: null,     // submitted ticket {symptom, tried, cause, impact}
   troubleshootHintLevel: 0,     // 0 = no hints shown, 1-5 = hint level revealed
   extendMode: false,
@@ -403,18 +421,30 @@ function wireForm() {
     specFileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      const statusEl = document.getElementById('spec-load-status');
+      if (file.size > 512 * 1024) {
+        statusEl.textContent = 'File too large — spec.json must be under 512 KB.';
+        statusEl.className = 'spec-load-error';
+        e.target.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
           const spec = JSON.parse(ev.target.result);
+          if (!isValidSpecStructure(spec)) {
+            statusEl.textContent = 'Not a valid lab spec file.';
+            statusEl.className = 'spec-load-error';
+            return;
+          }
           state.originalSpec = spec;
           state.answers.extendMode = true;
           loadSpecIntoState(spec);
-          document.getElementById('spec-load-status').textContent = `Loaded: ${file.name}`;
-          document.getElementById('spec-load-status').className = 'spec-load-ok';
+          statusEl.textContent = `Loaded: ${file.name}`;
+          statusEl.className = 'spec-load-ok';
         } catch {
-          document.getElementById('spec-load-status').textContent = 'Invalid JSON — could not load spec.';
-          document.getElementById('spec-load-status').className = 'spec-load-error';
+          statusEl.textContent = 'Invalid JSON — could not load spec.';
+          statusEl.className = 'spec-load-error';
         }
       };
       reader.readAsText(file);
@@ -1330,7 +1360,7 @@ function renderReviewDiagram() {
 
   if (!reviewMermaidInit) {
     if (typeof mermaid === 'undefined') return;
-    mermaid.initialize({ startOnLoad: false, theme: 'dark', darkMode: true, securityLevel: 'loose' });
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', darkMode: true, securityLevel: 'strict' });
     reviewMermaidInit = true;
   }
 
@@ -1573,6 +1603,7 @@ function toggleTroubleshootingMode() {
 function initTroubleshootStep() {
   // Reset quiz state for fresh visit
   state.troubleshootSpec = null;
+  state.troubleshootToken = null;
   state.troubleshootQuiz = null;
   state.troubleshootAnswers = {};
   state.troubleshootScore = null;
@@ -1613,10 +1644,20 @@ function initTroubleshootStep() {
     specFileInput.onchange = (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      if (file.size > 512 * 1024) {
+        if (specStatus) specStatus.textContent = 'File too large — spec.json must be under 512 KB.';
+        e.target.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
-          state.troubleshootSpec = JSON.parse(ev.target.result);
+          const spec = JSON.parse(ev.target.result);
+          if (!isValidSpecStructure(spec)) {
+            if (specStatus) specStatus.textContent = 'Not a valid lab spec file.';
+            return;
+          }
+          state.troubleshootSpec = spec;
           if (specStatus) specStatus.textContent = '';
           if (specSection) specSection.hidden = true;
           showTsTicketForm();
@@ -1681,6 +1722,7 @@ async function startTsQuiz() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Quiz generation failed');
+    state.troubleshootToken = data.token;
     state.troubleshootQuiz = data.questions;
     renderTsQuiz(0);
   } catch (err) {
@@ -1726,18 +1768,44 @@ function renderTsQuiz(questionIndex) {
     btn.type = 'button';
     btn.className = 'ts-quiz-option';
     btn.textContent = opt.text;
-    btn.onclick = () => {
-      state.troubleshootAnswers[questionIndex] = i;
-      // Show feedback
+    btn.onclick = async () => {
+      // Disable all immediately so the user can't change their answer mid-flight
+      optsList.querySelectorAll('.ts-quiz-option').forEach((b) => { b.disabled = true; });
+
+      let correct = false;
+      let explanation = '';
+      let correctIndex = null;
+
+      try {
+        const checkRes = await fetch('/api/troubleshoot/check-answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: state.troubleshootToken, questionIndex, answerIndex: i })
+        });
+        const checkData = await checkRes.json();
+        if (!checkRes.ok) throw new Error(checkData.error || 'Check failed');
+        correct      = checkData.correct;
+        explanation  = checkData.explanation;
+        correctIndex = checkData.correctIndex;
+      } catch {
+        // Server unreachable — record as incorrect, no explanation
+      }
+
+      state.troubleshootAnswers[questionIndex] = { answerIndex: i, correct };
+
+      // Highlight chosen option and reveal the correct one
       optsList.querySelectorAll('.ts-quiz-option').forEach((b, bi) => {
-        b.disabled = true;
-        if (q.options[bi].correct) b.classList.add('ts-opt-correct');
-        else if (bi === i && !q.options[bi].correct) b.classList.add('ts-opt-wrong');
+        if (bi === correctIndex) b.classList.add('ts-opt-correct');
+        if (bi === i && !correct) b.classList.add('ts-opt-wrong');
       });
-      const expEl = document.createElement('p');
-      expEl.className = 'ts-quiz-explanation';
-      expEl.textContent = q.explanation;
-      container.appendChild(expEl);
+
+      if (explanation) {
+        const expEl = document.createElement('p');
+        expEl.className = 'ts-quiz-explanation';
+        expEl.textContent = explanation;
+        container.appendChild(expEl);
+      }
+
       const nextBtn = document.createElement('button');
       nextBtn.type = 'button';
       nextBtn.className = 'btn btn-primary';
@@ -1751,25 +1819,36 @@ function renderTsQuiz(questionIndex) {
   container.appendChild(optsList);
 }
 
-function showTsResults() {
+async function showTsResults() {
   document.getElementById('ts-quiz-section').hidden = true;
-
-  const quiz = state.troubleshootQuiz;
-  const answers = state.troubleshootAnswers;
-  let correct = 0;
-  quiz.forEach((q, i) => {
-    const chosen = answers[i];
-    if (chosen !== undefined && q.options[chosen]?.correct) correct++;
-  });
-  const total = quiz.length;
-  const pct = Math.round((correct / total) * 100);
-  state.troubleshootScore = { correct, total, pct };
 
   const resultSection = document.getElementById('ts-result-section');
   if (!resultSection) return;
   resultSection.hidden = false;
 
-  document.getElementById('ts-score-display').textContent = `${correct} / ${total} (${pct}%)`;
+  const scoreDisplay = document.getElementById('ts-score-display');
+  scoreDisplay.textContent = 'Calculating…';
+
+  let correct = 0, total = 0, pct = 0;
+  try {
+    const res = await fetch('/api/troubleshoot/score-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: state.troubleshootToken })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Scoring failed');
+    ({ correct, total, pct } = data);
+  } catch {
+    // Fallback: count from locally recorded check-answer results
+    const answers = state.troubleshootAnswers;
+    total = (state.troubleshootQuiz || []).length;
+    Object.values(answers).forEach((a) => { if (a.correct) correct++; });
+    pct = total ? Math.round((correct / total) * 100) : 0;
+  }
+
+  state.troubleshootScore = { correct, total, pct };
+  scoreDisplay.textContent = `${correct} / ${total} (${pct}%)`;
 
   const resultMsg = document.getElementById('ts-result-message');
   if (pct >= 70) {
@@ -1975,8 +2054,8 @@ function wireGenerate() {
 
           let html = '<strong>Fix the following before generating:</strong><ul>';
           for (const [section, msgs] of Object.entries(groups)) {
-            html += `<li class="geb-section">${section}<ul>`;
-            for (const m of msgs) html += `<li>${m}</li>`;
+            html += `<li class="geb-section">${escHtml(section)}<ul>`;
+            for (const m of msgs) html += `<li>${escHtml(m)}</li>`;
             html += '</ul></li>';
           }
           html += '</ul>';
