@@ -16,10 +16,11 @@ const USE_CASE_LABELS = {
 
 const DEVICE_TYPE_LABELS = { nvme: 'NVMe', sata_ssd: 'SATA SSD', sas_ssd: 'SAS SSD', spinning_disk: 'Spinning disk' };
 const NESTED_DISK_PURPOSE_LABELS = {
-  vsan_capacity:   'vSAN capacity',
-  vsan_cache:      'vSAN cache / perf tier',
-  local_datastore: 'Local datastore (host 1 only)',
-  data:            'Additional data disk'
+  vsan_storage_pool: 'vSAN storage pool (ESA)',
+  vsan_capacity:     'vSAN capacity tier (OSA)',
+  vsan_cache:        'vSAN cache / perf tier (OSA)',
+  local_datastore:   'Local datastore (host 1 only)',
+  data:              'Additional data disk'
 };
 const NETTYPE_LABELS = { flat: 'Flat, no VLANs', vlans: 'VLANs configured', unsure: 'Not sure' };
 const FIREWALL_LABELS = { allow_all: 'Allow all', restricted: 'Restricted to needed ports', isolated: 'Fully isolated' };
@@ -277,6 +278,16 @@ function wireForm() {
     const esa = g.vsanArch !== 'osa';
     document.getElementById('vsan-esa-hint').hidden = !esa;
     document.getElementById('vsan-osa-hint').hidden = esa;
+    // Migrate existing disk purposes to match the new architecture
+    (g.nestedDisks || []).forEach((disk) => {
+      if (esa) {
+        if (disk.purpose === 'vsan_capacity') disk.purpose = 'vsan_storage_pool';
+        else if (disk.purpose === 'vsan_cache') disk.purpose = '';
+      } else {
+        if (disk.purpose === 'vsan_storage_pool') disk.purpose = 'vsan_capacity';
+      }
+    });
+    renderNestedDisks(onChange);
     onChange();
   });
 
@@ -588,13 +599,11 @@ function renderNestedDisks(onChange) {
     sizeInput.addEventListener('input', () => { disks[idx].sizeGB = Number(sizeInput.value) || null; if (onChange) onChange(); });
 
     const purposeSelect = document.createElement('select');
-    [
-      ['', 'Purpose…'],
-      ['vsan_capacity', 'vSAN capacity'],
-      ['vsan_cache', 'vSAN cache / perf tier'],
-      ['local_datastore', 'Local datastore (host 1 only)'],
-      ['data', 'Additional data disk']
-    ].forEach(([v, label]) => {
+    const isEsa = state.answers.design.vsanArch !== 'osa';
+    const purposeOpts = isEsa
+      ? [['', 'Purpose…'], ['vsan_storage_pool', 'vSAN storage pool (ESA)'], ['local_datastore', 'Local datastore (host 1 only)'], ['data', 'Additional data disk']]
+      : [['', 'Purpose…'], ['vsan_capacity', 'vSAN capacity tier'], ['vsan_cache', 'vSAN cache / perf tier'], ['local_datastore', 'Local datastore (host 1 only)'], ['data', 'Additional data disk']];
+    purposeOpts.forEach(([v, label]) => {
       const o = document.createElement('option');
       o.value = v; o.textContent = label; o.selected = disk.purpose === v;
       purposeSelect.appendChild(o);
@@ -613,6 +622,18 @@ function renderNestedDisks(onChange) {
     entry.append(sizeInput, purposeSelect, removeBtn);
     listEl.appendChild(entry);
   });
+
+  updateEsaNvmeWarning();
+}
+
+function updateEsaNvmeWarning() {
+  const warn = document.getElementById('vsan-esa-nvme-warn');
+  if (!warn) return;
+  const g = state.answers.design;
+  const h = state.answers.hardware;
+  const isEsa = g.vsanEnabled && g.vsanArch !== 'osa';
+  const hasNvme = (h.storageDevices || []).some((d) => d.type === 'nvme');
+  warn.hidden = !(isEsa && !hasNvme);
 }
 
 function updateWorkloadNote() {
@@ -699,9 +720,14 @@ function validateStep(n) {
     case 9: {
       const ndisks = g.nestedDisks || [];
       if (g.vsanEnabled) {
-        const hasCapacity = ndisks.some((d) => d.purpose === 'vsan_capacity');
-        if (!hasCapacity) {
-          return 'vSAN is enabled — add at least one vSAN capacity disk to the nested host disk layout.';
+        const isEsa = g.vsanArch !== 'osa';
+        const hasStorageDisk = isEsa
+          ? ndisks.some((d) => d.purpose === 'vsan_storage_pool')
+          : ndisks.some((d) => d.purpose === 'vsan_capacity');
+        if (!hasStorageDisk) {
+          return isEsa
+            ? 'vSAN ESA is enabled — add at least one vSAN storage pool disk to the nested host disk layout.'
+            : 'vSAN OSA is enabled — add at least one vSAN capacity disk to the nested host disk layout.';
         }
       }
       if (ndisks.some((d) => !d.sizeGB || !d.purpose)) {
@@ -1073,11 +1099,16 @@ function renderReview() {
 
   // --- Inline warnings ---
   if (g.vsanEnabled) {
-    const hasVsanCapacity = ndisks.some((dd) => dd.purpose === 'vsan_capacity');
-    if (!hasVsanCapacity) {
+    const isEsa = g.vsanArch !== 'osa';
+    const hasStorageDisk = isEsa
+      ? ndisks.some((dd) => dd.purpose === 'vsan_storage_pool')
+      : ndisks.some((dd) => dd.purpose === 'vsan_capacity');
+    if (!hasStorageDisk) {
       const warn = document.createElement('div');
       warn.className = 'review-warn';
-      warn.textContent = '⚠ vSAN is enabled but no vSAN capacity disk is defined. The cluster formation script will fail. Go back to step 8 (Nested disks) and add a vSAN capacity disk.';
+      warn.textContent = isEsa
+        ? '⚠ vSAN ESA is enabled but no storage pool disk is defined. Go back to Nested disks and add a vSAN storage pool (ESA) disk.'
+        : '⚠ vSAN OSA is enabled but no capacity disk is defined. Go back to Nested disks and add a vSAN capacity tier disk.';
       container.appendChild(warn);
     }
   }

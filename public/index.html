@@ -440,10 +440,14 @@
       <!-- Step 9: Nested host disk layout -->
       <section class="step" data-step="9">
         <h1>Nested host disk layout</h1>
-        <p class="step-intro">Virtual disks added to each nested ESXi host VM, on top of the boot disk. Configure vSAN capacity/cache and the local datastore for vCenter bootstrap here.</p>
+        <p class="step-intro">Virtual disks added to each nested ESXi host VM on top of the boot disk. Purpose options adapt to the vSAN architecture chosen in the previous step.</p>
+
+        <p id="vsan-esa-nvme-warn" class="hint" style="color:var(--warn);margin-bottom:14px;" hidden>
+          vSAN ESA requires NVMe-backed storage — no NVMe device found in your hardware inventory. Go back to Physical host (step 3) to add one, or switch to OSA in Nested cluster (step 7) which supports any disk type.
+        </p>
 
         <div class="field">
-          <p class="hint">Add one entry per disk role. vSAN capacity and cache disks are added to every nested host; the local datastore disk goes to host 1 only. Leave blank if your nested hosts only need a boot disk.</p>
+          <p class="hint">Add one entry per disk role. vSAN disks are added to every nested host; the local datastore disk goes to host 1 only. Leave blank if your nested hosts only need a boot disk.</p>
           <div id="nested-disk-list"></div>
           <button type="button" id="add-nested-disk" class="btn btn-secondary" style="margin-top:4px;font-size:12.5px;padding:7px 12px;">+ Add disk</button>
         </div>
