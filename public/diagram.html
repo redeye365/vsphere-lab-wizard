@@ -145,6 +145,7 @@
     overflow: hidden;
     position: relative;
     cursor: grab;
+    background: #f0f4f8;
   }
   .canvas-wrap.grabbing { cursor: grabbing; }
 
@@ -257,6 +258,7 @@
     overflow: hidden;
     position: relative;
     cursor: grab;
+    background: #f0f4f8;
   }
   .fullscreen-canvas.grabbing { cursor: grabbing; }
 
@@ -386,9 +388,8 @@
 
 mermaid.initialize({
   startOnLoad: false,
-  theme: 'dark',
-  darkMode: true,
-  securityLevel: 'strict',
+  theme: 'default',
+  securityLevel: 'antiscript',
   flowchart: { curve: 'basis' }
 });
 
@@ -451,6 +452,8 @@ async function renderDiagram(mermaidSrc, spec) {
 
   statusMsg.textContent = 'Rendering…';
   emptyState.style.display = 'none';
+
+  console.log('[diagram] mermaid source (' + (mermaidSrc ? mermaidSrc.length : 0) + ' chars):\n', mermaidSrc);
 
   try {
     const id = 'diag-' + Date.now();
@@ -600,7 +603,7 @@ document.getElementById('btn-download-png').addEventListener('click', async () =
     canvas.height = h * dpr;
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
-    ctx.fillStyle = '#0e1117';
+    ctx.fillStyle = '#f0f4f8';
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
     URL.revokeObjectURL(url);
