@@ -16,13 +16,14 @@ const os = require('os');
 const IS_PKG = typeof process.pkg !== 'undefined';
 const BASE_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 
-// ── Troubleshoot scenario session store ────────────────────────────────────
-const tsScenarioSessions = new Map(); // token → { fault, spec, createdAt, clueUsed, ticket, hintsGiven }
+// ── Troubleshoot session store ─────────────────────────────────────────────
+// token → { scenario, createdAt, clueUsed, ticket, hintsGiven }
+const tsSessions = new Map();
 
 setInterval(() => {
   const cutoff = Date.now() - 7200000; // 2 hours
-  for (const [token, session] of tsScenarioSessions) {
-    if (session.createdAt < cutoff) tsScenarioSessions.delete(token);
+  for (const [token, session] of tsSessions) {
+    if (session.createdAt < cutoff) tsSessions.delete(token);
   }
 }, 300000); // prune every 5 minutes
 
@@ -36,7 +37,7 @@ const { buildNsxScripts } = require('./lib/generateNsx');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
 const { evaluateSizing } = require('./lib/sizing');
-const { selectFault } = require('./lib/faultLibrary');
+const { loadScenarios, getScenario, saveScenario, deleteScenario, getVerifyScript, saveVerifyScript, getActive, setActive, nameToId } = require('./lib/scenarioLibrary');
 const { validateAnswers } = require('./lib/validateAnswers');
 
 // Locate mmdc (mermaid-cli) — checks local node_modules first, then PATH.
@@ -291,89 +292,206 @@ app.get('/diagram', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'diagram.html'));
 });
 
-// ── Troubleshooting mode endpoints ─────────────────────────────────────────
-// These endpoints are intentionally not documented in README/UI — they are
-// activated via a hidden keyboard shortcut (Ctrl+Shift+X / Cmd+Shift+X).
+// ── Admin: Scenario Library endpoints ──────────────────────────────────────
+// Activated via Cmd+Shift+X — not documented in README or public UI.
 
-// POST /api/troubleshoot/scenario
-// Selects a fault from the library matching the given topics/difficulty,
-// creates a scenario session, and returns the customer-facing scenario text.
-app.post('/api/troubleshoot/scenario', (req, res) => {
-  try {
-    const { spec, topics, examObjectives, difficulty } = req.body || {};
-    const fault = selectFault(
-      Array.isArray(topics) ? topics : [],
-      Array.isArray(examObjectives) ? examObjectives : [],
-      typeof difficulty === 'string' ? difficulty : 'medium'
-    );
-    const token = crypto.randomBytes(16).toString('hex');
-    tsScenarioSessions.set(token, {
-      fault,
-      spec: spec && typeof spec === 'object' ? spec : null,
-      createdAt: Date.now(),
-      clueUsed: false,
-      ticket: null,
-      hintsGiven: 0
-    });
-    res.json({
-      token,
-      scenario: {
-        callerName: fault.customer.callerName,
-        company: fault.customer.company,
-        message: fault.customer.message
-      }
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: 'Scenario generation failed.' });
-  }
+// GET /api/admin/scenario-list — return all scenarios in the library
+app.get('/api/admin/scenario-list', (req, res) => {
+  try { res.json({ scenarios: loadScenarios() }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/troubleshoot/customer-info
-// Returns the additional clue the customer can provide (one-time per session).
+// GET /api/admin/scenario-active — return the currently loaded scenario (if any)
+app.get('/api/admin/scenario-active', (req, res) => {
+  try {
+    const active = getActive();
+    if (!active) return res.json({ active: null });
+    const scenario = getScenario(active.id);
+    res.json({ active: scenario ? { ...active, scenario } : null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/scenario-load — set the active scenario (triggers snapshot revert if configured)
+app.post('/api/admin/scenario-load', (req, res) => {
+  const { id } = req.body || {};
+  if (!id || typeof id !== 'string') return res.status(400).json({ error: 'id required' });
+  try {
+    const scenario = getScenario(id);
+    if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
+    setActive(id);
+    // Snapshot revert: not yet wired — would require vCenter credentials.
+    // The admin should manually revert the snapshot named in scenario.snapshotName,
+    // or use the generated capture script.
+    const snapshotNote = scenario.snapshotName
+      ? `Revert vCenter snapshot '${scenario.snapshotName}' to put the lab in the broken state.`
+      : 'No snapshot captured yet — introduce the fault manually in the lab.';
+    res.json({ ok: true, scenario, snapshotNote });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/scenario-unload — clear the active scenario
+app.post('/api/admin/scenario-unload', (req, res) => {
+  try { setActive(null); res.json({ ok: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/scenario-save — create or update a scenario + optional verify script
+app.post('/api/admin/scenario-save', (req, res) => {
+  const { scenario, verifyScriptContent } = req.body || {};
+  if (!scenario || typeof scenario !== 'object') return res.status(400).json({ error: 'scenario object required' });
+  if (!scenario.name) return res.status(400).json({ error: 'scenario.name required' });
+  try {
+    if (!scenario.id) scenario.id = nameToId(scenario.name);
+    if (!scenario.created) scenario.created = new Date().toISOString().slice(0, 10);
+    scenario.verifyScript = scenario.verifyScript || `verify-${scenario.id}.ps1`;
+    saveScenario(scenario);
+    if (verifyScriptContent && typeof verifyScriptContent === 'string') {
+      saveVerifyScript(scenario.verifyScript, verifyScriptContent);
+    }
+    res.json({ ok: true, id: scenario.id });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// DELETE /api/admin/scenario/:id — delete a scenario from the library
+app.delete('/api/admin/scenario/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    deleteScenario(id);
+    // Clear active if this was the loaded scenario
+    const active = getActive();
+    if (active && active.id === id) setActive(null);
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// GET /api/admin/scenario-export/:id — download scenario as .labscenario bundle
+app.get('/api/admin/scenario-export/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    const scenario = getScenario(id);
+    if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
+    const verifyScript = getVerifyScript(id) || '';
+    const bundle = { version: '1', scenario, verifyScript };
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${id}.labscenario"`);
+    res.send(JSON.stringify(bundle, null, 2));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/scenario-import — import a .labscenario bundle
+app.post('/api/admin/scenario-import', (req, res) => {
+  const { bundle } = req.body || {};
+  if (!bundle || typeof bundle !== 'object') return res.status(400).json({ error: 'bundle object required' });
+  if (bundle.version !== '1') return res.status(400).json({ error: 'Unsupported bundle version' });
+  const scenario = bundle.scenario;
+  if (!scenario || !scenario.id || !scenario.name) return res.status(400).json({ error: 'Invalid scenario in bundle' });
+  try {
+    // Imported scenarios have no snapshot yet — clear snapshotName
+    scenario.snapshotName = '';
+    saveScenario(scenario);
+    if (bundle.verifyScript && typeof bundle.verifyScript === 'string') {
+      saveVerifyScript(scenario.verifyScript || `verify-${scenario.id}.ps1`, bundle.verifyScript);
+    }
+    res.json({ ok: true, id: scenario.id, name: scenario.name });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// POST /api/admin/scenario-capture — record a snapshot name against the active scenario
+// Actual vCenter snapshot capture is out-of-band (admin runs the VCSA snapshot API directly).
+// This endpoint updates the scenario metadata with the snapshot name provided.
+app.post('/api/admin/scenario-capture', (req, res) => {
+  const { id, snapshotName } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id required' });
+  try {
+    const scenario = getScenario(id);
+    if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
+    scenario.snapshotName = snapshotName || `scenario-${id}-${Date.now()}`;
+    saveScenario(scenario);
+    res.json({ ok: true, snapshotName: scenario.snapshotName });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// POST /api/admin/scenario-verify — run the verify script and return result
+app.post('/api/admin/scenario-verify', (req, res) => {
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id required' });
+  try {
+    const script = getVerifyScript(id);
+    if (!script) return res.status(404).json({ error: 'Verify script not found for this scenario' });
+    const scenario = getScenario(id);
+    const scriptPath = path.join(__dirname, 'scenarios', 'verify', (scenario && scenario.verifyScript) || `verify-${id}.ps1`);
+    const pwsh = process.platform === 'win32' ? 'powershell.exe' : 'pwsh';
+    const result = require('child_process').spawnSync(pwsh, ['-NoProfile', '-File', scriptPath], { timeout: 30000, encoding: 'utf8' });
+    if (result.status === null) return res.json({ result: 'ERROR', output: 'Script timed out or PowerShell not found. Install PowerShell Core (pwsh) to run verify scripts.' });
+    const output = (result.stdout || '') + (result.stderr || '');
+    const verified = output.includes('FAULT_RESOLVED') ? 'FAULT_RESOLVED' : output.includes('FAULT_PRESENT') ? 'FAULT_PRESENT' : 'UNKNOWN';
+    res.json({ result: verified, output: output.trim() });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Troubleshooting mode endpoints ─────────────────────────────────────────
+// Activated via Cmd+Shift+X — not documented in README or public UI.
+
+// POST /api/troubleshoot/start — begin a session with a specific scenario
+app.post('/api/troubleshoot/start', (req, res) => {
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id required' });
+  try {
+    const scenario = getScenario(id);
+    if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
+    const token = crypto.randomBytes(16).toString('hex');
+    tsSessions.set(token, { scenario, createdAt: Date.now(), clueUsed: false, ticket: null, hintsGiven: 0 });
+    res.json({
+      token,
+      callerName:      scenario.customerScenario ? 'Customer' : 'Lab',
+      scenarioMessage: scenario.customerScenario || '',
+      scenarioName:    scenario.name,
+      difficulty:      scenario.difficulty,
+      topics:          scenario.topics || []
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/troubleshoot/customer-info — return the follow-up clue (one-time)
 app.post('/api/troubleshoot/customer-info', (req, res) => {
   const { token } = req.body || {};
   if (!token || !/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
-  const session = tsScenarioSessions.get(token);
+  const session = tsSessions.get(token);
   if (!session) return res.status(404).json({ error: 'Session not found or expired' });
   session.clueUsed = true;
-  res.json({ clue: session.fault.customer.clue });
+  res.json({ clue: session.scenario.customerFollowUp || 'No additional information available.' });
 });
 
-// POST /api/troubleshoot/ticket
-// Records the support ticket — required before hints are unlocked.
+// POST /api/troubleshoot/ticket — record the support ticket (unlocks hints)
 app.post('/api/troubleshoot/ticket', (req, res) => {
   const { token, ticket } = req.body || {};
   if (!token || !/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
-  const session = tsScenarioSessions.get(token);
+  const session = tsSessions.get(token);
   if (!session) return res.status(404).json({ error: 'Session not found or expired' });
   if (!ticket || !ticket.symptom) return res.status(400).json({ error: 'Symptom is required' });
   session.ticket = ticket;
   res.json({ ok: true });
 });
 
-// POST /api/troubleshoot/hint
-// Returns the hint for the requested level. Ticket must be submitted first.
+// POST /api/troubleshoot/hint — return the hint at the requested level
 app.post('/api/troubleshoot/hint', (req, res) => {
   const { token, level } = req.body || {};
   if (!token || !/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
   if (typeof level !== 'number' || level < 1 || level > 5) return res.status(400).json({ error: 'level must be 1–5' });
-  const session = tsScenarioSessions.get(token);
+  const session = tsSessions.get(token);
   if (!session) return res.status(404).json({ error: 'Session not found or expired' });
   if (!session.ticket) return res.status(403).json({ error: 'Submit a ticket first to unlock hints' });
-  const hint = session.fault.hints[level - 1];
+  const hint = (session.scenario.hints || [])[level - 1];
   if (!hint) return res.status(400).json({ error: 'Hint not found' });
   if (level > session.hintsGiven) session.hintsGiven = level;
   res.json({ hint, level });
 });
 
-// POST /api/troubleshoot/debrief
-// Called when the user marks the fault as resolved.
-// Returns the full fault description, fix steps, and a basic ticket quality score.
+// POST /api/troubleshoot/debrief — mark resolved and return full scenario data + ticket score
 app.post('/api/troubleshoot/debrief', (req, res) => {
-  const { token, ticket, hintsUsed } = req.body || {};
+  const { token, ticket } = req.body || {};
   if (!token || !/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
-  const session = tsScenarioSessions.get(token);
+  const session = tsSessions.get(token);
   if (!session) return res.status(404).json({ error: 'Session not found or expired' });
 
   const t = session.ticket || ticket || {};
@@ -382,21 +500,24 @@ app.post('/api/troubleshoot/debrief', (req, res) => {
   if (t.symptom) {
     const fields = [t.symptom, t.tried, t.cause, t.impact].filter(Boolean).length;
     if (fields === 4) { ticketScore = 'Excellent'; ticketAnalysis = 'All four fields completed — thorough documentation.'; }
-    else if (fields === 3) { ticketScore = 'Good'; ticketAnalysis = 'Three fields completed. Adding all four helps replicate issues faster.'; }
-    else if (fields === 2) { ticketScore = 'Fair'; ticketAnalysis = 'Symptom plus one other field. More context speeds up triage.'; }
-    else { ticketScore = 'Minimal'; ticketAnalysis = 'Only the symptom was captured. Document steps tried and suspected cause to build better habits.'; }
+    else if (fields === 3) { ticketScore = 'Good';      ticketAnalysis = 'Three fields completed. Adding all four helps replicate issues faster.'; }
+    else if (fields === 2) { ticketScore = 'Fair';      ticketAnalysis = 'Symptom plus one other field. More context speeds up triage.'; }
+    else                   { ticketScore = 'Minimal';   ticketAnalysis = 'Only the symptom was captured. Document steps tried and suspected cause to build better habits.'; }
   }
 
+  const s = session.scenario;
   res.json({
-    faultDescription: session.fault.faultDescription,
-    fixSteps: session.fault.fixSteps,
-    objectives: session.fault.objectives,
-    topic: session.fault.topic,
-    difficulty: session.fault.difficulty,
+    scenarioName:    s.name,
+    faultDescription: s.description,
+    fixSteps:        s.fixSteps        || [],
+    objectives:      (s.examObjectives || []).join(', '),
+    topics:          (s.topics         || []).join(', '),
+    difficulty:      s.difficulty,
     ticketScore,
     ticketAnalysis,
-    hintsUsed: session.hintsGiven,
-    clueUsed: session.clueUsed
+    hintsUsed:       session.hintsGiven,
+    clueUsed:        session.clueUsed,
+    verifyScript:    s.verifyScript    || null
   });
 });
 

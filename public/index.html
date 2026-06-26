@@ -670,146 +670,226 @@
         </div>
       </section>
 
-      <!-- Step 14: Troubleshooting mode (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
+      <!-- Step 14: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
       <section class="step" data-step="14">
-        <h1>Troubleshooting Mode</h1>
-        <p class="step-intro">Practise fault-finding through a realistic scenario. A fictional customer calls with a problem — your job is to diagnose and fix it.</p>
+        <h1>Troubleshooting Lab</h1>
 
-        <!-- Phase 1: Lab confirmation -->
-        <div id="ts-phase-1" class="ts-phase">
-          <div class="ts-phase-header">Step 1 &mdash; Lab status</div>
-          <div class="field checkbox-field">
-            <label class="checkbox-row"><input type="checkbox" id="ts-check-1"><span>My lab is built and was working before this session</span></label>
-          </div>
-          <div class="field checkbox-field">
-            <label class="checkbox-row"><input type="checkbox" id="ts-check-2"><span>I understand I am about to practise fault-finding &mdash; my lab configuration may be deliberately broken</span></label>
-          </div>
-          <div class="field">
-            <p class="hint">Optionally load your <code>lab-spec.json</code> so the scenario can reference your exact component names and settings. If you skip this, generic values are used.</p>
-            <div class="ts-spec-load-row">
-              <label class="btn btn-secondary" style="cursor:pointer;">
-                Load lab spec (optional)
-                <input type="file" id="ts-spec-file-input" accept=".json" style="display:none;">
-              </label>
-              <span id="ts-spec-loaded-name" class="ts-spec-name"></span>
-            </div>
-            <p id="ts-spec-status" class="hint" style="color:var(--danger);margin-top:4px;"></p>
-          </div>
-          <button type="button" id="ts-start-btn" class="btn btn-primary" disabled>Start Troubleshooting</button>
+        <!-- Mode tabs -->
+        <div class="ts-mode-tabs" id="ts-mode-tabs">
+          <button type="button" class="ts-mode-tab active" id="ts-tab-library" data-mode="library">Scenario Library</button>
+          <button type="button" class="ts-mode-tab" id="ts-tab-session" data-mode="session">Troubleshooter</button>
         </div>
 
-        <!-- Phase 2: Learning goals -->
-        <div id="ts-phase-2" class="ts-phase" hidden>
-          <div class="ts-phase-header">Step 2 &mdash; Learning goals</div>
-          <div class="ts-learning-layout">
-            <div class="ts-learning-col">
-              <div class="ts-col-heading">Choose topic areas</div>
-              <p class="hint" style="margin-bottom:8px;">VMware topics</p>
-              <div class="ts-topic-grid" id="ts-topic-grid"></div>
-              <p class="hint" style="margin-top:12px;margin-bottom:8px;">Exam objectives</p>
-              <div class="ts-topic-grid" id="ts-exam-grid"></div>
-              <div class="ts-difficulty-row">
-                <span class="hint">Difficulty:</span>
-                <div class="ts-difficulty-pills">
-                  <label class="ts-diff-pill"><input type="radio" name="ts-difficulty" value="easy"><span>Easy</span></label>
-                  <label class="ts-diff-pill"><input type="radio" name="ts-difficulty" value="medium" checked><span>Medium</span></label>
-                  <label class="ts-diff-pill"><input type="radio" name="ts-difficulty" value="hard"><span>Hard</span></label>
-                </div>
+        <!-- ── ADMIN: Scenario Library ─────────────────────────────────── -->
+        <div id="ts-library-panel" class="ts-panel">
+
+          <!-- Active scenario banner -->
+          <div id="ts-active-banner" class="ts-active-banner" hidden>
+            <span id="ts-active-label"></span>
+            <button type="button" class="ts-unload-btn" id="ts-unload-btn">Unload</button>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="ts-lib-toolbar">
+            <input type="text" id="ts-lib-search" class="ts-lib-search" placeholder="Search scenarios&hellip;">
+            <select id="ts-lib-filter-diff" class="ts-lib-filter">
+              <option value="">All difficulties</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+            <select id="ts-lib-filter-topic" class="ts-lib-filter">
+              <option value="">All topics</option>
+            </select>
+            <div style="flex:1"></div>
+            <label class="btn btn-secondary" style="cursor:pointer;">
+              Import .labscenario
+              <input type="file" id="ts-import-file" accept=".labscenario,.json" style="display:none;">
+            </label>
+            <button type="button" class="btn btn-primary" id="ts-new-scenario-btn">+ New Scenario</button>
+          </div>
+
+          <p id="ts-lib-status" class="hint" style="margin-bottom:8px;color:var(--text-dim);"></p>
+
+          <!-- Scenario cards list -->
+          <div id="ts-scenario-list" class="ts-scenario-list"></div>
+        </div>
+
+        <!-- ── ADMIN: Build / Edit scenario form ──────────────────────── -->
+        <div id="ts-build-panel" class="ts-panel" hidden>
+          <div class="ts-build-header">
+            <span id="ts-build-title" class="ts-build-title">New Scenario</span>
+            <button type="button" class="ts-close-btn" id="ts-build-close">&times;</button>
+          </div>
+
+          <!-- Step 1: Snapshot -->
+          <div class="ts-build-section">
+            <h3 class="ts-build-section-heading">Step 1 &mdash; Introduce the fault &amp; capture a snapshot</h3>
+            <p class="hint">Set up your lab in a working state, introduce the fault however you like (wrong config, deleted record, etc.), then capture a vCenter snapshot below.</p>
+            <div class="ts-snapshot-row">
+              <input type="text" id="ts-snapshot-name" class="ts-snapshot-input" placeholder="Snapshot name (auto-generated on capture)">
+              <button type="button" class="btn btn-secondary" id="ts-capture-btn">Capture snapshot</button>
+            </div>
+            <p id="ts-capture-status" class="hint" style="color:var(--text-dim);margin-top:4px;"></p>
+          </div>
+
+          <!-- Step 2: Metadata -->
+          <div class="ts-build-section">
+            <h3 class="ts-build-section-heading">Step 2 &mdash; Scenario metadata</h3>
+            <input type="hidden" id="ts-build-id">
+            <div class="ts-build-grid">
+              <div class="field"><label>Name <span style="color:var(--danger)">*</span></label><input type="text" id="ts-build-name" placeholder="BGP AS Number Mismatch"></div>
+              <div class="field"><label>Difficulty</label>
+                <select id="ts-build-difficulty">
+                  <option value="easy">Easy</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+              <div class="field ts-build-full"><label>Description</label><input type="text" id="ts-build-desc" placeholder="One-line description of the fault"></div>
+              <div class="field ts-build-full"><label>Topics (comma-separated)</label><input type="text" id="ts-build-topics" placeholder="bgp, nsx-routing"></div>
+              <div class="field ts-build-full"><label>Exam objectives (comma-separated)</label><input type="text" id="ts-build-exams" placeholder="VCP-NV, VCAP-NV"></div>
+              <div class="field ts-build-full"><label>Lab requirements (comma-separated)</label><input type="text" id="ts-build-reqs" placeholder="nsx, vyos, nested-cluster-min-3"></div>
+            </div>
+
+            <div class="ts-build-section-sub">
+              <h4>Customer scenario</h4>
+              <div class="field"><label>Initial call / message</label><textarea id="ts-build-scenario" class="ts-notes" rows="3" placeholder="Hi, this is Alex — our VMs lost internet access…"></textarea></div>
+              <div class="field"><label>Follow-up clue (revealed when troubleshooter asks for more info)</label><textarea id="ts-build-followup" class="ts-notes" rows="2" placeholder="Actually, one of our junior engineers made a change last night…"></textarea></div>
+            </div>
+
+            <div class="ts-build-section-sub">
+              <h4>Hints (5 progressive levels)</h4>
+              <div id="ts-build-hints-container"></div>
+            </div>
+
+            <div class="ts-build-section-sub">
+              <h4>Fix steps</h4>
+              <textarea id="ts-build-fixsteps" class="ts-notes" rows="6" placeholder="One fix step per line&#10;1. Check BGP session status on T0&#10;2. Compare AS numbers…"></textarea>
+              <p class="hint">One step per line. Numbered lines are fine; numbers will be stripped.</p>
+            </div>
+
+            <div class="ts-build-section-sub">
+              <h4>Verify script (.ps1)</h4>
+              <textarea id="ts-build-verify" class="ts-notes ts-verify-editor" rows="10" placeholder="# verify-my-scenario.ps1&#10;# Connect to NSX/vCenter and return FAULT_PRESENT or FAULT_RESOLVED"></textarea>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="ts-build-actions">
+            <button type="button" class="btn btn-ghost" id="ts-build-cancel">Cancel</button>
+            <button type="button" class="btn btn-secondary" id="ts-test-btn" disabled>Test this scenario</button>
+            <button type="button" class="btn btn-primary" id="ts-build-save">Save to library</button>
+          </div>
+          <p id="ts-build-error" class="hint" style="color:var(--danger);margin-top:8px;"></p>
+        </div>
+
+        <!-- ── TROUBLESHOOTER: Session flow ───────────────────────────── -->
+        <div id="ts-session-panel" class="ts-panel" hidden>
+
+          <!-- Phase 1: Confirm lab is ready -->
+          <div id="ts-phase-1" class="ts-phase">
+            <div class="ts-phase-header">Step 1 &mdash; Confirm lab is ready</div>
+            <div class="field checkbox-field">
+              <label class="checkbox-row"><input type="checkbox" id="ts-check-1"><span>My lab is built and accessible</span></label>
+            </div>
+            <div class="field checkbox-field">
+              <label class="checkbox-row"><input type="checkbox" id="ts-check-2"><span>I understand the lab configuration has been deliberately broken for this session</span></label>
+            </div>
+            <button type="button" id="ts-start-btn" class="btn btn-primary" disabled>Choose a scenario</button>
+          </div>
+
+          <!-- Phase 2: Pick scenario -->
+          <div id="ts-phase-2" class="ts-phase" hidden>
+            <div class="ts-phase-header">Step 2 &mdash; Select scenario</div>
+
+            <!-- Active scenario (admin pre-loaded) -->
+            <div id="ts-admin-loaded" class="ts-admin-loaded-banner" hidden>
+              <div class="ts-admin-loaded-label">Admin has loaded a scenario for this session:</div>
+              <div id="ts-admin-loaded-name" class="ts-admin-loaded-name"></div>
+              <div id="ts-admin-loaded-meta" class="ts-admin-loaded-meta"></div>
+              <button type="button" class="btn btn-primary" id="ts-use-active-btn">Start with this scenario</button>
+              <button type="button" class="btn btn-ghost" id="ts-pick-own-btn" style="margin-left:8px;">Pick a different one</button>
+            </div>
+
+            <!-- Self-service picker (shown when no admin scenario or user chooses own) -->
+            <div id="ts-self-picker" hidden>
+              <div class="ts-lib-toolbar" style="margin-bottom:8px;">
+                <select id="ts-pick-diff" class="ts-lib-filter">
+                  <option value="">Any difficulty</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+                <select id="ts-pick-topic" class="ts-lib-filter">
+                  <option value="">Any topic</option>
+                </select>
+              </div>
+              <div id="ts-pick-list" class="ts-scenario-list ts-pick-list"></div>
+            </div>
+
+            <p id="ts-pick-error" class="hint" style="color:var(--danger);margin-top:8px;"></p>
+            <div class="ts-phase-actions">
+              <button type="button" class="btn btn-ghost" id="ts-pick-back">Back</button>
+            </div>
+          </div>
+
+          <!-- Phase 3: Investigation -->
+          <div id="ts-phase-3" class="ts-phase" hidden>
+
+            <div id="ts-scenario-card" class="ts-scenario-card">
+              <div id="ts-scenario-header" class="ts-scenario-header"></div>
+              <div id="ts-scenario-message" class="ts-scenario-message"></div>
+              <div id="ts-scenario-clue" class="ts-scenario-clue" hidden></div>
+            </div>
+
+            <div class="field" style="margin-top:16px;">
+              <label for="ts-notes">Investigation notes</label>
+              <textarea id="ts-notes" class="ts-notes" placeholder="What are you checking? What commands are you running? What are you finding?"></textarea>
+            </div>
+
+            <div class="ts-action-row">
+              <button type="button" id="ts-ask-customer" class="btn btn-secondary">Ask customer for more info</button>
+              <button type="button" id="ts-log-ticket-btn" class="btn btn-secondary">Log a ticket</button>
+              <button type="button" id="ts-request-hint" class="btn btn-secondary" disabled title="Submit a ticket first to unlock hints">Request hint</button>
+              <button type="button" id="ts-mark-resolved" class="btn btn-primary" style="margin-left:auto;">I&rsquo;ve fixed it</button>
+            </div>
+
+            <div id="ts-ticket-panel" class="ts-ticket-panel" hidden>
+              <div class="ts-ticket-panel-header">Support ticket</div>
+              <div class="field"><label for="ts-symptom">Symptom <span style="color:var(--danger)">*</span></label><input type="text" id="ts-symptom" placeholder="What is the customer observing?"></div>
+              <div class="field"><label for="ts-tried">Steps tried</label><input type="text" id="ts-tried" placeholder="What have you checked so far?"></div>
+              <div class="field"><label for="ts-cause">Suspected cause</label><input type="text" id="ts-cause" placeholder="Your working hypothesis"></div>
+              <div class="field"><label for="ts-impact">Impact / urgency</label><input type="text" id="ts-impact" placeholder="Business impact"></div>
+              <p id="ts-ticket-error" class="hint" style="color:var(--danger);"></p>
+              <div style="display:flex;gap:8px;">
+                <button type="button" id="ts-ticket-submit" class="btn btn-primary">Submit ticket</button>
+                <button type="button" id="ts-ticket-cancel" class="btn btn-ghost">Cancel</button>
               </div>
             </div>
-            <div class="ts-learning-divider">or</div>
-            <div class="ts-learning-col">
-              <div class="ts-col-heading">Upload a file</div>
-              <p class="hint">Upload a .txt or .md file describing what you want to practise. Topics will be extracted and combined with any list selections.</p>
-              <label class="btn btn-secondary" style="cursor:pointer;margin-bottom:10px;display:inline-block;">
-                Upload file
-                <input type="file" id="ts-goals-file" accept=".txt,.md" style="display:none;">
-              </label>
-              <div id="ts-file-topics-preview" class="ts-file-preview" hidden></div>
+
+            <div id="ts-hints-panel" class="ts-hints-panel" hidden>
+              <div class="ts-hints-header">Hints <span id="ts-hint-level-badge" class="ts-hint-level-badge"></span></div>
+              <div id="ts-hints-container"></div>
             </div>
-          </div>
-          <p id="ts-goals-error" class="hint" style="color:var(--danger);"></p>
-          <div class="ts-phase-actions">
-            <button type="button" id="ts-goals-back" class="btn btn-ghost">Back</button>
-            <button type="button" id="ts-goals-next" class="btn btn-primary">Generate scenario</button>
-          </div>
-        </div>
 
-        <!-- Phase 3: Investigation -->
-        <div id="ts-phase-3" class="ts-phase" hidden>
-
-          <!-- Customer scenario card (always visible) -->
-          <div id="ts-scenario-card" class="ts-scenario-card">
-            <div id="ts-scenario-header" class="ts-scenario-header"></div>
-            <div id="ts-scenario-message" class="ts-scenario-message"></div>
-            <div id="ts-scenario-clue" class="ts-scenario-clue" hidden></div>
           </div>
 
-          <!-- Notes -->
-          <div class="field" style="margin-top:16px;">
-            <label for="ts-notes">Investigation notes</label>
-            <textarea id="ts-notes" class="ts-notes" placeholder="What are you checking? What commands are you running? What findings are you making?"></textarea>
-          </div>
-
-          <!-- Action buttons -->
-          <div class="ts-action-row">
-            <button type="button" id="ts-ask-customer" class="btn btn-secondary">Ask customer for more info</button>
-            <button type="button" id="ts-log-ticket-btn" class="btn btn-secondary">Log a ticket</button>
-            <button type="button" id="ts-request-hint" class="btn btn-secondary" disabled title="Submit a ticket first to unlock hints">Request hint</button>
-            <button type="button" id="ts-mark-resolved" class="btn btn-primary" style="margin-left:auto;">I&rsquo;ve fixed it</button>
-          </div>
-
-          <!-- Ticket form -->
-          <div id="ts-ticket-panel" class="ts-ticket-panel" hidden>
-            <div class="ts-ticket-panel-header">Support ticket</div>
-            <div class="field">
-              <label for="ts-symptom">Symptom <span style="color:var(--danger)">*</span></label>
-              <input type="text" id="ts-symptom" placeholder="What is the customer observing?">
-            </div>
-            <div class="field">
-              <label for="ts-tried">Steps tried</label>
-              <input type="text" id="ts-tried" placeholder="What have you checked so far?">
-            </div>
-            <div class="field">
-              <label for="ts-cause">Suspected cause</label>
-              <input type="text" id="ts-cause" placeholder="Your working hypothesis">
-            </div>
-            <div class="field">
-              <label for="ts-impact">Impact / urgency</label>
-              <input type="text" id="ts-impact" placeholder="Business impact">
-            </div>
-            <p id="ts-ticket-error" class="hint" style="color:var(--danger);"></p>
-            <div style="display:flex;gap:8px;">
-              <button type="button" id="ts-ticket-submit" class="btn btn-primary">Submit ticket</button>
-              <button type="button" id="ts-ticket-cancel" class="btn btn-ghost">Cancel</button>
+          <!-- Phase 4: Debrief -->
+          <div id="ts-phase-4" class="ts-phase" hidden>
+            <div class="ts-phase-header">Session debrief</div>
+            <div id="ts-debrief-fault"      class="ts-debrief-section"></div>
+            <div id="ts-debrief-stats"      class="ts-debrief-stats"></div>
+            <div id="ts-debrief-ticket"     class="ts-debrief-section"></div>
+            <div id="ts-debrief-objectives" class="ts-debrief-section"></div>
+            <div class="ts-phase-actions" style="margin-top:20px;flex-wrap:wrap;gap:8px;">
+              <button type="button" id="ts-another-scenario" class="btn btn-secondary">Try another scenario</button>
+              <button type="button" id="ts-end-session"      class="btn btn-ghost">End session</button>
+              <button type="button" id="ts-download-summary" class="btn btn-secondary" style="margin-left:auto;">Download summary</button>
             </div>
           </div>
 
-          <!-- Hints (unlocked after ticket submission) -->
-          <div id="ts-hints-panel" class="ts-hints-panel" hidden>
-            <div class="ts-hints-header">
-              Hints
-              <span id="ts-hint-level-badge" class="ts-hint-level-badge"></span>
-            </div>
-            <div id="ts-hints-container"></div>
-          </div>
-
-        </div>
-
-        <!-- Phase 4: Debrief -->
-        <div id="ts-phase-4" class="ts-phase" hidden>
-          <div class="ts-phase-header">Session debrief</div>
-          <div id="ts-debrief-fault" class="ts-debrief-section"></div>
-          <div id="ts-debrief-stats" class="ts-debrief-stats"></div>
-          <div id="ts-debrief-ticket" class="ts-debrief-section"></div>
-          <div id="ts-debrief-objectives" class="ts-debrief-section"></div>
-          <div class="ts-phase-actions" style="margin-top:20px;flex-wrap:wrap;gap:8px;">
-            <button type="button" id="ts-another-fault" class="btn btn-secondary">Inject another fault</button>
-            <button type="button" id="ts-end-session" class="btn btn-ghost">End session</button>
-            <button type="button" id="ts-download-summary" class="btn btn-secondary" style="margin-left:auto;">Download session summary</button>
-          </div>
-        </div>
-
+        </div><!-- /ts-session-panel -->
       </section>
 
     </div>

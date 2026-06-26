@@ -14,7 +14,9 @@ HTML/CSS/JS in `public/`. Server-side generation only (no client-side bundling).
 
 Key files:
 - `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/from-spec`, `/diagram`, troubleshoot scenario endpoints
-- `lib/faultLibrary.js` — 10 faults (topic, difficulty, customer scenario, hints, fix steps)
+- `lib/scenarioLibrary.js` — scenario CRUD (loadScenarios, getScenario, saveScenario, deleteScenario, getActive, setActive)
+- `scenarios/<id>.json` — scenario metadata files (10 starters ship with the wizard)
+- `scenarios/verify/<name>.ps1` — PowerShell verify scripts (check FAULT_PRESENT/FAULT_RESOLVED)
 - `public/index.html` — all wizard steps in one HTML file
 - `public/wizard.js` — all client state, step logic, form wiring
 - `public/style.css` — all styles
@@ -114,26 +116,64 @@ network diagram, prerequisites.
   - Amber fixed badge; step 14 added to rail (hidden by default)
   - **No mention of troubleshooting mode anywhere in UI, docs, or README.**
 
-### v0.4.14-beta (current build — scenario-based troubleshooting)
-- **Troubleshooting mode complete redesign** (replaces spec quiz):
-  - Phase 1: lab confirmation + optional spec.json load
-  - Phase 2: learning goals — topic chips (10 topics), exam objectives (5), difficulty
-    selector, file upload with topic extraction
-  - Phase 3: investigation — customer scenario card (callerName, company, message),
-    investigation notes, "Ask customer" (one-time clue), ticket form gates hints,
-    5 progressive hint levels via `/api/troubleshoot/hint`, "I've fixed it" → debrief
-  - Phase 4: debrief — fault description, fix steps, stat grid (hints/ticket/clue),
-    ticket quality analysis, learning objective, download session summary (.md)
-  - Backend: 5 new endpoints (`/scenario`, `/customer-info`, `/ticket`, `/hint`,
-    `/debrief`); old quiz endpoints removed; `tsScenarioSessions` Map replaces
-    `quizSessions`
-  - Fault library: `lib/faultLibrary.js` — 10 faults across 7 topics, 3 difficulties,
-    mapped to exam objectives; `selectFault()` with topic/exam/difficulty filtering
+### v0.4.15-beta (current build — scenario snapshot library)
+- **Architecture change**: fault injection replaced by scenario snapshot library
+  - Scenarios are pre-built lab states with a fault already present, saved as vCenter
+    snapshots. Troubleshooters load a scenario, lab reverts, they fix it for real.
+  - `lib/faultLibrary.js` removed. `lib/scenarioLibrary.js` replaces it.
+  - `scenarios/` directory: 10 starter JSON files + `scenarios/verify/` PS1 scripts
+- **Scenario metadata format** (`scenarios/<id>.json`):
+  - `id`, `name`, `description`, `difficulty`, `examObjectives`, `topics`
+  - `customerScenario` (initial call text), `customerFollowUp` (one-time clue)
+  - `snapshotName` (vCenter snapshot name, set after capture), `verifyScript` (PS1)
+  - `fixSteps[]`, `hints[5]` (5 progressive levels), `labRequirements[]`
+- **`.labscenario` format**: plain JSON envelope `{version:"1", scenario:{…}, verifyScript:"…"}`
+  — no zip, no extra dependencies, fully portable
+- **Admin: Scenario Library** (left tab in step 14):
+  - List view with search, difficulty/topic filters, per-card Load/Edit/Export/Delete
+  - Build form: snapshot name capture, full metadata editor, 5 hint fields, verify script editor
+  - Import `.labscenario` file (clears snapshotName — must re-capture for local lab)
+  - Active scenario banner + Unload button
+- **Troubleshooter** (right tab in step 14):
+  - Phase 1: lab ready confirmation
+  - Phase 2: scenario picker — shows admin-loaded scenario (if any) or full library browser
+  - Phase 3: investigation (unchanged — customer scenario, notes, ticket, hints, "I've fixed it")
+  - Phase 4: debrief (unchanged — fault description, fix steps, stats, ticket quality)
+- **Backend endpoints** (admin — not in README):
+  - `GET  /api/admin/scenario-list` — all scenarios
+  - `GET  /api/admin/scenario-active` — currently loaded scenario
+  - `POST /api/admin/scenario-load` — set active scenario (manual snapshot revert required)
+  - `POST /api/admin/scenario-unload` — clear active
+  - `POST /api/admin/scenario-save` — create/update scenario + verify script
+  - `DELETE /api/admin/scenario/:id` — delete
+  - `GET  /api/admin/scenario-export/:id` — download `.labscenario` bundle
+  - `POST /api/admin/scenario-import` — import `.labscenario` bundle
+  - `POST /api/admin/scenario-capture` — record snapshot name in metadata
+  - `POST /api/admin/scenario-verify` — run PS1 verify script (requires pwsh)
+- **Backend endpoints** (troubleshooter):
+  - `POST /api/troubleshoot/start` — begin session with scenario id, returns token
+  - `POST /api/troubleshoot/customer-info` — one-time clue (customerFollowUp)
+  - `POST /api/troubleshoot/ticket` — record ticket, unlocks hints
+  - `POST /api/troubleshoot/hint` — level 1–5 hint
+  - `POST /api/troubleshoot/debrief` — session close, returns fix steps + ticket score
+- **Starter scenario library** (10 scenarios):
+  1. BGP AS Number Mismatch (T0/VyOS) — bgp-as-mismatch
+  2. Management VLAN Mismatch — mgmt-vlan-mismatch
+  3. SSH Service Policy Wrong — ssh-service-policy
+  4. DNS PTR Records Missing — dns-ptr-missing
+  5. NTP Source Mismatch — ntp-source-mismatch
+  6. Hosts File Duplicate Entry — hosts-file-ordering
+  7. SSL Certificate Shows localhost.localdomain — ssl-cert-localhost
+  8. DVS Teaming Policy Set to Custom — dvs-profile-custom
+  9. monitor.allowLegacyCPU Missing — monitor-allow-legacy-cpu
+  10. Local Datastore Missing Before vSAN — local-datastore-missing
 
-### v2b — Ticket logging wired (future)
-- Replace placeholder ticket message with real ServiceNow / Jira / plain-file logging
-- Ticket quality scoring becomes meaningful (auto-tagging, severity classification)
-- Link tickets to fault injection session IDs
+### v2b — vCenter snapshot integration (future)
+- Wire `/api/admin/scenario-load` to the vCenter REST API to perform the snapshot revert
+  automatically (currently requires manual revert in vCenter)
+- Wire `/api/admin/scenario-capture` to call the vCenter VM snapshot API
+- Store vCenter credentials securely (local config file, not in scenario JSON)
+- Admin panel: vCenter connection settings section
 
 ### v3 — VCF layer (future)
 - SDDC Manager bring-up JSON generation

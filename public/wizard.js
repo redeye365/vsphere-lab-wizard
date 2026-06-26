@@ -1800,69 +1800,371 @@ function toggleTroubleshootingMode() {
   const badge = document.getElementById('ts-badge');
   if (badge) badge.hidden = !state.troubleshootingMode;
 
-  // Show/hide the troubleshoot rail item
   const tsRailItem = document.querySelector('#rail-steps li[data-step="' + TROUBLESHOOT_STEP + '"]');
   if (tsRailItem) tsRailItem.hidden = !state.troubleshootingMode;
 
-  // If deactivating while on troubleshoot step, go back to review
   if (!state.troubleshootingMode && state.step === TROUBLESHOOT_STEP) {
     showStep(TOTAL_STEPS - 2);
   }
-  // Update btn-next visibility if currently on review step
   if (state.step === TOTAL_STEPS - 2) {
     const isLastVisible = !state.troubleshootingMode;
     document.getElementById('btn-next').style.display = isLastVisible ? 'none' : 'inline-flex';
   }
 }
 
-// ── Topic / exam definitions ────────────────────────────────────────────────
+// ── Mode switching ──────────────────────────────────────────────────────────
 
-const TS_TOPICS = [
-  { id: 'vsphere-networking', label: 'vSphere Networking' },
-  { id: 'vsan',               label: 'vSAN' },
-  { id: 'nsx-routing',        label: 'NSX Routing (T0/T1)' },
-  { id: 'nsx-dfw',            label: 'NSX DFW' },
-  { id: 'bgp',                label: 'BGP Peering' },
-  { id: 'vcf-bringup',        label: 'VCF Bring-up' },
-  { id: 'dns-ntp',            label: 'DNS / NTP' },
-  { id: 'certificate-management', label: 'Certificate Management' },
-  { id: 'storage',            label: 'Storage' },
-  { id: 'security',           label: 'Security' }
-];
+function tsSwitchMode(mode) {
+  const libPanel  = document.getElementById('ts-library-panel');
+  const buildPanel = document.getElementById('ts-build-panel');
+  const sessPanel = document.getElementById('ts-session-panel');
+  [libPanel, buildPanel, sessPanel].forEach(el => { if (el) el.hidden = true; });
 
-const TS_EXAMS = [
-  { id: 'VCP-DCV',          label: 'VCP-DCV' },
-  { id: 'VCAP-DCV',         label: 'VCAP-DCV' },
-  { id: 'VCP-NV',           label: 'VCP-NV' },
-  { id: 'VCAP-NV',          label: 'VCAP-NV' },
-  { id: 'VCF 3V0-25.25',   label: 'VCF 3V0-25.25' }
-];
+  document.querySelectorAll('.ts-mode-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.mode === mode || (mode === 'build' && t.dataset.mode === 'library'));
+  });
 
-// ── Troubleshoot entry point ────────────────────────────────────────────────
-
-function initTroubleshootStep() {
-  state.troubleshootPhase = 1;
-  state.troubleshootSpec = null;
-  state.troubleshootTopics = [];
-  state.troubleshootExamObjectives = [];
-  state.troubleshootDifficulty = 'medium';
-  state.troubleshootFileTopics = [];
-  state.troubleshootToken = null;
-  state.troubleshootScenario = null;
-  state.troubleshootClueText = null;
-  state.troubleshootClueUsed = false;
-  state.troubleshootNotes = '';
-  state.troubleshootTicket = null;
-  state.troubleshootTicketSubmitted = false;
-  state.troubleshootHintLevel = 0;
-  state.troubleshootHints = {};
-  state.troubleshootResolved = false;
-  state.troubleshootSessionData = null;
-
-  tsShowPhase(1);
-  tsWirePhase1();
+  if (mode === 'library') { if (libPanel) { libPanel.hidden = false; tsLibLoad(); } }
+  else if (mode === 'build') { if (buildPanel) buildPanel.hidden = false; }
+  else if (mode === 'session') { if (sessPanel) { sessPanel.hidden = false; } }
 }
 
+// ── Library: load and render ────────────────────────────────────────────────
+
+async function tsLibLoad() {
+  const listEl   = document.getElementById('ts-scenario-list');
+  const statusEl = document.getElementById('ts-lib-status');
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="hint">Loading…</p>';
+
+  try {
+    // Check for active scenario
+    const activeRes  = await fetch('/api/admin/scenario-active');
+    const activeData = await activeRes.json();
+    tsRenderActiveBanner(activeData.active ? activeData.active.scenario : null);
+
+    // Load full list
+    const res  = await fetch('/api/admin/scenario-list');
+    const data = await res.json();
+    state.tsAllScenarios = data.scenarios || [];
+    tsPopulateTopicFilter(state.tsAllScenarios, 'ts-lib-filter-topic');
+    tsLibRender();
+    if (statusEl) statusEl.textContent = `${state.tsAllScenarios.length} scenario${state.tsAllScenarios.length !== 1 ? 's' : ''} in library`;
+  } catch (err) {
+    if (listEl) listEl.innerHTML = '<p class="hint" style="color:var(--danger)">Failed to load scenarios: ' + escHtml(err.message) + '</p>';
+  }
+}
+
+function tsLibRender() {
+  const listEl  = document.getElementById('ts-scenario-list');
+  const search  = (document.getElementById('ts-lib-search')?.value || '').toLowerCase();
+  const diff    = document.getElementById('ts-lib-filter-diff')?.value || '';
+  const topic   = document.getElementById('ts-lib-filter-topic')?.value || '';
+
+  const filtered = (state.tsAllScenarios || []).filter(s => {
+    if (diff  && s.difficulty !== diff) return false;
+    if (topic && !(s.topics || []).includes(topic)) return false;
+    if (search && !s.name.toLowerCase().includes(search) && !s.description.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  if (!listEl) return;
+  if (filtered.length === 0) { listEl.innerHTML = '<p class="hint">No scenarios match the current filter.</p>'; return; }
+
+  listEl.innerHTML = '';
+  filtered.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'ts-lib-card';
+    card.innerHTML = `
+      <div class="ts-lib-card-main">
+        <div class="ts-lib-card-name">${escHtml(s.name)}</div>
+        <div class="ts-lib-card-desc">${escHtml(s.description || '')}</div>
+        <div class="ts-lib-card-meta">
+          <span class="ts-diff-badge ts-diff-${s.difficulty}">${escHtml(s.difficulty || '')}</span>
+          ${(s.topics || []).map(t => `<span class="ts-topic-chip-inline">${escHtml(t)}</span>`).join('')}
+          ${s.snapshotName ? '<span class="ts-snapshot-badge">snapshot captured</span>' : '<span class="ts-no-snapshot-badge">no snapshot</span>'}
+        </div>
+      </div>
+      <div class="ts-lib-card-actions">
+        <button type="button" class="btn btn-primary btn-sm ts-load-btn" data-id="${escHtml(s.id)}">Load</button>
+        <button type="button" class="btn btn-secondary btn-sm ts-edit-btn" data-id="${escHtml(s.id)}">Edit</button>
+        <button type="button" class="btn btn-secondary btn-sm ts-export-btn" data-id="${escHtml(s.id)}">Export</button>
+        <button type="button" class="btn btn-danger btn-sm ts-delete-btn" data-id="${escHtml(s.id)}">Delete</button>
+      </div>`;
+    listEl.appendChild(card);
+  });
+
+  listEl.querySelectorAll('.ts-load-btn').forEach(btn => btn.onclick = () => tsLibLoad_scenario(btn.dataset.id));
+  listEl.querySelectorAll('.ts-edit-btn').forEach(btn => btn.onclick = () => tsLibEdit(btn.dataset.id));
+  listEl.querySelectorAll('.ts-export-btn').forEach(btn => btn.onclick = () => tsLibExport(btn.dataset.id));
+  listEl.querySelectorAll('.ts-delete-btn').forEach(btn => btn.onclick = () => tsLibDelete(btn.dataset.id));
+}
+
+function tsRenderActiveBanner(scenario) {
+  const banner = document.getElementById('ts-active-banner');
+  const label  = document.getElementById('ts-active-label');
+  if (!banner) return;
+  if (scenario) {
+    if (label) label.textContent = `Active: ${scenario.name}`;
+    banner.hidden = false;
+  } else {
+    banner.hidden = true;
+  }
+}
+
+function tsPopulateTopicFilter(scenarios, filterId) {
+  const sel = document.getElementById(filterId);
+  if (!sel) return;
+  const topics = [...new Set(scenarios.flatMap(s => s.topics || []))].sort();
+  const first  = sel.options[0];
+  sel.innerHTML = '';
+  sel.appendChild(first);
+  topics.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); });
+}
+
+async function tsLibLoad_scenario(id) {
+  const btn = document.querySelector(`.ts-load-btn[data-id="${id}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  try {
+    const res  = await fetch('/api/admin/scenario-load', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Load failed');
+    tsRenderActiveBanner(data.scenario);
+    const note = data.snapshotNote ? `\n\n${data.snapshotNote}` : '';
+    alert(`Scenario loaded: ${data.scenario.name}${note}`);
+  } catch (err) {
+    alert('Failed to load scenario: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Load'; }
+  }
+}
+
+function tsLibExport(id) {
+  window.location.href = `/api/admin/scenario-export/${encodeURIComponent(id)}`;
+}
+
+async function tsLibDelete(id) {
+  const s = (state.tsAllScenarios || []).find(x => x.id === id);
+  if (!confirm(`Delete scenario "${s ? s.name : id}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/api/admin/scenario/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+    await tsLibLoad();
+  } catch (err) { alert('Delete failed: ' + err.message); }
+}
+
+// ── Build / Edit form ───────────────────────────────────────────────────────
+
+function tsLibOpenBuild(scenario) {
+  tsSwitchMode('build');
+  const buildPanel = document.getElementById('ts-build-panel');
+  if (buildPanel) buildPanel.hidden = false;
+  document.getElementById('ts-library-panel').hidden = true;
+  document.getElementById('ts-build-title').textContent = scenario ? 'Edit Scenario' : 'New Scenario';
+
+  const id = scenario ? scenario.id : '';
+  document.getElementById('ts-build-id').value           = id;
+  document.getElementById('ts-build-name').value         = scenario ? scenario.name : '';
+  document.getElementById('ts-build-desc').value         = scenario ? scenario.description || '' : '';
+  document.getElementById('ts-build-difficulty').value   = scenario ? scenario.difficulty || 'medium' : 'medium';
+  document.getElementById('ts-build-topics').value       = scenario ? (scenario.topics || []).join(', ') : '';
+  document.getElementById('ts-build-exams').value        = scenario ? (scenario.examObjectives || []).join(', ') : '';
+  document.getElementById('ts-build-reqs').value         = scenario ? (scenario.labRequirements || []).join(', ') : '';
+  document.getElementById('ts-build-scenario').value     = scenario ? scenario.customerScenario || '' : '';
+  document.getElementById('ts-build-followup').value     = scenario ? scenario.customerFollowUp || '' : '';
+  document.getElementById('ts-build-fixsteps').value     = scenario ? (scenario.fixSteps || []).join('\n') : '';
+  document.getElementById('ts-snapshot-name').value      = scenario ? scenario.snapshotName || '' : '';
+  document.getElementById('ts-capture-status').textContent = '';
+
+  // Hints
+  const hintsContainer = document.getElementById('ts-build-hints-container');
+  if (hintsContainer) {
+    hintsContainer.innerHTML = '';
+    const hintLabels = ['Level 1 — Customer nudge', 'Level 2 — Technical nudge', 'Level 3 — Specific direction', 'Level 4 — Near-answer', 'Level 5 — Full solution'];
+    for (let i = 0; i < 5; i++) {
+      const div = document.createElement('div');
+      div.className = 'field';
+      div.innerHTML = `<label>${escHtml(hintLabels[i])}</label><textarea class="ts-notes ts-hint-input" rows="2" data-hint="${i}" placeholder="${escHtml(hintLabels[i])}"></textarea>`;
+      hintsContainer.appendChild(div);
+      div.querySelector('textarea').value = scenario && scenario.hints ? (scenario.hints[i] || '') : '';
+    }
+  }
+
+  // Verify script content (fetch if editing)
+  const verifyEl = document.getElementById('ts-build-verify');
+  if (verifyEl) {
+    verifyEl.value = '';
+    if (id) {
+      fetch(`/api/admin/scenario-export/${encodeURIComponent(id)}`)
+        .then(r => r.json()).then(d => { if (d.verifyScript) verifyEl.value = d.verifyScript; }).catch(() => {});
+    }
+  }
+
+  const testBtn = document.getElementById('ts-test-btn');
+  if (testBtn) testBtn.disabled = !id;
+}
+
+function tsLibEdit(id) {
+  const s = (state.tsAllScenarios || []).find(x => x.id === id);
+  if (s) tsLibOpenBuild(s);
+}
+
+async function tsLibSave() {
+  const errEl = document.getElementById('ts-build-error');
+  if (errEl) errEl.textContent = '';
+
+  const name    = document.getElementById('ts-build-name')?.value.trim();
+  if (!name) { if (errEl) errEl.textContent = 'Name is required.'; return; }
+
+  const hints = [];
+  document.querySelectorAll('.ts-hint-input').forEach((el, i) => { hints[i] = el.value.trim(); });
+
+  const fixLines = (document.getElementById('ts-build-fixsteps')?.value || '').split('\n')
+    .map(l => l.trim().replace(/^\d+[\.\)]\s*/, '')).filter(Boolean);
+
+  const scenario = {
+    id:               document.getElementById('ts-build-id')?.value || '',
+    name,
+    description:      document.getElementById('ts-build-desc')?.value.trim() || '',
+    difficulty:       document.getElementById('ts-build-difficulty')?.value || 'medium',
+    topics:           (document.getElementById('ts-build-topics')?.value || '').split(',').map(t=>t.trim()).filter(Boolean),
+    examObjectives:   (document.getElementById('ts-build-exams')?.value || '').split(',').map(t=>t.trim()).filter(Boolean),
+    labRequirements:  (document.getElementById('ts-build-reqs')?.value || '').split(',').map(t=>t.trim()).filter(Boolean),
+    customerScenario: document.getElementById('ts-build-scenario')?.value.trim() || '',
+    customerFollowUp: document.getElementById('ts-build-followup')?.value.trim() || '',
+    snapshotName:     document.getElementById('ts-snapshot-name')?.value.trim() || '',
+    hints,
+    fixSteps:         fixLines,
+    author:           'vSphere Lab Wizard',
+    created:          new Date().toISOString().slice(0, 10)
+  };
+
+  const verifyScriptContent = document.getElementById('ts-build-verify')?.value.trim() || '';
+  const saveBtn = document.getElementById('ts-build-save');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+
+  try {
+    const res  = await fetch('/api/admin/scenario-save', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ scenario, verifyScriptContent })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+    tsSwitchMode('library');
+    document.getElementById('ts-library-panel').hidden = false;
+    document.getElementById('ts-build-panel').hidden   = true;
+    await tsLibLoad();
+  } catch (err) {
+    if (errEl) errEl.textContent = err.message;
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save to library'; }
+  }
+}
+
+async function tsCaptureSnapshot() {
+  const idEl     = document.getElementById('ts-build-id');
+  const nameEl   = document.getElementById('ts-snapshot-name');
+  const statusEl = document.getElementById('ts-capture-status');
+  const captureBtn = document.getElementById('ts-capture-btn');
+
+  const buildName = document.getElementById('ts-build-name')?.value.trim();
+  if (!buildName) { if (statusEl) statusEl.textContent = 'Enter a scenario name first.'; return; }
+
+  const snapshotName = `scenario-${buildName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}-${Date.now()}`;
+  if (nameEl) nameEl.value = snapshotName;
+  if (statusEl) statusEl.textContent = 'Snapshot name generated. If this scenario is already saved, the name has been recorded. Revert to this snapshot manually in vCenter after introducing the fault.';
+
+  // If there is a saved scenario, update its snapshotName
+  const id = idEl?.value;
+  if (id) {
+    try {
+      const res = await fetch('/api/admin/scenario-capture', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ id, snapshotName })
+      });
+      if (res.ok) { if (statusEl) statusEl.textContent += ' Saved to metadata.'; }
+    } catch { /* ignore */ }
+  }
+}
+
+async function tsLibImport(file) {
+  const statusEl = document.getElementById('ts-lib-status');
+  try {
+    const text = await file.text();
+    const bundle = JSON.parse(text);
+    const res  = await fetch('/api/admin/scenario-import', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ bundle })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Import failed');
+    if (statusEl) statusEl.textContent = `Imported: ${data.name}. Note: imported scenarios have no local snapshot — introduce the fault manually, then capture a new snapshot.`;
+    await tsLibLoad();
+  } catch (err) {
+    if (statusEl) statusEl.textContent = 'Import failed: ' + err.message;
+  }
+}
+
+// ── Troubleshooter: initialise ──────────────────────────────────────────────
+
+function initTroubleshootStep() {
+  state.troubleshootPhase           = 1;
+  state.troubleshootToken           = null;
+  state.troubleshootScenario        = null;
+  state.troubleshootClueText        = null;
+  state.troubleshootClueUsed        = false;
+  state.troubleshootNotes           = '';
+  state.troubleshootTicket          = null;
+  state.troubleshootTicketSubmitted = false;
+  state.troubleshootHintLevel       = 0;
+  state.troubleshootHints           = {};
+  state.troubleshootResolved        = false;
+  state.troubleshootSessionData     = null;
+  state.tsAllScenarios              = [];
+
+  // Default to library mode when the step opens
+  tsSwitchMode('library');
+
+  // Wire mode tabs
+  document.querySelectorAll('.ts-mode-tab').forEach(tab => {
+    tab.onclick = () => {
+      if (tab.dataset.mode === 'session') { tsSwitchMode('session'); tsShowPhase(1); tsWirePhase1(); }
+      else tsSwitchMode('library');
+    };
+  });
+
+  // Wire build form buttons
+  const newBtn  = document.getElementById('ts-new-scenario-btn');
+  const saveBtn = document.getElementById('ts-build-save');
+  const cancelBtn = document.getElementById('ts-build-cancel');
+  const closeBtn  = document.getElementById('ts-build-close');
+  const captureBtn = document.getElementById('ts-capture-btn');
+  const importFile = document.getElementById('ts-import-file');
+  const unloadBtn  = document.getElementById('ts-unload-btn');
+
+  if (newBtn)    newBtn.onclick    = () => tsLibOpenBuild(null);
+  if (saveBtn)   saveBtn.onclick   = () => tsLibSave();
+  if (cancelBtn) cancelBtn.onclick = () => { tsSwitchMode('library'); document.getElementById('ts-build-panel').hidden = true; document.getElementById('ts-library-panel').hidden = false; };
+  if (closeBtn)  closeBtn.onclick  = () => cancelBtn?.click();
+  if (captureBtn) captureBtn.onclick = () => tsCaptureSnapshot();
+  if (unloadBtn) unloadBtn.onclick = async () => {
+    await fetch('/api/admin/scenario-unload', { method: 'POST' });
+    tsRenderActiveBanner(null);
+  };
+  if (importFile) importFile.onchange = (e) => {
+    const f = e.target.files[0];
+    if (f) tsLibImport(f);
+    e.target.value = '';
+  };
+
+  // Wire library search/filter
+  document.getElementById('ts-lib-search')?.addEventListener('input',  tsLibRender);
+  document.getElementById('ts-lib-filter-diff')?.addEventListener('change',  tsLibRender);
+  document.getElementById('ts-lib-filter-topic')?.addEventListener('change', tsLibRender);
+}
 
 // ── Phase helpers ───────────────────────────────────────────────────────────
 
@@ -1880,178 +2182,132 @@ function tsWirePhase1() {
   const check1   = document.getElementById('ts-check-1');
   const check2   = document.getElementById('ts-check-2');
   const startBtn = document.getElementById('ts-start-btn');
-  const specFile = document.getElementById('ts-spec-file-input');
-  const specStatus = document.getElementById('ts-spec-status');
-  const specName = document.getElementById('ts-spec-loaded-name');
 
   if (check1) check1.checked = false;
   if (check2) check2.checked = false;
-  if (specName) specName.textContent = '';
   if (startBtn) startBtn.disabled = true;
 
-  const updateStart = () => {
-    if (startBtn) startBtn.disabled = !(check1?.checked && check2?.checked);
-  };
-  if (check1) check1.addEventListener('change', updateStart);
-  if (check2) check2.addEventListener('change', updateStart);
+  const updateStart = () => { if (startBtn) startBtn.disabled = !(check1?.checked && check2?.checked); };
+  check1?.addEventListener('change', updateStart);
+  check2?.addEventListener('change', updateStart);
 
-  if (specFile) {
-    specFile.value = '';
-    specFile.onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 1024 * 1024) {
-        if (specStatus) specStatus.textContent = 'File too large (max 1 MB).';
-        e.target.value = '';
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const spec = JSON.parse(ev.target.result);
-          if (!isValidSpecStructure(spec)) {
-            if (specStatus) specStatus.textContent = 'Not a valid lab-spec.json.';
-            return;
-          }
-          state.troubleshootSpec = spec;
-          if (specStatus) specStatus.textContent = '';
-          if (specName) specName.textContent = file.name;
-        } catch {
-          if (specStatus) specStatus.textContent = 'Invalid JSON.';
-        }
-      };
-      reader.readAsText(file);
-    };
-  }
-
-  if (startBtn) {
-    startBtn.onclick = () => { tsShowPhase(2); tsWirePhase2(); };
-  }
+  if (startBtn) startBtn.onclick = () => { tsShowPhase(2); tsWirePhase2(); };
 }
 
-// ── Phase 2: Learning goals ─────────────────────────────────────────────────
+// ── Phase 2: Scenario picker ────────────────────────────────────────────────
 
-function tsWirePhase2() {
-  const topicGrid = document.getElementById('ts-topic-grid');
-  const examGrid  = document.getElementById('ts-exam-grid');
-
-  if (topicGrid) {
-    topicGrid.innerHTML = '';
-    TS_TOPICS.forEach(t => {
-      const label = document.createElement('label');
-      label.className = 'ts-topic-chip';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.value = t.id;
-      cb.checked = state.troubleshootTopics.includes(t.id);
-      cb.addEventListener('change', () => {
-        if (cb.checked) { if (!state.troubleshootTopics.includes(t.id)) state.troubleshootTopics.push(t.id); }
-        else state.troubleshootTopics = state.troubleshootTopics.filter(x => x !== t.id);
-      });
-      label.appendChild(cb);
-      label.appendChild(document.createTextNode(' ' + t.label));
-      topicGrid.appendChild(label);
-    });
-  }
-
-  if (examGrid) {
-    examGrid.innerHTML = '';
-    TS_EXAMS.forEach(e => {
-      const label = document.createElement('label');
-      label.className = 'ts-topic-chip';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.value = e.id;
-      cb.checked = state.troubleshootExamObjectives.includes(e.id);
-      cb.addEventListener('change', () => {
-        if (cb.checked) { if (!state.troubleshootExamObjectives.includes(e.id)) state.troubleshootExamObjectives.push(e.id); }
-        else state.troubleshootExamObjectives = state.troubleshootExamObjectives.filter(x => x !== e.id);
-      });
-      label.appendChild(cb);
-      label.appendChild(document.createTextNode(' ' + e.label));
-      examGrid.appendChild(label);
-    });
-  }
-
-  document.querySelectorAll('input[name="ts-difficulty"]').forEach(r => {
-    r.checked = r.value === state.troubleshootDifficulty;
-    r.addEventListener('change', () => { if (r.checked) state.troubleshootDifficulty = r.value; });
-  });
-
-  const goalsFile = document.getElementById('ts-goals-file');
-  const preview   = document.getElementById('ts-file-topics-preview');
-  if (goalsFile) {
-    goalsFile.value = '';
-    goalsFile.onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        state.troubleshootFileTopics = tsExtractTopicsFromText(ev.target.result);
-        if (preview) {
-          preview.hidden = false;
-          preview.innerHTML = state.troubleshootFileTopics.length > 0
-            ? '<strong>Topics extracted:</strong> ' + state.troubleshootFileTopics.map(t => `<span class="ts-topic-chip-inline">${t}</span>`).join(' ')
-            : 'No specific topics detected — will use list selections.';
-        }
-      };
-      reader.readAsText(file);
-    };
-  }
-
-  const backBtn = document.getElementById('ts-goals-back');
-  const nextBtn = document.getElementById('ts-goals-next');
-  if (backBtn) backBtn.onclick = () => tsShowPhase(1);
-  if (nextBtn) nextBtn.onclick = () => tsGenerateScenario();
-}
-
-function tsExtractTopicsFromText(text) {
-  const lower = text.toLowerCase();
-  const found = [];
-  const checks = [
-    { terms: ['vsphere', 'vswitch', 'port group', 'dvs', 'distributed switch', 'vmnic', 'vmk'], id: 'vsphere-networking' },
-    { terms: ['vsan', 'storage policy'], id: 'vsan' },
-    { terms: ['nsx routing', 't0', 't1', 'tier-0', 'tier-1', 'overlay', 'geneve'], id: 'nsx-routing' },
-    { terms: ['dfw', 'distributed firewall', 'microsegmentation', 'security group'], id: 'nsx-dfw' },
-    { terms: ['bgp', 'as number', 'autonomous system', 'peering'], id: 'bgp' },
-    { terms: ['vcf', 'vmware cloud foundation', 'sddc manager', 'bring-up', 'bringup'], id: 'vcf-bringup' },
-    { terms: ['dns', 'ntp', 'name resolution', 'time sync', 'ptr record'], id: 'dns-ntp' },
-    { terms: ['certificate', 'ssl', 'tls', 'cert', 'pki'], id: 'certificate-management' },
-    { terms: ['storage', 'datastore', 'vmfs', 'nfs', 'vvols'], id: 'storage' },
-    { terms: ['security', 'hardening', 'firewall', 'lockdown mode', 'rbac'], id: 'security' }
-  ];
-  checks.forEach(({ terms, id }) => {
-    if (terms.some(t => lower.includes(t)) && !found.includes(id)) found.push(id);
-  });
-  return found;
-}
-
-async function tsGenerateScenario() {
-  const nextBtn = document.getElementById('ts-goals-next');
-  const errEl   = document.getElementById('ts-goals-error');
-  if (nextBtn) { nextBtn.disabled = true; nextBtn.textContent = 'Generating…'; }
+async function tsWirePhase2() {
+  const adminBanner = document.getElementById('ts-admin-loaded');
+  const selfPicker  = document.getElementById('ts-self-picker');
+  const errEl       = document.getElementById('ts-pick-error');
   if (errEl) errEl.textContent = '';
 
-  const allTopics = [...new Set([...state.troubleshootTopics, ...(state.troubleshootFileTopics || [])])];
+  // Check if admin has loaded a scenario
+  try {
+    const res  = await fetch('/api/admin/scenario-active');
+    const data = await res.json();
+    if (data.active && data.active.scenario) {
+      const s = data.active.scenario;
+      if (adminBanner) adminBanner.hidden = false;
+      if (selfPicker)  selfPicker.hidden  = true;
+      const nameEl = document.getElementById('ts-admin-loaded-name');
+      const metaEl = document.getElementById('ts-admin-loaded-meta');
+      if (nameEl) nameEl.textContent = s.name;
+      if (metaEl) metaEl.textContent = [s.difficulty, ...(s.topics || [])].join(' · ');
+
+      document.getElementById('ts-use-active-btn').onclick = () => tsStartSession(s.id);
+      document.getElementById('ts-pick-own-btn').onclick   = () => {
+        if (adminBanner) adminBanner.hidden = true;
+        if (selfPicker)  selfPicker.hidden  = false;
+        tsLoadPickList();
+      };
+    } else {
+      if (adminBanner) adminBanner.hidden = true;
+      if (selfPicker)  selfPicker.hidden  = false;
+      tsLoadPickList();
+    }
+  } catch {
+    if (adminBanner) adminBanner.hidden = true;
+    if (selfPicker)  selfPicker.hidden  = false;
+    tsLoadPickList();
+  }
+
+  document.getElementById('ts-pick-back').onclick = () => { tsShowPhase(1); tsWirePhase1(); };
+}
+
+async function tsLoadPickList() {
+  const listEl = document.getElementById('ts-pick-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="hint">Loading…</p>';
 
   try {
-    const res = await fetch('/api/troubleshoot/scenario', {
+    const res  = await fetch('/api/admin/scenario-list');
+    const data = await res.json();
+    const scenarios = data.scenarios || [];
+    tsPopulateTopicFilter(scenarios, 'ts-pick-topic');
+    state.tsPickScenarios = scenarios;
+    tsRenderPickList();
+
+    document.getElementById('ts-pick-diff')?.addEventListener('change',  tsRenderPickList);
+    document.getElementById('ts-pick-topic')?.addEventListener('change', tsRenderPickList);
+  } catch (err) {
+    listEl.innerHTML = '<p class="hint" style="color:var(--danger)">Could not load scenarios: ' + escHtml(err.message) + '</p>';
+  }
+}
+
+function tsRenderPickList() {
+  const listEl = document.getElementById('ts-pick-list');
+  if (!listEl) return;
+  const diff  = document.getElementById('ts-pick-diff')?.value  || '';
+  const topic = document.getElementById('ts-pick-topic')?.value || '';
+
+  const filtered = (state.tsPickScenarios || []).filter(s => {
+    if (diff  && s.difficulty !== diff) return false;
+    if (topic && !(s.topics || []).includes(topic)) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) { listEl.innerHTML = '<p class="hint">No scenarios match.</p>'; return; }
+
+  listEl.innerHTML = '';
+  filtered.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'ts-lib-card ts-pick-card';
+    card.innerHTML = `
+      <div class="ts-lib-card-main">
+        <div class="ts-lib-card-name">${escHtml(s.name)}</div>
+        <div class="ts-lib-card-desc">${escHtml(s.description || '')}</div>
+        <div class="ts-lib-card-meta">
+          <span class="ts-diff-badge ts-diff-${s.difficulty}">${escHtml(s.difficulty || '')}</span>
+          ${(s.topics || []).map(t => `<span class="ts-topic-chip-inline">${escHtml(t)}</span>`).join('')}
+        </div>
+      </div>
+      <div class="ts-lib-card-actions">
+        <button type="button" class="btn btn-primary btn-sm" data-id="${escHtml(s.id)}">Select</button>
+      </div>`;
+    listEl.appendChild(card);
+  });
+
+  listEl.querySelectorAll('button[data-id]').forEach(btn => btn.onclick = () => tsStartSession(btn.dataset.id));
+}
+
+async function tsStartSession(id) {
+  const errEl = document.getElementById('ts-pick-error');
+  if (errEl) errEl.textContent = '';
+  try {
+    const res  = await fetch('/api/troubleshoot/start', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        spec: state.troubleshootSpec || null,
-        topics: allTopics,
-        examObjectives: state.troubleshootExamObjectives,
-        difficulty: state.troubleshootDifficulty
-      })
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Scenario generation failed');
+    if (!res.ok) throw new Error(data.error || 'Failed to start session');
     state.troubleshootToken    = data.token;
-    state.troubleshootScenario = data.scenario;
+    state.troubleshootScenario = { callerName: data.callerName, message: data.scenarioMessage, name: data.scenarioName };
     tsShowPhase(3);
     tsWirePhase3();
   } catch (err) {
-    if (nextBtn) { nextBtn.disabled = false; nextBtn.textContent = 'Generate scenario'; }
-    if (errEl) errEl.textContent = 'Could not generate scenario: ' + err.message;
+    if (errEl) errEl.textContent = 'Could not start session: ' + err.message;
   }
 }
 
@@ -2063,8 +2319,8 @@ function tsWirePhase3() {
 
   const headerEl  = document.getElementById('ts-scenario-header');
   const messageEl = document.getElementById('ts-scenario-message');
-  if (headerEl) headerEl.innerHTML = `<span class="ts-caller-icon">&#128222;</span><strong class="ts-caller-name">${escHtml(scenario.callerName)}</strong><span class="ts-caller-company">&nbsp;from ${escHtml(scenario.company)}</span>`;
-  if (messageEl) messageEl.textContent = scenario.message;
+  if (headerEl)  headerEl.innerHTML  = `<span class="ts-caller-icon">&#128222;</span><strong class="ts-caller-name">${escHtml(scenario.callerName || 'Customer')}</strong>`;
+  if (messageEl) messageEl.textContent = scenario.message || '';
 
   const notesEl = document.getElementById('ts-notes');
   if (notesEl) {
@@ -2073,41 +2329,29 @@ function tsWirePhase3() {
   }
 
   const askBtn = document.getElementById('ts-ask-customer');
-  if (askBtn) {
-    askBtn.disabled = state.troubleshootClueUsed;
-    askBtn.onclick = () => tsAskCustomer();
-  }
+  if (askBtn) { askBtn.disabled = state.troubleshootClueUsed; askBtn.onclick = () => tsAskCustomer(); }
 
   const logTicketBtn = document.getElementById('ts-log-ticket-btn');
   const ticketPanel  = document.getElementById('ts-ticket-panel');
   if (logTicketBtn) {
     logTicketBtn.hidden = state.troubleshootTicketSubmitted;
-    logTicketBtn.onclick = () => {
-      if (ticketPanel) ticketPanel.hidden = false;
-      logTicketBtn.hidden = true;
-    };
+    logTicketBtn.onclick = () => { if (ticketPanel) ticketPanel.hidden = false; logTicketBtn.hidden = true; };
   }
 
-  const cancelBtn = document.getElementById('ts-ticket-cancel');
-  if (cancelBtn) {
-    cancelBtn.onclick = () => {
-      if (ticketPanel) ticketPanel.hidden = true;
-      if (logTicketBtn) logTicketBtn.hidden = false;
-    };
-  }
-
-  const submitBtn = document.getElementById('ts-ticket-submit');
-  if (submitBtn) submitBtn.onclick = () => tsSubmitTicket();
+  document.getElementById('ts-ticket-cancel').onclick = () => {
+    if (ticketPanel) ticketPanel.hidden = true;
+    if (logTicketBtn) logTicketBtn.hidden = false;
+  };
+  document.getElementById('ts-ticket-submit').onclick = () => tsSubmitTicket();
 
   const hintBtn = document.getElementById('ts-request-hint');
   if (hintBtn) {
     hintBtn.disabled = !state.troubleshootTicketSubmitted;
-    hintBtn.title = state.troubleshootTicketSubmitted ? 'Request the next hint' : 'Submit a ticket first to unlock hints';
-    hintBtn.onclick = () => tsRequestHint();
+    hintBtn.title    = state.troubleshootTicketSubmitted ? 'Request the next hint' : 'Submit a ticket first to unlock hints';
+    hintBtn.onclick  = () => tsRequestHint();
   }
 
-  const resolvedBtn = document.getElementById('ts-mark-resolved');
-  if (resolvedBtn) resolvedBtn.onclick = () => tsMarkResolved();
+  document.getElementById('ts-mark-resolved').onclick = () => tsMarkResolved();
 
   if (state.troubleshootClueText) {
     const clueEl = document.getElementById('ts-scenario-clue');
@@ -2125,21 +2369,15 @@ async function tsAskCustomer() {
   const askBtn = document.getElementById('ts-ask-customer');
   if (askBtn) { askBtn.disabled = true; askBtn.textContent = 'Asking…'; }
   try {
-    const res = await fetch('/api/troubleshoot/customer-info', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: state.troubleshootToken })
-    });
+    const res  = await fetch('/api/troubleshoot/customer-info', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: state.troubleshootToken }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     state.troubleshootClueText = data.clue;
     state.troubleshootClueUsed = true;
     const clueEl = document.getElementById('ts-scenario-clue');
     if (clueEl) { clueEl.hidden = false; clueEl.textContent = data.clue; }
-    if (askBtn) askBtn.textContent = 'Ask customer for more info';
-  } catch {
-    if (askBtn) { askBtn.disabled = false; askBtn.textContent = 'Ask customer for more info'; }
-  }
+  } catch { /* leave button disabled */ }
+  if (askBtn) askBtn.textContent = 'Ask customer for more info';
 }
 
 function tsSubmitTicket() {
@@ -2148,25 +2386,14 @@ function tsSubmitTicket() {
   const cause   = document.getElementById('ts-cause')?.value.trim();
   const impact  = document.getElementById('ts-impact')?.value.trim();
   const errEl   = document.getElementById('ts-ticket-error');
-
   if (!symptom) { if (errEl) errEl.textContent = 'Symptom is required.'; return; }
   if (errEl) errEl.textContent = '';
-
   state.troubleshootTicket = { symptom, tried, cause, impact };
   state.troubleshootTicketSubmitted = true;
-
-  fetch('/api/troubleshoot/ticket', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: state.troubleshootToken, ticket: state.troubleshootTicket })
-  });
-
-  const ticketPanel  = document.getElementById('ts-ticket-panel');
-  const logTicketBtn = document.getElementById('ts-log-ticket-btn');
-  if (ticketPanel) ticketPanel.hidden = true;
-  if (logTicketBtn) logTicketBtn.hidden = true;
+  fetch('/api/troubleshoot/ticket', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: state.troubleshootToken, ticket: state.troubleshootTicket }) });
+  document.getElementById('ts-ticket-panel').hidden = true;
+  document.getElementById('ts-log-ticket-btn').hidden = true;
   tsShowTicketConfirm();
-
   const hintBtn = document.getElementById('ts-request-hint');
   if (hintBtn) { hintBtn.disabled = false; hintBtn.title = 'Request the next hint'; }
 }
@@ -2188,11 +2415,7 @@ async function tsRequestHint() {
   const hintBtn = document.getElementById('ts-request-hint');
   if (hintBtn) { hintBtn.disabled = true; hintBtn.textContent = 'Loading…'; }
   try {
-    const res = await fetch('/api/troubleshoot/hint', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: state.troubleshootToken, level: nextLevel })
-    });
+    const res  = await fetch('/api/troubleshoot/hint', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: state.troubleshootToken, level: nextLevel }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     state.troubleshootHintLevel = nextLevel;
@@ -2200,13 +2423,9 @@ async function tsRequestHint() {
     const panel = document.getElementById('ts-hints-panel');
     if (panel) panel.hidden = false;
     tsRenderHints();
-    if (hintBtn) {
-      hintBtn.disabled = nextLevel >= 5;
-      hintBtn.textContent = nextLevel >= 5 ? 'No more hints' : 'Request hint';
-    }
+    if (hintBtn) { hintBtn.disabled = nextLevel >= 5; hintBtn.textContent = nextLevel >= 5 ? 'No more hints' : 'Request hint'; }
   } catch (err) {
     if (hintBtn) { hintBtn.disabled = false; hintBtn.textContent = 'Request hint'; }
-    console.error('Hint request failed:', err.message);
   }
 }
 
@@ -2214,12 +2433,9 @@ function tsRenderHints() {
   const container = document.getElementById('ts-hints-container');
   const badge     = document.getElementById('ts-hint-level-badge');
   if (!container) return;
-
   if (badge) badge.textContent = `Level ${state.troubleshootHintLevel} of 5`;
-
   const levelLabels = ['Customer nudge', 'Technical nudge', 'Specific direction', 'Near-answer', 'Full solution'];
   container.innerHTML = '';
-
   Object.entries(state.troubleshootHints).forEach(([level, text]) => {
     const i    = Number(level) - 1;
     const card = document.createElement('div');
@@ -2241,16 +2457,7 @@ function tsRenderHints() {
 async function tsMarkResolved() {
   state.troubleshootResolved = true;
   try {
-    const res = await fetch('/api/troubleshoot/debrief', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token: state.troubleshootToken,
-        ticket: state.troubleshootTicket,
-        hintsUsed: state.troubleshootHintLevel,
-        notes: state.troubleshootNotes
-      })
-    });
+    const res  = await fetch('/api/troubleshoot/debrief', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: state.troubleshootToken, ticket: state.troubleshootTicket }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     state.troubleshootSessionData = data;
@@ -2276,18 +2483,12 @@ function tsWirePhase4(data) {
       <h3 class="ts-debrief-heading">What the fault was</h3>
       <p class="ts-debrief-fault-text">${escHtml(data.faultDescription)}</p>
       <div class="ts-fix-steps"><strong>Fix steps:</strong><ol>
-        ${(data.fixSteps || []).map(s => `<li>${escHtml(s)}</li>`).join('' )}
+        ${(data.fixSteps || []).map(s => `<li>${escHtml(s)}</li>`).join('')}
       </ol></div>`;
   }
 
   if (statsEl && data) {
-    const hintFeedback = [
-      '', 'Excellent — solved without any hints.',
-      'Strong — solved with just a gentle nudge.',
-      'Good — needed some direction but got there.',
-      'Getting there — needed specific guidance.',
-      'Used the full hint chain — review this topic area.'
-    ];
+    const hintFeedback = ['', 'Excellent — solved without any hints.', 'Strong — solved with just a gentle nudge.', 'Good — needed some direction but got there.', 'Getting there — needed specific guidance.', 'Used the full hint chain — review this topic area.'];
     statsEl.innerHTML = `
       <div class="ts-debrief-stat-grid">
         <div class="ts-debrief-stat"><span class="ts-stat-label">Hints used</span><span class="ts-stat-value">${state.troubleshootHintLevel} of 5</span></div>
@@ -2312,33 +2513,21 @@ function tsWirePhase4(data) {
 
   if (objectivesEl && data) {
     objectivesEl.innerHTML = `
-      <h3 class="ts-debrief-heading">Learning objective covered</h3>
+      <h3 class="ts-debrief-heading">Exam objectives covered</h3>
       <p>${escHtml(data.objectives || '—')}</p>`;
   }
 
-  const anotherBtn  = document.getElementById('ts-another-fault');
-  const endBtn      = document.getElementById('ts-end-session');
-  const downloadBtn = document.getElementById('ts-download-summary');
-
-  if (anotherBtn) {
-    anotherBtn.onclick = () => {
-      state.troubleshootToken = null;
-      state.troubleshootScenario = null;
-      state.troubleshootClueText = null;
-      state.troubleshootClueUsed = false;
-      state.troubleshootNotes = '';
-      state.troubleshootTicket = null;
-      state.troubleshootTicketSubmitted = false;
-      state.troubleshootHintLevel = 0;
-      state.troubleshootHints = {};
-      state.troubleshootResolved = false;
-      state.troubleshootSessionData = null;
-      tsShowPhase(2);
-      tsWirePhase2();
-    };
-  }
-  if (endBtn) endBtn.onclick = () => initTroubleshootStep();
-  if (downloadBtn) downloadBtn.onclick = () => tsDownloadSummary(data);
+  document.getElementById('ts-another-scenario').onclick = () => {
+    state.troubleshootToken = null; state.troubleshootScenario = null;
+    state.troubleshootClueText = null; state.troubleshootClueUsed = false;
+    state.troubleshootNotes = ''; state.troubleshootTicket = null;
+    state.troubleshootTicketSubmitted = false; state.troubleshootHintLevel = 0;
+    state.troubleshootHints = {}; state.troubleshootResolved = false;
+    state.troubleshootSessionData = null;
+    tsShowPhase(2); tsWirePhase2();
+  };
+  document.getElementById('ts-end-session').onclick    = () => initTroubleshootStep();
+  document.getElementById('ts-download-summary').onclick = () => tsDownloadSummary(data);
 }
 
 function tsDownloadSummary(data) {
@@ -2348,6 +2537,7 @@ function tsDownloadSummary(data) {
     '# Troubleshooting Session Summary',
     '',
     `Date: ${new Date().toLocaleDateString()}`,
+    `Scenario: ${data.scenarioName || '—'}`,
     '',
     '## Fault',
     data.faultDescription || '—',
@@ -2355,7 +2545,7 @@ function tsDownloadSummary(data) {
     '## Fix steps',
     ...(data.fixSteps || []).map((s, i) => `${i + 1}. ${s}`),
     '',
-    '## Learning objective',
+    '## Exam objectives',
     data.objectives || '—',
     '',
     '## Performance',
