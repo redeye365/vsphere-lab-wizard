@@ -39,7 +39,7 @@ const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
 const { evaluateSizing } = require('./lib/sizing');
 const { loadScenarios, getScenario, saveScenario, deleteScenario, getVerifyScript, saveVerifyScript, getActive, setActive, nameToId } = require('./lib/scenarioLibrary');
 const { validateAnswers } = require('./lib/validateAnswers');
-const { revertAllToSnapshot, testConnection: vcenterTestConnection } = require('./lib/vcenterClient');
+const { revertAllToSnapshot, createSnapshotsOnAllVMs, testConnection: vcenterTestConnection } = require('./lib/vcenterClient');
 const vcenterConfig = require('./lib/vcenterConfig');
 
 // Locate mmdc (mermaid-cli) — checks local node_modules first, then PATH.
@@ -443,19 +443,36 @@ app.post('/api/admin/scenario-import', (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// POST /api/admin/scenario-capture — record a snapshot name against the active scenario
-// Actual vCenter snapshot capture is out-of-band (admin runs the VCSA snapshot API directly).
-// This endpoint updates the scenario metadata with the snapshot name provided.
-app.post('/api/admin/scenario-capture', (req, res) => {
-  const { id, snapshotName } = req.body || {};
+// POST /api/admin/scenario-capture — create a vCenter snapshot on all VMs and record the name
+app.post('/api/admin/scenario-capture', async (req, res) => {
+  const { id, snapshotName: requestedName } = req.body || {};
   if (!id) return res.status(400).json({ error: 'id required' });
   try {
     const scenario = getScenario(id);
     if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
-    scenario.snapshotName = snapshotName || `scenario-${id}-${Date.now()}`;
-    saveScenario(scenario);
-    res.json({ ok: true, snapshotName: scenario.snapshotName });
-  } catch (err) { res.status(400).json({ error: err.message }); }
+
+    const snapshotName = (requestedName || '').trim() || `scenario-${id}-${Date.now()}`;
+
+    const cfg = vcenterConfig.load(BASE_DIR);
+    if (!cfg || !cfg.server) {
+      // No vCenter config — record the name only; admin creates the snapshot manually
+      scenario.snapshotName = snapshotName;
+      saveScenario(scenario);
+      return res.json({ ok: true, snapshotName, vcenterNote: 'vCenter not configured — create this snapshot manually in vCenter using the name above, then load the scenario to auto-revert.' });
+    }
+
+    try {
+      const { created, errors } = await createSnapshotsOnAllVMs(cfg, snapshotName, `vSphere Lab Wizard — ${scenario.name}`);
+      scenario.snapshotName = snapshotName;
+      saveScenario(scenario);
+      res.json({ ok: true, snapshotName, created, errors });
+    } catch (vcErr) {
+      // vCenter error — still record the name so admin can create manually and load later
+      scenario.snapshotName = snapshotName;
+      saveScenario(scenario);
+      res.json({ ok: true, snapshotName, vcenterError: vcErr.message });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST /api/admin/scenario-verify — run the verify script and return result

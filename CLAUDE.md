@@ -173,22 +173,23 @@ network diagram, prerequisites.
   9. monitor.allowLegacyCPU Missing — monitor-allow-legacy-cpu
   10. Local Datastore Missing Before vSAN — local-datastore-missing
 
-### v0.5.1-beta (current build — vCenter snapshot revert)
-- **vCenter snapshot revert wired** in `POST /api/admin/scenario-load`:
+### v0.5.1-beta (current build — full vCenter snapshot automation)
+- **vCenter snapshot revert** wired in `POST /api/admin/scenario-load`:
   - Connects to vCenter using `vcenter-config.json` (gitignored, stored at BASE_DIR)
   - Lists all VMs via vSphere REST API, reverts any VM that has the named snapshot
   - Error `SNAPSHOT_NOT_FOUND`: surfaced to admin with clear message pointing to Capture button
   - Graceful fallback if vCenter not configured (admin can still revert manually)
+- **vCenter snapshot capture** wired in `POST /api/admin/scenario-capture`:
+  - Creates the snapshot on all VMs in vCenter inventory automatically
+  - Snapshot name auto-generated (`scenario-<id>-<epoch>`) or admin-provided
+  - Per-VM success/error reported back; name always recorded in scenario metadata
+  - Graceful fallback if vCenter not configured — name recorded, admin creates manually
 - **vCenter Settings panel** (⚙ vCenter button in Admin toolbar):
   - Form: server, username, password, trust self-signed cert checkbox
   - "Test Connection" — authenticate + immediate log-out to verify credentials
   - Credentials stored in `vcenter-config.json`, never in git
 - **New endpoints**: `GET/POST /api/admin/vcenter-config`, `POST /api/admin/vcenter-test`
 - **New lib files**: `lib/vcenterClient.js`, `lib/vcenterConfig.js` (no new npm deps — built-in `https` only)
-
-### v2b — vCenter capture automation (future)
-- Wire `/api/admin/scenario-capture` to call the vCenter VM snapshot API to create the
-  snapshot automatically (currently admin must create it in vCenter then click Capture)
 
 ### v3 — VCF layer (future)
 - SDDC Manager bring-up JSON generation

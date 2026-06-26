@@ -751,9 +751,9 @@
           <!-- Step 1: Snapshot -->
           <div class="ts-build-section">
             <h3 class="ts-build-section-heading">Step 1 &mdash; Introduce the fault &amp; capture a snapshot</h3>
-            <p class="hint">Set up your lab in a working state, introduce the fault however you like (wrong config, deleted record, etc.), then capture a vCenter snapshot below.</p>
+            <p class="hint">Save the scenario (Step 2 below), introduce the fault in your lab, then click <strong>Capture snapshot</strong> &mdash; the wizard will create the snapshot on all vCenter VMs automatically. Requires vCenter credentials saved in <em>&#9881; vCenter</em> settings.</p>
             <div class="ts-snapshot-row">
-              <input type="text" id="ts-snapshot-name" class="ts-snapshot-input" placeholder="Snapshot name (auto-generated on capture)">
+              <input type="text" id="ts-snapshot-name" class="ts-snapshot-input" placeholder="Snapshot name (auto-generated if blank)">
               <button type="button" class="btn btn-secondary" id="ts-capture-btn">Capture snapshot</button>
             </div>
             <p id="ts-capture-status" class="hint" style="color:var(--text-dim);margin-top:4px;"></p>

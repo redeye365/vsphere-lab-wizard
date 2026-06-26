@@ -2131,29 +2131,48 @@ async function tsLibSave() {
 }
 
 async function tsCaptureSnapshot() {
-  const idEl     = document.getElementById('ts-build-id');
-  const nameEl   = document.getElementById('ts-snapshot-name');
-  const statusEl = document.getElementById('ts-capture-status');
+  const idEl      = document.getElementById('ts-build-id');
+  const nameEl    = document.getElementById('ts-snapshot-name');
+  const statusEl  = document.getElementById('ts-capture-status');
   const captureBtn = document.getElementById('ts-capture-btn');
 
-  const buildName = document.getElementById('ts-build-name')?.value.trim();
-  if (!buildName) { if (statusEl) statusEl.textContent = 'Enter a scenario name first.'; return; }
-
-  const snapshotName = `scenario-${buildName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}-${Date.now()}`;
-  if (nameEl) nameEl.value = snapshotName;
-  if (statusEl) statusEl.textContent = 'Snapshot name generated. If this scenario is already saved, the name has been recorded. Revert to this snapshot manually in vCenter after introducing the fault.';
-
-  // If there is a saved scenario, update its snapshotName
   const id = idEl?.value;
-  if (id) {
-    try {
-      const res = await fetch('/api/admin/scenario-capture', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ id, snapshotName })
-      });
-      if (res.ok) { if (statusEl) statusEl.textContent += ' Saved to metadata.'; }
-    } catch { /* ignore */ }
+  if (!id) {
+    if (statusEl) { statusEl.textContent = 'Save the scenario first, then capture a snapshot.'; statusEl.style.color = 'var(--warn)'; }
+    return;
+  }
+
+  const buildName = document.getElementById('ts-build-name')?.value.trim();
+  const customName = nameEl?.value.trim();
+  const snapshotName = customName || `scenario-${buildName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}-${Date.now()}`;
+
+  if (captureBtn) { captureBtn.disabled = true; captureBtn.textContent = 'Creating…'; }
+  if (statusEl)   { statusEl.textContent = 'Connecting to vCenter…'; statusEl.style.color = 'var(--text-dim)'; }
+
+  try {
+    const res  = await fetch('/api/admin/scenario-capture', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id, snapshotName })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Capture failed');
+
+    if (nameEl) nameEl.value = data.snapshotName;
+
+    if (data.vcenterNote) {
+      if (statusEl) { statusEl.textContent = `Name saved: ${data.snapshotName}. ${data.vcenterNote}`; statusEl.style.color = 'var(--text-dim)'; }
+    } else if (data.vcenterError) {
+      if (statusEl) { statusEl.textContent = `Name saved but vCenter error: ${data.vcenterError}`; statusEl.style.color = 'var(--warn)'; }
+    } else {
+      const vmList = (data.created || []).map(v => v.name).join(', ');
+      const errCount = (data.errors || []).length;
+      const errNote = errCount > 0 ? ` (${errCount} VM(s) failed — check vCenter)` : '';
+      if (statusEl) { statusEl.textContent = `Snapshot '${data.snapshotName}' created on ${(data.created || []).length} VM(s): ${vmList}${errNote}`; statusEl.style.color = 'var(--accent)'; }
+    }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = 'Capture failed: ' + err.message; statusEl.style.color = 'var(--danger)'; }
+  } finally {
+    if (captureBtn) { captureBtn.disabled = false; captureBtn.textContent = 'Capture snapshot'; }
   }
 }
 
