@@ -56,6 +56,11 @@ const ESXI_VERSION_LABELS = {
 
 // Minimum vRAM per nested host by ESXi version
 const ESXI_MIN_VRAM = { '9.1': 8, '9.0u2': 8, '9.0u1': 8, '9.0': 8, '8.0u3': 8, '8.0u2': 8, '8.0u1': 8 };
+const ESXI9X_VERSIONS = new Set(['9.1', '9.0u2', '9.0u1', '9.0']);
+const VCENTER_TINY_RAM_GB = 14;
+const DC_RAM_GB_SIZING = 4;
+const VYOS_RAM_GB_SIZING = 1;
+const ESXI_OVERHEAD_GB = 4;
 
 const NET_COLORS = {
   management: '#4fb3a4',
@@ -194,6 +199,186 @@ function bindRadio(name, obj, key, onChange, transform) {
   });
 }
 
+// ── ESXi 9.x sizing helpers ───────────────────────────────────────────────────
+
+function updateHostCountWarning() {
+  const warn = document.getElementById('host-count-warning');
+  if (warn) warn.hidden = (state.answers.hardware.hostCount || 1) <= 3;
+}
+
+function updateEsxi9Notices() {
+  const notices = document.getElementById('esxi9-notices');
+  if (notices) notices.hidden = !ESXI9X_VERSIONS.has(state.answers.design.esxiVersion);
+}
+
+function updateVramWarning() {
+  const g = state.answers.design;
+  const warn = document.getElementById('vram-min-warning');
+  if (!warn) return;
+  const minVram = g.esxiVersion ? (ESXI_MIN_VRAM[g.esxiVersion] || null) : null;
+  if (minVram && g.vramPerHostGB > 0 && g.vramPerHostGB < minVram) {
+    warn.hidden = false;
+    warn.textContent = `Below minimum recommended for ESXi ${ESXI_VERSION_LABELS[g.esxiVersion] || g.esxiVersion} — ${minVram} GB vRAM per host is the minimum. Nested hosts may be unstable or fail to boot.`;
+  } else {
+    warn.hidden = true;
+  }
+}
+
+function calcHostTiers(physRamGB, esxiVer) {
+  const g = state.answers.design;
+  const perHostMin = ESXI_MIN_VRAM[esxiVer] || 8;
+  const fixedRam = ESXI_OVERHEAD_GB + VCENTER_TINY_RAM_GB
+    + (g.dcEnabled   ? DC_RAM_GB_SIZING   : 0)
+    + (g.vyosEnabled ? VYOS_RAM_GB_SIZING : 0);
+  const available = Math.max(0, physRamGB - fixedRam);
+  const maxHosts = Math.min(Math.floor(available / perHostMin), 12);
+  return {
+    perHostMin, fixedRam, available, maxHosts,
+    tiers: [
+      { id: 'minimal',  hosts: 1,        vsanCapable: false,         ramNeeded: fixedRam + perHostMin,           feasible: physRamGB >= fixedRam + perHostMin },
+      { id: 'standard', hosts: 3,        vsanCapable: true,          ramNeeded: fixedRam + 3 * perHostMin,       feasible: physRamGB >= fixedRam + 3 * perHostMin },
+      { id: 'maximum',  hosts: maxHosts, vsanCapable: maxHosts >= 3, ramNeeded: fixedRam + maxHosts * perHostMin, feasible: maxHosts >= 1 }
+    ]
+  };
+}
+
+function renderSizingRecommendations() {
+  const g = state.answers.design;
+  const h = state.answers.hardware;
+  const panel = document.getElementById('sizing-recommendations');
+  if (!panel) return;
+
+  const physRam = h.ramGB;
+  const esxiVer = g.esxiVersion;
+  const show = physRam && esxiVer && ESXI9X_VERSIONS.has(esxiVer);
+  panel.hidden = !show;
+  if (!show) return;
+
+  const t = calcHostTiers(physRam, esxiVer);
+  const tierLabels = [
+    'Minimal — 1 host, learn vSphere basics',
+    'Standard — 3 hosts, enables vSAN',
+    `Maximum — ${t.maxHosts} host${t.maxHosts !== 1 ? 's' : ''} on your hardware`
+  ];
+
+  const grid = document.getElementById('sizing-tier-grid');
+  grid.innerHTML = '';
+
+  t.tiers.forEach((tier, i) => {
+    const card = document.createElement('div');
+    const isSelected = Number(g.nestedHostCount) === tier.hosts && tier.feasible;
+    card.className = 'sizing-tier-card' + (isSelected ? ' selected' : '') + (tier.feasible ? '' : ' infeasible');
+
+    const hostNum = document.createElement('div');
+    hostNum.className = 'tier-host-count';
+    hostNum.textContent = tier.feasible ? tier.hosts : '—';
+
+    const label = document.createElement('div');
+    label.className = 'tier-label';
+    label.textContent = tierLabels[i];
+
+    const ramLine = document.createElement('div');
+    ramLine.className = 'tier-ram-line';
+    ramLine.textContent = tier.feasible
+      ? `Needs ${tier.ramNeeded} GB of ${physRam} GB`
+      : `Needs ${tier.ramNeeded} GB — you have ${physRam} GB`;
+
+    card.append(hostNum, label, ramLine);
+
+    if (tier.vsanCapable && tier.feasible) {
+      const badge = document.createElement('div');
+      badge.className = 'tier-vsan-badge';
+      badge.textContent = 'vSAN capable';
+      card.appendChild(badge);
+    }
+
+    if (!tier.feasible) {
+      const note = document.createElement('div');
+      note.className = 'tier-infeasible-note';
+      note.textContent = `Need ${tier.ramNeeded - physRam} GB more RAM`;
+      card.appendChild(note);
+    }
+
+    if (tier.feasible) {
+      card.addEventListener('click', () => {
+        g.nestedHostCount = tier.hosts;
+        g.vcpuPerHost = Math.max(g.vcpuPerHost || 0, 4);
+        g.vramPerHostGB = Math.max(g.vramPerHostGB || 0, tier.perHostMin);
+        const hostEl = document.getElementById('nestedHostCount');
+        const vcpuEl = document.getElementById('vcpuPerHost');
+        const vramEl = document.getElementById('vramPerHostGB');
+        if (hostEl) hostEl.value = tier.hosts;
+        if (vcpuEl) vcpuEl.value = g.vcpuPerHost;
+        if (vramEl) vramEl.value = g.vramPerHostGB;
+        renderSizingRecommendations();
+        renderResourceTips();
+        updateVramWarning();
+      });
+    }
+
+    grid.appendChild(card);
+  });
+}
+
+function renderResourceTips() {
+  const g = state.answers.design;
+  const h = state.answers.hardware;
+  const panel  = document.getElementById('resource-tips-panel');
+  const list   = document.getElementById('resource-tips-list');
+  const sub    = document.getElementById('resource-tips-subtitle');
+  if (!panel || !list) return;
+
+  const physRam = h.ramGB || 0;
+  const esxiVer = g.esxiVersion;
+  if (!physRam || !ESXI9X_VERSIONS.has(esxiVer)) { panel.hidden = true; return; }
+
+  const t = calcHostTiers(physRam, esxiVer);
+  const standardNeed = t.tiers[1].ramNeeded;
+  if (physRam >= standardNeed + 16) { panel.hidden = true; return; }
+
+  panel.hidden = false;
+  if (sub) sub.textContent = `— ${physRam} GB available, ${standardNeed} GB needed for 3-host setup`;
+
+  const tips = [];
+
+  if (g.esxiDeployMethod !== 'ova') {
+    tips.push({ saving: 'time', text: "Use William Lam's nested ESXi OVA — pre-built appliance, automated deployment, no manual ISO install." });
+  }
+
+  tips.push({ saving: '7 GB', text: 'Use vCenter Tiny deployment size (2 vCPU, 14 GB) instead of Small (4 vCPU, 21 GB) — fully adequate for a lab with fewer than 10 hosts.' });
+
+  if (g.dcEnabled) {
+    tips.push({ saving: '0–8 GB', text: 'Keep DC at minimum spec — 2 vCPU / 4 GB is sufficient for lab DNS and Active Directory.' });
+  }
+
+  tips.push({ saving: 'overhead', text: 'Disable memory reservation on nested ESXi VMs and rely on the memory balloon driver — lets the physical host reclaim idle guest RAM.' });
+
+  if (g.workloadVmsEnabled) {
+    tips.push({ saving: `${(g.workloadVmCount || 3) * 4}+ GB`, text: 'Defer workload VMs until the base cluster is healthy. Each small VM adds 4+ GB; deploy after vSAN health checks pass.' });
+  }
+
+  const hasNvme = (h.storageDevices || []).some((d) => d.type === 'nvme');
+  if (hasNvme && !g.memTieringEnabled) {
+    tips.push({ saving: 'up to 2×', text: 'Enable NVMe memory tiering (ESXi 9.1) — extends effective RAM using NVMe as a memory tier. Set <code>sched.mem.enableNestedTiering = true</code> on each nested host before first power-on.' });
+  }
+
+  list.innerHTML = '';
+  tips.forEach((tip) => {
+    const item = document.createElement('div');
+    item.className = 'resource-tip-item';
+    const badge = document.createElement('span');
+    badge.className = 'resource-tip-saving';
+    badge.textContent = tip.saving;
+    const text = document.createElement('span');
+    text.className = 'resource-tip-text';
+    text.innerHTML = tip.text;
+    item.append(badge, text);
+    list.appendChild(item);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Depot step is only relevant when vSAN is enabled AND a local_datastore disk is configured.
 function depotStepVisible() {
   const g = state.answers.design;
@@ -205,13 +390,22 @@ function wireForm() {
   const d = state.answers.discovery;
   const h = state.answers.hardware;
   const g = state.answers.design;
-  const onChange = () => { renderTopology(); updateWorkloadNote(); updateDcNotice(); };
+  const onChange = () => {
+    renderTopology();
+    updateWorkloadNote();
+    updateDcNotice();
+    updateEsxi9Notices();
+    renderSizingRecommendations();
+    renderResourceTips();
+    updateVramWarning();
+  };
 
   bindRadio('useCase', d, 'useCase', onChange);
 
   bindText('host1Ip', h, 'ipAddress', onChange);
   document.getElementById('hostCount').addEventListener('input', () => {
     h.hostCount = Number(document.getElementById('hostCount').value) || 1;
+    updateHostCountWarning();
     syncAdditionalHosts();
     renderAdditionalHosts(onChange);
     renderPlacementRows(onChange);
@@ -235,7 +429,23 @@ function wireForm() {
   bindNumber('nicCount', h, 'nicCount', onChange);
   bindSelect('nicSpeed', h, 'nicSpeed', onChange);
 
-  bindSelect('esxiVersion', g, 'esxiVersion', onChange);
+  document.getElementById('esxiVersion').addEventListener('change', (e) => {
+    g.esxiVersion = e.target.value || null;
+    if (g.esxiVersion && ESXI9X_VERSIONS.has(g.esxiVersion)) {
+      const minVram = ESXI_MIN_VRAM[g.esxiVersion] || 8;
+      if ((g.vramPerHostGB || 0) < minVram) {
+        g.vramPerHostGB = minVram;
+        const vramEl = document.getElementById('vramPerHostGB');
+        if (vramEl) vramEl.value = minVram;
+      }
+      if ((g.vcpuPerHost || 0) < 4) {
+        g.vcpuPerHost = 4;
+        const vcpuEl = document.getElementById('vcpuPerHost');
+        if (vcpuEl) vcpuEl.value = 4;
+      }
+    }
+    onChange();
+  });
 
   // OVA vs ISO deploy method
   document.querySelectorAll('input[name="esxiDeployMethod"]').forEach((el) => {
@@ -919,13 +1129,6 @@ function validateStep(n) {
       if (g.vsanEnabled && !g.vsanCidr) {
         return 'vSAN is switched on, so it needs a CIDR too.';
       }
-      // Version minimum check
-      if (g.esxiVersion && ESXI_MIN_VRAM[g.esxiVersion]) {
-        const minVram = ESXI_MIN_VRAM[g.esxiVersion];
-        if (g.vramPerHostGB < minVram) {
-          return `${ESXI_VERSION_LABELS[g.esxiVersion]} requires at least ${minVram}GB vRAM per nested host. Current setting: ${g.vramPerHostGB}GB.`;
-        }
-      }
       return null;
     case 8:
       // NSX step — no required fields (nsxEnabled is optional)
@@ -989,7 +1192,9 @@ function showStep(n) {
 
   if (n === reviewStep) renderReview();
   if (n === TROUBLESHOOT_STEP) initTroubleshootStep();
+  if (n === 7) { renderSizingRecommendations(); renderResourceTips(); updateVramWarning(); }
   updateDcNotice();
+  updateEsxi9Notices();
 }
 
 function getNextStep(n) {

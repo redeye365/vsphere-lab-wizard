@@ -89,6 +89,7 @@
             <label for="hostCount">Physical hosts</label>
             <input type="number" id="hostCount" min="1" value="1">
             <p class="hint">Each physical host can run several nested ESXi VMs. If you have more than one, the wizard will ask for each host's IP and can distribute nested VMs across them.</p>
+            <p id="host-count-warning" class="hint hint-warning" hidden>This wizard is optimised for home lab deployments of 1&ndash;3 physical hosts. More than 3 is supported but untested &mdash; proceed with caution.</p>
           </div>
           <div class="field">
             <label for="host1Ip">Host 1 management IP</label>
@@ -158,6 +159,18 @@
             <option value="8.0u1">ESXi 8.0 Update 1</option>
           </select>
           <p class="hint">ESXi 8.x and 9.x all require at least 8GB vRAM per nested host. The wizard warns if the nested host sizing falls below the minimum. ESXi 9.x requires a VCF/VVF subscription to download.</p>
+        </div>
+
+        <div id="esxi9-notices" style="margin-top:12px;" hidden>
+          <div class="notice-block notice-warning">
+            <strong>CPU compatibility:</strong> ESXi 9.0+ dropped support for Intel Skylake, Kaby Lake-S, Broadwell-EP/DE, and 1st-Gen Xeon Scalable (Platinum 8100, Gold 6100/5100, Silver 4100, Bronze 3100). These require <code>allowLegacyCPU=true</code> to install &mdash; the wizard enables it in the nested cluster step by default.
+          </div>
+          <div class="notice-block notice-info" style="margin-top:8px;">
+            AMD Ryzen (Zen 4/5): known high CPU utilisation at boot due to slow entropy generation &mdash; a workaround command is included in the generated build guide. NVMe memory tiering now works inside nested VMs in ESXi 9.1 using <code>sched.mem.enableNestedTiering&nbsp;=&nbsp;true</code> on each nested host.
+          </div>
+          <div class="notice-block notice-info" style="margin-top:8px;">
+            ESXi 9.x requires an active <strong>VVF or VCF subscription</strong> to download from Broadcom. ESXi 8.x is available for free with a Broadcom account.
+          </div>
         </div>
       </section>
 
@@ -308,6 +321,14 @@
         <h1>Size the nested cluster</h1>
         <p class="step-intro">The wizard checks this against the physical RAM and CPU from step 2.</p>
 
+        <div id="sizing-recommendations" hidden>
+          <div class="field">
+            <label>Recommended cluster sizes for your hardware</label>
+            <div id="sizing-tier-grid" class="sizing-tier-grid"></div>
+            <p class="hint" id="sizing-tier-hint">Based on: min. 8&nbsp;GB vRAM/nested host &middot; 14&nbsp;GB vCenter Tiny &middot; 4&nbsp;GB DC &middot; 1&nbsp;GB VyOS &middot; 4&nbsp;GB ESXi overhead. Click a tier to apply it.</p>
+          </div>
+        </div>
+
         <div class="field-row">
           <div class="field">
             <label for="nestedHostCount">Nested ESXi hosts</label>
@@ -321,6 +342,7 @@
           <div class="field">
             <label for="vramPerHostGB">vRAM per host (GB)</label>
             <input type="number" id="vramPerHostGB" min="1" value="16">
+            <p id="vram-min-warning" class="hint hint-warning" hidden></p>
           </div>
           <div class="field">
             <label for="nestedDiskGB">Boot disk per host (GB)</label>
@@ -405,6 +427,14 @@
             <input type="number" id="tierNvmePct" min="1" max="400" value="25">
             <p class="hint">Percentage of host RAM to back with the NVMe tier. VMware supports up to 4× DRAM (400%).</p>
           </div>
+        </div>
+
+        <div id="resource-tips-panel" class="resource-tips-panel" hidden>
+          <div class="resource-tips-header">
+            <span>Resource saving tips</span>
+            <span id="resource-tips-subtitle" class="resource-tips-subtitle"></span>
+          </div>
+          <div id="resource-tips-list"></div>
         </div>
       </section>
 

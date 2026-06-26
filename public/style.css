@@ -1096,3 +1096,157 @@ select:focus {
 
 .ts-hint-unlock:hover { border-color: var(--warn); color: var(--warn); }
 .ts-hint-card.revealed .ts-hint-unlock { display: none; }
+
+/* ── Sizing tier cards ───────────────────────────────────────────────── */
+
+.sizing-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 4px 0 0;
+}
+
+@media (max-width: 700px) {
+  .sizing-tier-grid { grid-template-columns: 1fr; }
+}
+
+.sizing-tier-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  user-select: none;
+}
+
+.sizing-tier-card:hover:not(.infeasible) { border-color: var(--text-dim); }
+
+.sizing-tier-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.sizing-tier-card.infeasible {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.tier-host-count {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.sizing-tier-card.infeasible .tier-host-count { color: var(--text-faint); }
+
+.tier-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tier-ram-line {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.tier-infeasible-note {
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 2px;
+}
+
+.tier-vsan-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(79, 179, 164, .15);
+  color: var(--accent);
+  border: 1px solid rgba(79, 179, 164, .3);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-top: 3px;
+  width: fit-content;
+}
+
+/* ── Resource tips panel ─────────────────────────────────────────────── */
+
+.resource-tips-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px 16px;
+  margin-top: 16px;
+}
+
+.resource-tips-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.resource-tips-subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.resource-tip-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.resource-tip-saving {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(63, 185, 80, .1);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, .25);
+  border-radius: 3px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  margin-top: 1px;
+  min-width: 50px;
+  text-align: center;
+}
+
+.resource-tip-text { flex: 1; line-height: 1.5; }
+
+/* ── ESXi 9.x notices ────────────────────────────────────────────────── */
+
+.notice-block {
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.notice-block + .notice-block { margin-top: 8px; }
+
+.notice-block.notice-warning {
+  background: rgba(180, 83, 9, .08);
+  border: 1px solid rgba(180, 83, 9, .25);
+  color: #b45309;
+}
+
+.notice-block.notice-info {
+  background: rgba(79, 179, 164, .06);
+  border: 1px solid rgba(79, 179, 164, .2);
+  color: var(--text-dim);
+}
