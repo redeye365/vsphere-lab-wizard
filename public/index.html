@@ -226,7 +226,7 @@
         <p class="step-intro">Not the lab itself yet &mdash; the network the physical host already sits on.</p>
 
         <div class="field">
-          <label>Network type</label>
+          <label>Network type <span class="info-icon">i<span class="info-tooltip">Flat means all devices share a single broadcast domain with no VLAN separation &mdash; typical of a home router with one LAN port. VLANs allow traffic isolation and require a managed switch. If your switch has a web UI or CLI for configuration, it&rsquo;s probably managed and VLAN-capable.</span></span></label>
           <div class="choice-row">
             <label class="choice-pill"><input type="radio" name="networkType" value="flat"><span>Flat, no VLANs</span></label>
             <label class="choice-pill"><input type="radio" name="networkType" value="vlans"><span>VLANs configured</span></label>
@@ -235,7 +235,7 @@
         </div>
 
         <div class="field">
-          <label>Can your router/switch tag VLANs?</label>
+          <label>Can your router/switch tag VLANs? <span class="info-icon">i<span class="info-tooltip">Managed switches (those with a web UI or CLI) can tag VLAN IDs onto frames. Unmanaged consumer switches cannot. If you bought it from a consumer electronics shop with no setup required, it&rsquo;s probably unmanaged. If unsure, choose &ldquo;Not sure&rdquo; &mdash; the wizard will keep things simple.</span></span></label>
           <div class="choice-row">
             <label class="choice-pill"><input type="radio" name="vlanCapable" value="yes"><span>Yes</span></label>
             <label class="choice-pill"><input type="radio" name="vlanCapable" value="no"><span>No</span></label>
@@ -245,7 +245,7 @@
         </div>
 
         <div class="field">
-          <label>Is DHCP available, or static IPs only?</label>
+          <label>Is DHCP available, or static IPs only? <span class="info-icon">i<span class="info-tooltip">DHCP automatically assigns IP addresses to devices when they connect. Most home routers do this &mdash; if your laptop gets an IP automatically when you plug in, DHCP is available. Your physical ESXi host itself still needs a static IP, but this affects how VyOS and the DC are configured.</span></span></label>
           <div class="choice-row">
             <label class="choice-pill"><input type="radio" name="dhcpAvailable" value="yes"><span>DHCP available</span></label>
             <label class="choice-pill"><input type="radio" name="dhcpAvailable" value="no"><span>Static only</span></label>
@@ -259,15 +259,33 @@
         <h1>Lay out the lab's networks</h1>
         <p class="step-intro">Each one becomes its own tagged port group on the physical vSwitch.</p>
 
+        <!-- Port group context cards -->
+        <div class="pg-context-grid">
+          <div class="pg-context-card">
+            <div class="pg-context-card-head">
+              <span class="pg-dot pg-dot-external"></span>
+              External port group
+            </div>
+            <p>Has a <strong>physical uplink</strong> to your home or office network and the internet. Your lab reaches the outside world through this. In a standard ESXi install this is called <code>VM Network</code>. VyOS connects its WAN interface here.</p>
+          </div>
+          <div class="pg-context-card">
+            <div class="pg-context-card-head">
+              <span class="pg-dot pg-dot-internal"></span>
+              Internal lab port group
+            </div>
+            <p><strong>No physical uplink</strong> — traffic stays entirely inside the physical host. All inter-VLAN routing is handled by VyOS. Set this port group to <code>VLAN 4095</code> (trunk mode) so VyOS receives tagged frames for every VLAN.</p>
+          </div>
+        </div>
+
         <div id="dc-ip-notice" class="dc-ip-notice" hidden></div>
 
         <div class="field-row">
           <div class="field">
-            <label for="mgmtCidr">Management CIDR</label>
+            <label for="mgmtCidr">Management CIDR <span class="info-icon">i<span class="info-tooltip">The IP range for all control-plane components: nested ESXi hosts, vCenter, VyOS management interface, and domain controller. Example: 192.168.10.0/24 gives you addresses .1&ndash;.254. Assign static IPs from this range to every lab appliance.</span></span></label>
             <input type="text" id="mgmtCidr" placeholder="192.168.10.0/24">
           </div>
           <div class="field">
-            <label>Management VLAN mode</label>
+            <label>Management VLAN mode <span class="info-icon">i<span class="info-tooltip">Tagged (best practice): each component adds a VLAN ID to its frames. Requires the physical internal port group to be set to VLAN 4095 trunk. Untagged (simpler): management traffic runs on the native VLAN with no tagging &mdash; easier to set up but all traffic shares one broadcast domain.</span></span></label>
             <div class="radio-group">
               <label class="radio-row"><input type="radio" name="mgmtVlanMode" value="untagged" checked><span>Untagged (simpler — VLAN 0)</span></label>
               <label class="radio-row"><input type="radio" name="mgmtVlanMode" value="tagged"><span>Tagged (best practice)</span></label>
@@ -276,44 +294,44 @@
             <p class="hint" id="mgmt-vlan-hint-tagged" hidden>All three layers must use the same VLAN ID: physical port group, VyOS <code>eth1 vif N</code>, and nested vmk0.</p>
           </div>
           <div class="field" id="mgmt-vlan-id-field" hidden>
-            <label for="mgmtVlan">Management VLAN ID</label>
+            <label for="mgmtVlan">Management VLAN ID <span class="info-icon">i<span class="info-tooltip">The VLAN tag number used by management traffic. All three layers must match: (1) the physical vSwitch port group VLAN ID, (2) the VyOS sub-interface (eth1.N), and (3) nested vmk0. A mismatch at any layer breaks management connectivity.</span></span></label>
             <input type="number" id="mgmtVlan" min="1" max="4094" placeholder="e.g. 10">
           </div>
         </div>
 
         <div class="field-row">
           <div class="field">
-            <label for="vmotionCidr">vMotion CIDR</label>
+            <label for="vmotionCidr">vMotion CIDR <span class="info-icon">i<span class="info-tooltip">The dedicated IP range for live VM migration between nested hosts. Keep this on a separate subnet from management &mdash; vMotion generates high-bandwidth traffic and will compete with management if they share a network.</span></span></label>
             <input type="text" id="vmotionCidr" placeholder="192.168.11.0/24">
           </div>
           <div class="field">
-            <label for="vmotionVlan">vMotion VLAN ID</label>
+            <label for="vmotionVlan">vMotion VLAN ID <span class="info-icon">i<span class="info-tooltip">Used for live migration of VMs between nested hosts. Give it a dedicated VLAN and subnet, separate from management, so vMotion traffic cannot saturate the management network during a migration.</span></span></label>
             <input type="number" id="vmotionVlan" min="0" max="4094" placeholder="optional">
           </div>
         </div>
 
         <div class="field-row">
           <div class="field">
-            <label for="vmCidr">VM traffic CIDR</label>
+            <label for="vmCidr">VM traffic CIDR <span class="info-icon">i<span class="info-tooltip">The network your workload and test VMs connect to. Application VMs will get IPs from this range. VyOS routes traffic between this network and the management network, and provides NAT to the internet.</span></span></label>
             <input type="text" id="vmCidr" placeholder="192.168.20.0/24">
           </div>
           <div class="field">
-            <label for="vmVlan">VM traffic VLAN ID</label>
+            <label for="vmVlan">VM traffic VLAN ID <span class="info-icon">i<span class="info-tooltip">The VLAN your workload VMs use for their network traffic. All VMs on the workload segment will tag their frames with this ID. VyOS must have a matching sub-interface (eth1.N) to route traffic in and out of this segment.</span></span></label>
             <input type="number" id="vmVlan" min="0" max="4094" placeholder="optional">
           </div>
         </div>
 
         <div class="field-row" id="vsan-network-row" hidden>
           <div class="field">
-            <label for="vsanCidr">vSAN CIDR</label>
+            <label for="vsanCidr">vSAN CIDR <span class="info-icon">i<span class="info-tooltip">The dedicated subnet for vSAN storage traffic between nested hosts. Storage I/O is high-throughput and latency-sensitive &mdash; it must never share a subnet or VLAN with management or vMotion traffic.</span></span></label>
             <input type="text" id="vsanCidr" placeholder="192.168.12.0/24">
           </div>
           <div class="field">
-            <label for="vsanVlan">vSAN VLAN ID</label>
+            <label for="vsanVlan">vSAN VLAN ID <span class="info-icon">i<span class="info-tooltip">Must be a dedicated VLAN entirely separate from management and vMotion. vSAN generates sustained high-bandwidth storage I/O that will starve control-plane traffic if they share a VLAN. Each nested ESXi host gets a vmk adapter on this VLAN specifically for vSAN.</span></span></label>
             <input type="number" id="vsanVlan" min="0" max="4094" placeholder="optional">
           </div>
         </div>
-        <p class="hint" id="vsan-network-hint" hidden>vSAN network appears here because it's switched on in the next step.</p>
+        <p class="hint" id="vsan-network-hint" hidden>vSAN network appears here because it&rsquo;s switched on in the next step.</p>
       </section>
 
       <!-- Step 7: Nested cluster -->
@@ -451,7 +469,7 @@
         <div id="nsx-fields" hidden>
           <div class="field-row">
             <div class="field">
-              <label>NSX Manager size</label>
+              <label>NSX Manager size <span class="info-icon">i<span class="info-tooltip">Small is sufficient for all lab and POC work. Medium is for small production environments. The difference is resource reservation &mdash; Small uses 3 vCPU and 12 GB RAM, Medium uses 6 vCPU and 24 GB RAM per node. The wizard&rsquo;s sizing check includes this in total RAM calculations.</span></span></label>
               <div class="radio-group">
                 <label class="radio-row"><input type="radio" name="nsxSize" value="small" checked><span>Small &mdash; 3 vCPU / 12GB RAM (lab/POC)</span></label>
                 <label class="radio-row"><input type="radio" name="nsxSize" value="medium"><span>Medium &mdash; 6 vCPU / 24GB RAM (small production)</span></label>
@@ -460,7 +478,7 @@
           </div>
 
           <div class="field">
-            <label>Gateway topology</label>
+            <label>Gateway topology <span class="info-icon">i<span class="info-tooltip">T0 (Tier-0) is the north-south gateway &mdash; it connects your NSX overlay to the physical network via VyOS or a physical router. T1 (Tier-1) is the tenant gateway &mdash; it connects logical segments to the T0. DFW (Distributed Firewall) enforces micro-segmentation rules at the vNIC level on every VM, regardless of which host it&rsquo;s on.</span></span></label>
             <div class="radio-group">
               <label class="radio-row"><input type="radio" name="nsxTopology" value="T0T1" checked><span>T0 + T1 Gateways only</span></label>
               <label class="radio-row"><input type="radio" name="nsxTopology" value="T0T1DFW"><span>T0 + T1 Gateways + Distributed Firewall (DFW)</span></label>
@@ -471,21 +489,21 @@
 
           <div class="field-row">
             <div class="field">
-              <label for="nsxIpAddress">NSX Manager IP address</label>
+              <label for="nsxIpAddress">NSX Manager IP address <span class="info-icon tip-left">i<span class="info-tooltip">Must be a static IP in your management network range (configured in the Lab networks step). This is the IP you&rsquo;ll browse to for the NSX Manager web UI and API. It must be reachable from your management subnet.</span></span></label>
               <input type="text" id="nsxIpAddress" placeholder="e.g. 192.168.10.30">
               <p class="hint">Must be in the management network range. Used in generated scripts.</p>
             </div>
           </div>
 
           <div id="nsx-bgp-section" class="field" hidden>
-            <label>BGP peering (VyOS detected in BGP mode)</label>
+            <label>BGP peering (VyOS detected in BGP mode) <span class="info-icon">i<span class="info-tooltip">BGP (Border Gateway Protocol) dynamically exchanges routes between NSX T0 and VyOS. When enabled, the NSX T0 gateway will advertise overlay segment prefixes to VyOS, and VyOS will advertise a default route to T0. Both sides must agree on each other&rsquo;s AS number.</span></span></label>
             <div class="field-row">
               <div class="field">
-                <label for="nsxBgpLocalAs">NSX T0 AS number</label>
+                <label for="nsxBgpLocalAs">NSX T0 AS number <span class="info-icon">i<span class="info-tooltip">The BGP Autonomous System number for the NSX T0 gateway. Use a private ASN in the 64512&ndash;65534 range for labs. VyOS must be configured with this as its &ldquo;remote-as&rdquo; when peering with NSX.</span></span></label>
                 <input type="number" id="nsxBgpLocalAs" min="1" max="65535" value="65001">
               </div>
               <div class="field">
-                <label for="nsxBgpPeerAs">VyOS AS number</label>
+                <label for="nsxBgpPeerAs">VyOS AS number <span class="info-icon">i<span class="info-tooltip">The BGP AS number assigned to VyOS. NSX T0 will peer with this AS. Must match the &ldquo;local-as&rdquo; configured on VyOS and the &ldquo;remote-as&rdquo; value set on the NSX T0 BGP neighbour entry.</span></span></label>
                 <input type="number" id="nsxBgpPeerAs" min="1" max="65535" value="65002">
               </div>
             </div>

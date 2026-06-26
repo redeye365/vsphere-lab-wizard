@@ -1604,3 +1604,115 @@ select:focus {
   border: 1px solid rgba(79, 179, 164, .2);
   color: var(--text-dim);
 }
+
+/* ── Field info icon + tooltip ───────────────────────────────────────────── */
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1px solid var(--text-faint);
+  color: var(--text-faint);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 600;
+  cursor: default;
+  position: relative;
+  vertical-align: middle;
+  margin-left: 5px;
+  user-select: none;
+  flex-shrink: 0;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.info-icon:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.info-tooltip {
+  display: none;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(100% + 8px);
+  width: 270px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-dim);
+  line-height: 1.55;
+  z-index: 300;
+  pointer-events: none;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  white-space: normal;
+}
+
+/* Right-align tooltip when icon is near right edge */
+.info-icon.tip-left .info-tooltip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.info-icon:hover .info-tooltip { display: block; }
+
+/* ── Port group context cards (top of network step) ─────────────────────── */
+
+.pg-context-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.pg-context-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 12px 14px;
+}
+
+.pg-context-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 6px;
+}
+
+.pg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pg-dot-external { background: #4f88d4; }
+.pg-dot-internal { background: var(--accent); }
+
+.pg-context-card p {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.pg-context-card code {
+  font-size: 11.5px;
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--accent-text);
+}
