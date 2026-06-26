@@ -2458,35 +2458,45 @@ function wireGenerate() {
       if (!res.ok) {
         const details = Array.isArray(data.details) && data.details.length ? data.details : null;
         if (details) {
+          // step: data-step value (0-indexed); railNum: user-visible step number shown in rail
           const sectionHint = (msg) => {
             const map = [
-              [/^(cpuCores|ramGB|nicCount|nicSpeed|hostCount|storageDevice)/,  'Physical host (step 3)'],
-              [/^(mgmtCidr|mgmtVlan|vmotionCidr|vmotionVlan|vsanCidr|vsanVlan|vmCidr|vmVlan)/, 'Networks (step 4)'],
-              [/^(dcIpAddress|dcDomainName)/,                                  'Domain controller (step 5)'],
-              [/^(vyosNetworkMode)/,                                            'VyOS router (step 6)'],
-              [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering)/, 'Nested cluster (step 7)'],
-              [/^(nsxSize|nsxTopology|nsxIpAddress|nsxBgp)/,                   'NSX-T (step 8)'],
-              [/^nestedDisk/,                                                   'Nested disks (step 9)'],
-              [/^depot/,                                                        'Bundle depot (step 10)'],
-              [/^workloadVm/,                                                   'Workload VMs (step 11)'],
-              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            'Security & access (step 12)'],
+              [/^(cpuCores|ramGB|nicCount|nicSpeed|hostCount|storageDevice)/,  {label: 'Hardware',          step: 1,  railNum: 2}],
+              [/^(mgmtCidr|mgmtVlan|vmotionCidr|vmotionVlan|vsanCidr|vsanVlan|vmCidr|vmVlan)/, {label: 'Lab networks',     step: 6,  railNum: 7}],
+              [/^(dcIpAddress|dcDomainName)/,                                  {label: 'Domain controller', step: 4,  railNum: 5}],
+              [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 3,  railNum: 4}],
+              [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering)/, {label: 'Nested cluster',    step: 7,  railNum: 8}],
+              [/^(nsxSize|nsxTopology|nsxIpAddress|nsxBgp)/,                   {label: 'NSX-T',             step: 8,  railNum: 9}],
+              [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 9,  railNum: 10}],
+              [/^depot/,                                                        {label: 'Bundle depot',      step: 10, railNum: 11}],
+              [/^workloadVm/,                                                   {label: 'Workload VMs',      step: 11, railNum: 12}],
+              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            {label: 'Security & access', step: 12, railNum: 13}],
             ];
-            for (const [re, label] of map) {
-              if (re.test(msg)) return label;
+            for (const [re, hint] of map) {
+              if (re.test(msg)) return hint;
             }
             return null;
           };
 
           const groups = {};
           for (const msg of details) {
-            const section = sectionHint(msg) || 'General';
-            (groups[section] = groups[section] || []).push(msg);
+            const hint = sectionHint(msg);
+            const key = hint ? hint.label : 'General';
+            if (!groups[key]) groups[key] = { step: hint ? hint.step : null, railNum: hint ? hint.railNum : null, msgs: [] };
+            groups[key].msgs.push(msg);
           }
 
           let html = '<strong>Fix the following before generating:</strong><ul>';
-          for (const [section, msgs] of Object.entries(groups)) {
-            html += `<li class="geb-section">${escHtml(section)}<ul>`;
-            for (const m of msgs) html += `<li>${escHtml(m)}</li>`;
+          for (const [sectionLabel, {step, railNum, msgs}] of Object.entries(groups)) {
+            const goLink = step !== null
+              ? ` — <a href="#" onclick="showStep(${step});return false;" class="geb-step-link">go to step ${railNum}</a>`
+              : '';
+            html += `<li class="geb-section">${escHtml(sectionLabel)}${goLink}<ul>`;
+            for (const m of msgs) {
+              // strip internal field name prefix (e.g. "fieldName: ") added for regex matching
+              const display = m.replace(/^\w+:\s*/, '');
+              html += `<li>${escHtml(display)}</li>`;
+            }
             html += '</ul></li>';
           }
           html += '</ul>';

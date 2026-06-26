@@ -359,12 +359,12 @@
           </div>
           <div class="field">
             <label for="vramPerHostGB">vRAM per host (GB)</label>
-            <input type="number" id="vramPerHostGB" min="1" value="16">
+            <input type="number" id="vramPerHostGB" min="1" max="2048" value="16">
             <p id="vram-min-warning" class="hint hint-warning" hidden></p>
           </div>
           <div class="field">
             <label for="nestedDiskGB">Boot disk per host (GB)</label>
-            <input type="number" id="nestedDiskGB" min="8" value="32">
+            <input type="number" id="nestedDiskGB" min="8" max="2048" value="32">
           </div>
         </div>
 
@@ -572,7 +572,7 @@
           <div class="field-row">
             <div class="field">
               <label for="workloadVmCount">Number of VMs</label>
-              <input type="number" id="workloadVmCount" min="1" max="20" value="3">
+              <input type="number" id="workloadVmCount" min="1" max="50" value="3">
             </div>
             <div class="field">
               <label>VM size</label>

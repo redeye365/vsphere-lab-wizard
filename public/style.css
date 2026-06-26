@@ -868,6 +868,14 @@ select:focus {
   color: var(--text);
 }
 
+.generate-error-block .geb-step-link {
+  color: var(--accent);
+  font-weight: 400;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.generate-error-block .geb-step-link:hover { opacity: 0.75; }
+
 .review-warn {
   background: rgba(217, 105, 106, 0.12);
   border: 1px solid var(--danger);
