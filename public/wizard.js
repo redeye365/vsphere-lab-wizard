@@ -104,13 +104,23 @@ const SCRIPT_LABELS = {
 const state = {
   step: 0,
   troubleshootingMode: false,
-  troubleshootSpec: null,       // spec loaded/used for troubleshooting quiz
-  troubleshootToken: null,      // server-issued quiz session token
-  troubleshootQuiz: null,       // quiz questions from server (no correct flags)
-  troubleshootAnswers: {},      // {questionIndex: {answerIndex, correct}} — filled by check-answer
-  troubleshootScore: null,      // {correct, total, pct} from server score-quiz
-  troubleshootTicket: null,     // submitted ticket {symptom, tried, cause, impact}
-  troubleshootHintLevel: 0,     // 0 = no hints shown, 1-5 = hint level revealed
+  troubleshootPhase: 1,
+  troubleshootSpec: null,
+  troubleshootTopics: [],
+  troubleshootExamObjectives: [],
+  troubleshootDifficulty: 'medium',
+  troubleshootFileTopics: [],
+  troubleshootToken: null,
+  troubleshootScenario: null,
+  troubleshootClueText: null,
+  troubleshootClueUsed: false,
+  troubleshootNotes: '',
+  troubleshootTicket: null,
+  troubleshootTicketSubmitted: false,
+  troubleshootHintLevel: 0,
+  troubleshootHints: {},
+  troubleshootResolved: false,
+  troubleshootSessionData: null,
   extendMode: false,
   originalSpec: null,           // spec loaded from file in extend mode
   answers: {
@@ -1805,52 +1815,93 @@ function toggleTroubleshootingMode() {
   }
 }
 
+// ── Topic / exam definitions ────────────────────────────────────────────────
+
+const TS_TOPICS = [
+  { id: 'vsphere-networking', label: 'vSphere Networking' },
+  { id: 'vsan',               label: 'vSAN' },
+  { id: 'nsx-routing',        label: 'NSX Routing (T0/T1)' },
+  { id: 'nsx-dfw',            label: 'NSX DFW' },
+  { id: 'bgp',                label: 'BGP Peering' },
+  { id: 'vcf-bringup',        label: 'VCF Bring-up' },
+  { id: 'dns-ntp',            label: 'DNS / NTP' },
+  { id: 'certificate-management', label: 'Certificate Management' },
+  { id: 'storage',            label: 'Storage' },
+  { id: 'security',           label: 'Security' }
+];
+
+const TS_EXAMS = [
+  { id: 'VCP-DCV',          label: 'VCP-DCV' },
+  { id: 'VCAP-DCV',         label: 'VCAP-DCV' },
+  { id: 'VCP-NV',           label: 'VCP-NV' },
+  { id: 'VCAP-NV',          label: 'VCAP-NV' },
+  { id: 'VCF 3V0-25.25',   label: 'VCF 3V0-25.25' }
+];
+
+// ── Troubleshoot entry point ────────────────────────────────────────────────
+
 function initTroubleshootStep() {
-  // Reset quiz state for fresh visit
+  state.troubleshootPhase = 1;
   state.troubleshootSpec = null;
+  state.troubleshootTopics = [];
+  state.troubleshootExamObjectives = [];
+  state.troubleshootDifficulty = 'medium';
+  state.troubleshootFileTopics = [];
   state.troubleshootToken = null;
-  state.troubleshootQuiz = null;
-  state.troubleshootAnswers = {};
-  state.troubleshootScore = null;
+  state.troubleshootScenario = null;
+  state.troubleshootClueText = null;
+  state.troubleshootClueUsed = false;
+  state.troubleshootNotes = '';
   state.troubleshootTicket = null;
+  state.troubleshootTicketSubmitted = false;
   state.troubleshootHintLevel = 0;
+  state.troubleshootHints = {};
+  state.troubleshootResolved = false;
+  state.troubleshootSessionData = null;
 
-  const specSection  = document.getElementById('ts-spec-section');
-  const ticketSection = document.getElementById('ts-ticket-section');
-  const quizSection  = document.getElementById('ts-quiz-section');
-  const hintSection  = document.getElementById('ts-hint-section');
-  const resultSection = document.getElementById('ts-result-section');
+  tsShowPhase(1);
+  tsWirePhase1();
+}
 
-  if (specSection)   specSection.hidden   = false;
-  if (ticketSection) ticketSection.hidden = true;
-  if (quizSection)   quizSection.hidden   = true;
-  if (hintSection)   hintSection.hidden   = true;
-  if (resultSection) resultSection.hidden = true;
 
-  const useCurrentBtn = document.getElementById('ts-use-current');
-  const loadFileBtn   = document.getElementById('ts-load-spec-btn');
-  const specFileInput = document.getElementById('ts-spec-file-input');
-  const specStatus    = document.getElementById('ts-spec-status');
+// ── Phase helpers ───────────────────────────────────────────────────────────
 
-  if (useCurrentBtn) {
-    useCurrentBtn.onclick = () => {
-      const specFromGenerated = state.generated?.spec;
-      if (!specFromGenerated) {
-        if (specStatus) specStatus.textContent = 'No generated spec found — complete the wizard and click Generate first.';
-        return;
-      }
-      state.troubleshootSpec = specFromGenerated;
-      if (specStatus) specStatus.textContent = '';
-      if (specSection) specSection.hidden = true;
-      showTsTicketForm();
-    };
+function tsShowPhase(n) {
+  state.troubleshootPhase = n;
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById(`ts-phase-${i}`);
+    if (el) el.hidden = i !== n;
   }
-  if (specFileInput) {
-    specFileInput.onchange = (e) => {
+}
+
+// ── Phase 1: Lab confirmation ───────────────────────────────────────────────
+
+function tsWirePhase1() {
+  const check1   = document.getElementById('ts-check-1');
+  const check2   = document.getElementById('ts-check-2');
+  const startBtn = document.getElementById('ts-start-btn');
+  const specFile = document.getElementById('ts-spec-file-input');
+  const specStatus = document.getElementById('ts-spec-status');
+  const specName = document.getElementById('ts-spec-loaded-name');
+
+  if (check1) check1.checked = false;
+  if (check2) check2.checked = false;
+  if (specName) specName.textContent = '';
+  if (startBtn) startBtn.disabled = true;
+
+  const updateStart = () => {
+    if (startBtn) startBtn.disabled = !(check1?.checked && check2?.checked);
+  };
+  if (check1) check1.addEventListener('change', updateStart);
+  if (check2) check2.addEventListener('change', updateStart);
+
+  if (specFile) {
+    specFile.value = '';
+    specFile.onchange = (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      if (file.size > 512 * 1024) {
-        if (specStatus) specStatus.textContent = 'File too large — spec.json must be under 512 KB.';
+      if (file.size > 1024 * 1024) {
+        if (specStatus) specStatus.textContent = 'File too large (max 1 MB).';
         e.target.value = '';
         return;
       }
@@ -1859,295 +1910,470 @@ function initTroubleshootStep() {
         try {
           const spec = JSON.parse(ev.target.result);
           if (!isValidSpecStructure(spec)) {
-            if (specStatus) specStatus.textContent = 'Not a valid lab spec file.';
+            if (specStatus) specStatus.textContent = 'Not a valid lab-spec.json.';
             return;
           }
           state.troubleshootSpec = spec;
           if (specStatus) specStatus.textContent = '';
-          if (specSection) specSection.hidden = true;
-          showTsTicketForm();
+          if (specName) specName.textContent = file.name;
         } catch {
-          if (specStatus) specStatus.textContent = 'Invalid JSON — check the file.';
+          if (specStatus) specStatus.textContent = 'Invalid JSON.';
         }
       };
       reader.readAsText(file);
     };
   }
-}
 
-function showTsTicketForm() {
-  const ticketSection = document.getElementById('ts-ticket-section');
-  if (!ticketSection) return;
-  ticketSection.hidden = false;
-
-  const submitBtn = document.getElementById('ts-ticket-submit');
-  if (submitBtn) {
-    submitBtn.onclick = () => {
-      const symptom = document.getElementById('ts-symptom').value.trim();
-      const tried   = document.getElementById('ts-tried').value.trim();
-      const cause   = document.getElementById('ts-cause').value.trim();
-      const impact  = document.getElementById('ts-impact').value.trim();
-
-      if (!symptom) {
-        document.getElementById('ts-ticket-error').textContent = 'Symptom is required.';
-        return;
-      }
-      document.getElementById('ts-ticket-error').textContent = '';
-
-      state.troubleshootTicket = { symptom, tried, cause, impact };
-
-      // Ticket quality affects starting hint level:
-      // All 4 fields = start at hint 0 (no bonus)
-      // 3 fields = start at hint 1 (skip first hint)
-      // <3 fields = start at hint 2 (skip two hints)
-      const filledFields = [symptom, tried, cause, impact].filter(Boolean).length;
-      state.troubleshootHintLevel = filledFields >= 4 ? 0 : filledFields === 3 ? 1 : 2;
-
-      ticketSection.hidden = true;
-      document.getElementById('ts-ticket-logged').hidden = false;
-      startTsQuiz();
-    };
+  if (startBtn) {
+    startBtn.onclick = () => { tsShowPhase(2); tsWirePhase2(); };
   }
 }
 
-async function startTsQuiz() {
-  if (!state.troubleshootSpec) return;
+// ── Phase 2: Learning goals ─────────────────────────────────────────────────
 
-  const quizSection = document.getElementById('ts-quiz-section');
-  const loadingEl   = document.getElementById('ts-quiz-loading');
+function tsWirePhase2() {
+  const topicGrid = document.getElementById('ts-topic-grid');
+  const examGrid  = document.getElementById('ts-exam-grid');
 
-  if (quizSection) quizSection.hidden = false;
-  if (loadingEl) loadingEl.hidden = false;
+  if (topicGrid) {
+    topicGrid.innerHTML = '';
+    TS_TOPICS.forEach(t => {
+      const label = document.createElement('label');
+      label.className = 'ts-topic-chip';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = t.id;
+      cb.checked = state.troubleshootTopics.includes(t.id);
+      cb.addEventListener('change', () => {
+        if (cb.checked) { if (!state.troubleshootTopics.includes(t.id)) state.troubleshootTopics.push(t.id); }
+        else state.troubleshootTopics = state.troubleshootTopics.filter(x => x !== t.id);
+      });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + t.label));
+      topicGrid.appendChild(label);
+    });
+  }
+
+  if (examGrid) {
+    examGrid.innerHTML = '';
+    TS_EXAMS.forEach(e => {
+      const label = document.createElement('label');
+      label.className = 'ts-topic-chip';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = e.id;
+      cb.checked = state.troubleshootExamObjectives.includes(e.id);
+      cb.addEventListener('change', () => {
+        if (cb.checked) { if (!state.troubleshootExamObjectives.includes(e.id)) state.troubleshootExamObjectives.push(e.id); }
+        else state.troubleshootExamObjectives = state.troubleshootExamObjectives.filter(x => x !== e.id);
+      });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + e.label));
+      examGrid.appendChild(label);
+    });
+  }
+
+  document.querySelectorAll('input[name="ts-difficulty"]').forEach(r => {
+    r.checked = r.value === state.troubleshootDifficulty;
+    r.addEventListener('change', () => { if (r.checked) state.troubleshootDifficulty = r.value; });
+  });
+
+  const goalsFile = document.getElementById('ts-goals-file');
+  const preview   = document.getElementById('ts-file-topics-preview');
+  if (goalsFile) {
+    goalsFile.value = '';
+    goalsFile.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        state.troubleshootFileTopics = tsExtractTopicsFromText(ev.target.result);
+        if (preview) {
+          preview.hidden = false;
+          preview.innerHTML = state.troubleshootFileTopics.length > 0
+            ? '<strong>Topics extracted:</strong> ' + state.troubleshootFileTopics.map(t => `<span class="ts-topic-chip-inline">${t}</span>`).join(' ')
+            : 'No specific topics detected — will use list selections.';
+        }
+      };
+      reader.readAsText(file);
+    };
+  }
+
+  const backBtn = document.getElementById('ts-goals-back');
+  const nextBtn = document.getElementById('ts-goals-next');
+  if (backBtn) backBtn.onclick = () => tsShowPhase(1);
+  if (nextBtn) nextBtn.onclick = () => tsGenerateScenario();
+}
+
+function tsExtractTopicsFromText(text) {
+  const lower = text.toLowerCase();
+  const found = [];
+  const checks = [
+    { terms: ['vsphere', 'vswitch', 'port group', 'dvs', 'distributed switch', 'vmnic', 'vmk'], id: 'vsphere-networking' },
+    { terms: ['vsan', 'storage policy'], id: 'vsan' },
+    { terms: ['nsx routing', 't0', 't1', 'tier-0', 'tier-1', 'overlay', 'geneve'], id: 'nsx-routing' },
+    { terms: ['dfw', 'distributed firewall', 'microsegmentation', 'security group'], id: 'nsx-dfw' },
+    { terms: ['bgp', 'as number', 'autonomous system', 'peering'], id: 'bgp' },
+    { terms: ['vcf', 'vmware cloud foundation', 'sddc manager', 'bring-up', 'bringup'], id: 'vcf-bringup' },
+    { terms: ['dns', 'ntp', 'name resolution', 'time sync', 'ptr record'], id: 'dns-ntp' },
+    { terms: ['certificate', 'ssl', 'tls', 'cert', 'pki'], id: 'certificate-management' },
+    { terms: ['storage', 'datastore', 'vmfs', 'nfs', 'vvols'], id: 'storage' },
+    { terms: ['security', 'hardening', 'firewall', 'lockdown mode', 'rbac'], id: 'security' }
+  ];
+  checks.forEach(({ terms, id }) => {
+    if (terms.some(t => lower.includes(t)) && !found.includes(id)) found.push(id);
+  });
+  return found;
+}
+
+async function tsGenerateScenario() {
+  const nextBtn = document.getElementById('ts-goals-next');
+  const errEl   = document.getElementById('ts-goals-error');
+  if (nextBtn) { nextBtn.disabled = true; nextBtn.textContent = 'Generating…'; }
+  if (errEl) errEl.textContent = '';
+
+  const allTopics = [...new Set([...state.troubleshootTopics, ...(state.troubleshootFileTopics || [])])];
 
   try {
-    const res = await fetch('/api/troubleshoot/generate-quiz', {
+    const res = await fetch('/api/troubleshoot/scenario', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spec: state.troubleshootSpec })
+      body: JSON.stringify({
+        spec: state.troubleshootSpec || null,
+        topics: allTopics,
+        examObjectives: state.troubleshootExamObjectives,
+        difficulty: state.troubleshootDifficulty
+      })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Quiz generation failed');
-    state.troubleshootToken = data.token;
-    state.troubleshootQuiz = data.questions;
-    renderTsQuiz(0);
+    if (!res.ok) throw new Error(data.error || 'Scenario generation failed');
+    state.troubleshootToken    = data.token;
+    state.troubleshootScenario = data.scenario;
+    tsShowPhase(3);
+    tsWirePhase3();
   } catch (err) {
-    if (loadingEl) loadingEl.textContent = 'Could not load quiz: ' + err.message;
+    if (nextBtn) { nextBtn.disabled = false; nextBtn.textContent = 'Generate scenario'; }
+    if (errEl) errEl.textContent = 'Could not generate scenario: ' + err.message;
   }
 }
 
-function renderTsQuiz(questionIndex) {
-  const quiz    = state.troubleshootQuiz;
-  const loadingEl = document.getElementById('ts-quiz-loading');
-  if (loadingEl) loadingEl.hidden = true;
+// ── Phase 3: Investigation ──────────────────────────────────────────────────
 
-  if (!quiz || quiz.length === 0) {
-    document.getElementById('ts-quiz-container').innerHTML = '<p>No questions available for this spec.</p>';
-    return;
+function tsWirePhase3() {
+  const scenario = state.troubleshootScenario;
+  if (!scenario) return;
+
+  const headerEl  = document.getElementById('ts-scenario-header');
+  const messageEl = document.getElementById('ts-scenario-message');
+  if (headerEl) headerEl.innerHTML = `<span class="ts-caller-icon">&#128222;</span><strong class="ts-caller-name">${escHtml(scenario.callerName)}</strong><span class="ts-caller-company">&nbsp;from ${escHtml(scenario.company)}</span>`;
+  if (messageEl) messageEl.textContent = scenario.message;
+
+  const notesEl = document.getElementById('ts-notes');
+  if (notesEl) {
+    notesEl.value = state.troubleshootNotes;
+    notesEl.oninput = () => { state.troubleshootNotes = notesEl.value; };
   }
 
-  if (questionIndex >= quiz.length) {
-    showTsResults();
-    return;
+  const askBtn = document.getElementById('ts-ask-customer');
+  if (askBtn) {
+    askBtn.disabled = state.troubleshootClueUsed;
+    askBtn.onclick = () => tsAskCustomer();
   }
 
-  const q = quiz[questionIndex];
-  const container = document.getElementById('ts-quiz-container');
-  if (!container) return;
-
-  container.innerHTML = '';
-
-  const progress = document.createElement('p');
-  progress.className = 'ts-quiz-progress';
-  progress.textContent = `Question ${questionIndex + 1} of ${quiz.length}`;
-  container.appendChild(progress);
-
-  const questionEl = document.createElement('p');
-  questionEl.className = 'ts-quiz-question';
-  questionEl.textContent = q.question;
-  container.appendChild(questionEl);
-
-  const optsList = document.createElement('div');
-  optsList.className = 'ts-quiz-options';
-  q.options.forEach((opt, i) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ts-quiz-option';
-    btn.textContent = opt.text;
-    btn.onclick = async () => {
-      // Disable all immediately so the user can't change their answer mid-flight
-      optsList.querySelectorAll('.ts-quiz-option').forEach((b) => { b.disabled = true; });
-
-      let correct = false;
-      let explanation = '';
-      let correctIndex = null;
-
-      try {
-        const checkRes = await fetch('/api/troubleshoot/check-answer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: state.troubleshootToken, questionIndex, answerIndex: i })
-        });
-        const checkData = await checkRes.json();
-        if (!checkRes.ok) throw new Error(checkData.error || 'Check failed');
-        correct      = checkData.correct;
-        explanation  = checkData.explanation;
-        correctIndex = checkData.correctIndex;
-      } catch {
-        // Server unreachable — record as incorrect, no explanation
-      }
-
-      state.troubleshootAnswers[questionIndex] = { answerIndex: i, correct };
-
-      // Highlight chosen option and reveal the correct one
-      optsList.querySelectorAll('.ts-quiz-option').forEach((b, bi) => {
-        if (bi === correctIndex) b.classList.add('ts-opt-correct');
-        if (bi === i && !correct) b.classList.add('ts-opt-wrong');
-      });
-
-      if (explanation) {
-        const expEl = document.createElement('p');
-        expEl.className = 'ts-quiz-explanation';
-        expEl.textContent = explanation;
-        container.appendChild(expEl);
-      }
-
-      const nextBtn = document.createElement('button');
-      nextBtn.type = 'button';
-      nextBtn.className = 'btn btn-primary';
-      nextBtn.style.marginTop = '12px';
-      nextBtn.textContent = questionIndex + 1 < quiz.length ? 'Next question' : 'See results';
-      nextBtn.onclick = () => renderTsQuiz(questionIndex + 1);
-      container.appendChild(nextBtn);
+  const logTicketBtn = document.getElementById('ts-log-ticket-btn');
+  const ticketPanel  = document.getElementById('ts-ticket-panel');
+  if (logTicketBtn) {
+    logTicketBtn.hidden = state.troubleshootTicketSubmitted;
+    logTicketBtn.onclick = () => {
+      if (ticketPanel) ticketPanel.hidden = false;
+      logTicketBtn.hidden = true;
     };
-    optsList.appendChild(btn);
-  });
-  container.appendChild(optsList);
+  }
+
+  const cancelBtn = document.getElementById('ts-ticket-cancel');
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      if (ticketPanel) ticketPanel.hidden = true;
+      if (logTicketBtn) logTicketBtn.hidden = false;
+    };
+  }
+
+  const submitBtn = document.getElementById('ts-ticket-submit');
+  if (submitBtn) submitBtn.onclick = () => tsSubmitTicket();
+
+  const hintBtn = document.getElementById('ts-request-hint');
+  if (hintBtn) {
+    hintBtn.disabled = !state.troubleshootTicketSubmitted;
+    hintBtn.title = state.troubleshootTicketSubmitted ? 'Request the next hint' : 'Submit a ticket first to unlock hints';
+    hintBtn.onclick = () => tsRequestHint();
+  }
+
+  const resolvedBtn = document.getElementById('ts-mark-resolved');
+  if (resolvedBtn) resolvedBtn.onclick = () => tsMarkResolved();
+
+  if (state.troubleshootClueText) {
+    const clueEl = document.getElementById('ts-scenario-clue');
+    if (clueEl) { clueEl.hidden = false; clueEl.textContent = state.troubleshootClueText; }
+  }
+  if (state.troubleshootTicketSubmitted) tsShowTicketConfirm();
+  if (state.troubleshootHintLevel > 0) {
+    const panel = document.getElementById('ts-hints-panel');
+    if (panel) panel.hidden = false;
+    tsRenderHints();
+  }
 }
 
-async function showTsResults() {
-  document.getElementById('ts-quiz-section').hidden = true;
-
-  const resultSection = document.getElementById('ts-result-section');
-  if (!resultSection) return;
-  resultSection.hidden = false;
-
-  const scoreDisplay = document.getElementById('ts-score-display');
-  scoreDisplay.textContent = 'Calculating…';
-
-  let correct = 0, total = 0, pct = 0;
+async function tsAskCustomer() {
+  const askBtn = document.getElementById('ts-ask-customer');
+  if (askBtn) { askBtn.disabled = true; askBtn.textContent = 'Asking…'; }
   try {
-    const res = await fetch('/api/troubleshoot/score-quiz', {
+    const res = await fetch('/api/troubleshoot/customer-info', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: state.troubleshootToken })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Scoring failed');
-    ({ correct, total, pct } = data);
+    if (!res.ok) throw new Error(data.error);
+    state.troubleshootClueText = data.clue;
+    state.troubleshootClueUsed = true;
+    const clueEl = document.getElementById('ts-scenario-clue');
+    if (clueEl) { clueEl.hidden = false; clueEl.textContent = data.clue; }
+    if (askBtn) askBtn.textContent = 'Ask customer for more info';
   } catch {
-    // Fallback: count from locally recorded check-answer results
-    const answers = state.troubleshootAnswers;
-    total = (state.troubleshootQuiz || []).length;
-    Object.values(answers).forEach((a) => { if (a.correct) correct++; });
-    pct = total ? Math.round((correct / total) * 100) : 0;
-  }
-
-  state.troubleshootScore = { correct, total, pct };
-  scoreDisplay.textContent = `${correct} / ${total} (${pct}%)`;
-
-  const resultMsg = document.getElementById('ts-result-message');
-  if (pct >= 70) {
-    resultMsg.textContent = 'Environment verified. Your lab knowledge checks out.';
-    resultMsg.className = 'ts-result-pass';
-    document.getElementById('ts-hint-section').hidden = true;
-  } else {
-    resultMsg.textContent = 'Score below 70% — some areas need review. Use the hint system below for guidance.';
-    resultMsg.className = 'ts-result-fail';
-    initHintSystem();
+    if (askBtn) { askBtn.disabled = false; askBtn.textContent = 'Ask customer for more info'; }
   }
 }
 
-// --- Hint system ---
+function tsSubmitTicket() {
+  const symptom = document.getElementById('ts-symptom')?.value.trim();
+  const tried   = document.getElementById('ts-tried')?.value.trim();
+  const cause   = document.getElementById('ts-cause')?.value.trim();
+  const impact  = document.getElementById('ts-impact')?.value.trim();
+  const errEl   = document.getElementById('ts-ticket-error');
 
-const HINT_LEVELS = [
-  { label: 'Nudge',        description: 'A gentle pointer to the right area.' },
-  { label: 'Direction',    description: 'Tells you what category to investigate.' },
-  { label: 'Clue',         description: 'Narrows it to a specific component or setting.' },
-  { label: 'Near-answer',  description: 'Tells you what to check without giving the exact value.' },
-  { label: 'Full solution',description: 'Shows the exact spec value and what to verify.' }
-];
+  if (!symptom) { if (errEl) errEl.textContent = 'Symptom is required.'; return; }
+  if (errEl) errEl.textContent = '';
 
-function initHintSystem() {
-  const hintSection = document.getElementById('ts-hint-section');
-  if (!hintSection) return;
-  hintSection.hidden = false;
+  state.troubleshootTicket = { symptom, tried, cause, impact };
+  state.troubleshootTicketSubmitted = true;
 
-  renderHints();
+  fetch('/api/troubleshoot/ticket', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: state.troubleshootToken, ticket: state.troubleshootTicket })
+  });
+
+  const ticketPanel  = document.getElementById('ts-ticket-panel');
+  const logTicketBtn = document.getElementById('ts-log-ticket-btn');
+  if (ticketPanel) ticketPanel.hidden = true;
+  if (logTicketBtn) logTicketBtn.hidden = true;
+  tsShowTicketConfirm();
+
+  const hintBtn = document.getElementById('ts-request-hint');
+  if (hintBtn) { hintBtn.disabled = false; hintBtn.title = 'Request the next hint'; }
 }
 
-function renderHints() {
+function tsShowTicketConfirm() {
+  let confirm = document.getElementById('ts-ticket-logged-confirm');
+  if (!confirm) {
+    confirm = document.createElement('p');
+    confirm.id = 'ts-ticket-logged-confirm';
+    confirm.className = 'ts-ticket-logged hint';
+    document.querySelector('.ts-action-row')?.insertAdjacentElement('afterend', confirm);
+  }
+  confirm.textContent = 'Ticket logged — hints are now available.';
+}
+
+async function tsRequestHint() {
+  const nextLevel = state.troubleshootHintLevel + 1;
+  if (nextLevel > 5) return;
+  const hintBtn = document.getElementById('ts-request-hint');
+  if (hintBtn) { hintBtn.disabled = true; hintBtn.textContent = 'Loading…'; }
+  try {
+    const res = await fetch('/api/troubleshoot/hint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: state.troubleshootToken, level: nextLevel })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    state.troubleshootHintLevel = nextLevel;
+    state.troubleshootHints[nextLevel] = data.hint;
+    const panel = document.getElementById('ts-hints-panel');
+    if (panel) panel.hidden = false;
+    tsRenderHints();
+    if (hintBtn) {
+      hintBtn.disabled = nextLevel >= 5;
+      hintBtn.textContent = nextLevel >= 5 ? 'No more hints' : 'Request hint';
+    }
+  } catch (err) {
+    if (hintBtn) { hintBtn.disabled = false; hintBtn.textContent = 'Request hint'; }
+    console.error('Hint request failed:', err.message);
+  }
+}
+
+function tsRenderHints() {
   const container = document.getElementById('ts-hints-container');
+  const badge     = document.getElementById('ts-hint-level-badge');
   if (!container) return;
 
-  const spec = state.troubleshootSpec;
-  const nc   = spec?.nestedCluster || {};
-  const nets = spec?.networks || {};
+  if (badge) badge.textContent = `Level ${state.troubleshootHintLevel} of 5`;
 
-  // Generate hint text for each level based on actual spec values
-  const hints = [
-    // Level 1: Nudge
-    `Check your network configuration — something doesn't match the design spec.`,
-    // Level 2: Direction
-    `Focus on the management network. The CIDR, VLAN settings, or gateway may not match what's in the spec.`,
-    // Level 3: Clue
-    `The management network is ${nets.management?.cidr || 'not set'}.${nets.management?.vlanId != null ? ` It uses VLAN ${nets.management.vlanId}.` : ' It runs untagged.'} Check all three layers: port group, VyOS interface, and nested vmk0.`,
-    // Level 4: Near-answer
-    `Verify these specific values match your running environment:\n• Mgmt CIDR: ${nets.management?.cidr || '?'}\n• VLAN: ${nets.management?.vlanId ?? 'untagged'}\n• vCenter SSO domain: ${nc.ssoDomain || '?'}\n• Cluster name: ${nc.clusterName || '?'}`,
-    // Level 5: Full solution
-    `Full spec summary for verification:\n• Mgmt: ${nets.management?.cidr || '?'} VLAN ${nets.management?.vlanId ?? 'native'}\n• vMotion: ${nets.vMotion?.cidr || '?'} VLAN ${nets.vMotion?.vlanId ?? 'native'}\n• Nested hosts: ${nc.hostCount || '?'} × ${nc.vcpuPerHost || '?'} vCPU / ${nc.vramPerHostGB || '?'}GB\n• Cluster: ${nc.clusterName || '?'} · SSO: ${nc.ssoDomain || '?'}\n• NTP: ${spec?.ntp?.source || '?'}`
-  ];
-
+  const levelLabels = ['Customer nudge', 'Technical nudge', 'Specific direction', 'Near-answer', 'Full solution'];
   container.innerHTML = '';
 
-  const startLevel = state.troubleshootHintLevel;
-
-  HINT_LEVELS.forEach((level, i) => {
-    const revealed = i < startLevel || (i === state.troubleshootHintLevel && state.troubleshootHintLevel > 0);
-    const div = document.createElement('div');
-    div.className = 'ts-hint-card' + (revealed ? ' ts-hint-revealed' : '');
-
-    const header = document.createElement('div');
-    header.className = 'ts-hint-header';
-    const levelBadge = document.createElement('span');
-    levelBadge.className = 'ts-hint-level-badge';
-    levelBadge.textContent = `Level ${i + 1}: ${level.label}`;
-    header.appendChild(levelBadge);
-    div.appendChild(header);
-
-    if (revealed) {
-      const body = document.createElement('div');
-      body.className = 'ts-hint-body';
-      body.textContent = hints[i];
-      div.appendChild(body);
-    } else {
-      const lockBtn = document.createElement('button');
-      lockBtn.type = 'button';
-      lockBtn.className = 'btn btn-secondary ts-hint-unlock';
-      lockBtn.textContent = `Reveal ${level.label}`;
-      lockBtn.disabled = i > state.troubleshootHintLevel;
-      lockBtn.onclick = () => {
-        state.troubleshootHintLevel = i + 1;
-        renderHints();
-      };
-      div.appendChild(lockBtn);
-      const desc = document.createElement('span');
-      desc.className = 'ts-hint-desc';
-      desc.textContent = level.description;
-      div.appendChild(desc);
-    }
-
-    container.appendChild(div);
+  Object.entries(state.troubleshootHints).forEach(([level, text]) => {
+    const i    = Number(level) - 1;
+    const card = document.createElement('div');
+    card.className = 'ts-hint-card revealed';
+    const hdr  = document.createElement('div');
+    hdr.className = 'ts-hint-header';
+    const lbadge = document.createElement('span');
+    lbadge.className = 'ts-hint-level-badge';
+    lbadge.textContent = `Level ${level}: ${levelLabels[i] || ''}`;
+    hdr.appendChild(lbadge);
+    const body = document.createElement('div');
+    body.className = 'ts-hint-body';
+    body.textContent = text;
+    card.append(hdr, body);
+    container.appendChild(card);
   });
+}
+
+async function tsMarkResolved() {
+  state.troubleshootResolved = true;
+  try {
+    const res = await fetch('/api/troubleshoot/debrief', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: state.troubleshootToken,
+        ticket: state.troubleshootTicket,
+        hintsUsed: state.troubleshootHintLevel,
+        notes: state.troubleshootNotes
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    state.troubleshootSessionData = data;
+    tsShowPhase(4);
+    tsWirePhase4(data);
+  } catch (err) {
+    console.error('Debrief failed:', err.message);
+    tsShowPhase(4);
+    tsWirePhase4(null);
+  }
+}
+
+// ── Phase 4: Debrief ────────────────────────────────────────────────────────
+
+function tsWirePhase4(data) {
+  const faultEl      = document.getElementById('ts-debrief-fault');
+  const statsEl      = document.getElementById('ts-debrief-stats');
+  const ticketEl     = document.getElementById('ts-debrief-ticket');
+  const objectivesEl = document.getElementById('ts-debrief-objectives');
+
+  if (faultEl && data) {
+    faultEl.innerHTML = `
+      <h3 class="ts-debrief-heading">What the fault was</h3>
+      <p class="ts-debrief-fault-text">${escHtml(data.faultDescription)}</p>
+      <div class="ts-fix-steps"><strong>Fix steps:</strong><ol>
+        ${(data.fixSteps || []).map(s => `<li>${escHtml(s)}</li>`).join('' )}
+      </ol></div>`;
+  }
+
+  if (statsEl && data) {
+    const hintFeedback = [
+      '', 'Excellent — solved without any hints.',
+      'Strong — solved with just a gentle nudge.',
+      'Good — needed some direction but got there.',
+      'Getting there — needed specific guidance.',
+      'Used the full hint chain — review this topic area.'
+    ];
+    statsEl.innerHTML = `
+      <div class="ts-debrief-stat-grid">
+        <div class="ts-debrief-stat"><span class="ts-stat-label">Hints used</span><span class="ts-stat-value">${state.troubleshootHintLevel} of 5</span></div>
+        <div class="ts-debrief-stat"><span class="ts-stat-label">Ticket quality</span><span class="ts-stat-value">${data.ticketScore || '—'}</span></div>
+        <div class="ts-debrief-stat"><span class="ts-stat-label">Customer info</span><span class="ts-stat-value">${state.troubleshootClueUsed ? 'Used' : 'Not used'}</span></div>
+      </div>
+      ${hintFeedback[state.troubleshootHintLevel] ? `<p class="ts-hint-feedback">${hintFeedback[state.troubleshootHintLevel]}</p>` : ''}
+      ${data.ticketAnalysis ? `<p class="ts-ticket-analysis">${escHtml(data.ticketAnalysis)}</p>` : ''}`;
+  }
+
+  if (ticketEl && state.troubleshootTicket) {
+    const t = state.troubleshootTicket;
+    ticketEl.innerHTML = `
+      <h3 class="ts-debrief-heading">Your ticket</h3>
+      <table class="ts-debrief-table">
+        <tr><td>Symptom</td><td>${escHtml(t.symptom || '—')}</td></tr>
+        <tr><td>Steps tried</td><td>${escHtml(t.tried || '—')}</td></tr>
+        <tr><td>Suspected cause</td><td>${escHtml(t.cause || '—')}</td></tr>
+        <tr><td>Impact</td><td>${escHtml(t.impact || '—')}</td></tr>
+      </table>`;
+  }
+
+  if (objectivesEl && data) {
+    objectivesEl.innerHTML = `
+      <h3 class="ts-debrief-heading">Learning objective covered</h3>
+      <p>${escHtml(data.objectives || '—')}</p>`;
+  }
+
+  const anotherBtn  = document.getElementById('ts-another-fault');
+  const endBtn      = document.getElementById('ts-end-session');
+  const downloadBtn = document.getElementById('ts-download-summary');
+
+  if (anotherBtn) {
+    anotherBtn.onclick = () => {
+      state.troubleshootToken = null;
+      state.troubleshootScenario = null;
+      state.troubleshootClueText = null;
+      state.troubleshootClueUsed = false;
+      state.troubleshootNotes = '';
+      state.troubleshootTicket = null;
+      state.troubleshootTicketSubmitted = false;
+      state.troubleshootHintLevel = 0;
+      state.troubleshootHints = {};
+      state.troubleshootResolved = false;
+      state.troubleshootSessionData = null;
+      tsShowPhase(2);
+      tsWirePhase2();
+    };
+  }
+  if (endBtn) endBtn.onclick = () => initTroubleshootStep();
+  if (downloadBtn) downloadBtn.onclick = () => tsDownloadSummary(data);
+}
+
+function tsDownloadSummary(data) {
+  if (!data) return;
+  const t = state.troubleshootTicket || {};
+  const lines = [
+    '# Troubleshooting Session Summary',
+    '',
+    `Date: ${new Date().toLocaleDateString()}`,
+    '',
+    '## Fault',
+    data.faultDescription || '—',
+    '',
+    '## Fix steps',
+    ...(data.fixSteps || []).map((s, i) => `${i + 1}. ${s}`),
+    '',
+    '## Learning objective',
+    data.objectives || '—',
+    '',
+    '## Performance',
+    `- Hints used: ${state.troubleshootHintLevel} of 5`,
+    `- Ticket quality: ${data.ticketScore || '—'}`,
+    `- Customer info used: ${state.troubleshootClueUsed ? 'Yes' : 'No'}`,
+    '',
+    '## Your ticket',
+    `- Symptom: ${t.symptom || '—'}`,
+    `- Steps tried: ${t.tried || '—'}`,
+    `- Suspected cause: ${t.cause || '—'}`,
+    `- Impact: ${t.impact || '—'}`
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'troubleshoot-session.md';
+  a.click();
 }
 
 // --- Generate ---

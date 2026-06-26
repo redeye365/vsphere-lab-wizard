@@ -1097,6 +1097,360 @@ select:focus {
 .ts-hint-unlock:hover { border-color: var(--warn); color: var(--warn); }
 .ts-hint-card.revealed .ts-hint-unlock { display: none; }
 
+/* ── New troubleshooting mode (scenario-based) ───────────────────────────── */
+
+.ts-phase { margin-bottom: 0; }
+.ts-phase + .ts-phase { margin-top: 0; }
+
+.ts-phase-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* Spec load row */
+.ts-spec-load-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.ts-spec-name {
+  font-size: 12.5px;
+  color: var(--accent-text);
+}
+
+/* Learning goals layout */
+.ts-learning-layout {
+  display: flex;
+  gap: 0;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+.ts-learning-col { flex: 1; min-width: 0; }
+.ts-learning-divider {
+  width: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-faint);
+  padding-top: 28px;
+}
+.ts-col-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.ts-topic-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ts-topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+  white-space: nowrap;
+}
+.ts-topic-chip:hover { border-color: var(--accent); color: var(--accent-text); }
+.ts-topic-chip input[type="checkbox"] { display: none; }
+.ts-topic-chip:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.ts-topic-chip-inline {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid rgba(79, 179, 164, 0.3);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  margin-right: 4px;
+}
+
+.ts-difficulty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.ts-difficulty-pills { display: flex; gap: 6px; }
+.ts-diff-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+}
+.ts-diff-pill:hover { border-color: var(--accent); color: var(--accent-text); }
+.ts-diff-pill input { display: none; }
+.ts-diff-pill:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.ts-file-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+/* Phase actions row */
+.ts-phase-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Customer scenario card */
+.ts-scenario-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.ts-scenario-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13.5px;
+}
+.ts-caller-icon { font-size: 15px; }
+.ts-caller-name { font-weight: 600; color: var(--text); }
+.ts-caller-company { color: var(--text-faint); font-size: 12.5px; }
+.ts-scenario-message {
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+.ts-scenario-clue {
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 13px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* Notes textarea */
+.ts-notes {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: var(--sans);
+  padding: 10px 12px;
+  line-height: 1.5;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.ts-notes:focus { border-color: var(--accent); }
+
+/* Investigation action row */
+.ts-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+/* Ticket panel */
+.ts-ticket-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.ts-ticket-panel-header {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin-bottom: 14px;
+}
+
+/* Ticket logged confirmation */
+.ts-ticket-logged {
+  margin-top: 10px;
+  color: var(--accent-text) !important;
+  font-size: 13px;
+}
+
+/* Hints panel */
+.ts-hints-panel {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.ts-hints-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+#ts-hints-container { padding: 10px; }
+.ts-hint-level-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--warn-soft);
+  border: 1px solid rgba(217, 154, 78, 0.3);
+  color: var(--warn);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.ts-hint-card.revealed .ts-hint-level-badge { background: var(--accent-soft); border-color: rgba(79,179,164,.3); color: var(--accent-text); }
+
+/* Debrief */
+.ts-debrief-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.ts-debrief-heading {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin: 0 0 12px;
+}
+.ts-debrief-fault-text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+.ts-fix-steps { font-size: 13.5px; line-height: 1.65; color: var(--text-dim); }
+.ts-fix-steps ol { margin: 8px 0 0 0; padding-left: 20px; }
+.ts-fix-steps li { margin-bottom: 6px; }
+
+.ts-debrief-stats {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.ts-debrief-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ts-debrief-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+.ts-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+}
+.ts-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--accent-text);
+}
+.ts-hint-feedback {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 6px 0 0;
+}
+.ts-ticket-analysis {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  margin: 8px 0 0;
+  font-style: italic;
+}
+
+.ts-debrief-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ts-debrief-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+.ts-debrief-table td:first-child {
+  width: 130px;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+.ts-debrief-table td:last-child { color: var(--text-dim); }
+
 /* ── Sizing tier cards ───────────────────────────────────────────────── */
 
 .sizing-tier-grid {

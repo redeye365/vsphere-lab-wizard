@@ -16,15 +16,13 @@ const os = require('os');
 const IS_PKG = typeof process.pkg !== 'undefined';
 const BASE_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 
-// ── Quiz session store ─────────────────────────────────────────────────────
-// Keyed by a 32-char hex token. Stores the answer key server-side so correct
-// answers are never sent to the browser. Sessions expire after 2 hours.
-const quizSessions = new Map(); // token → { answerKey, answers, createdAt }
+// ── Troubleshoot scenario session store ────────────────────────────────────
+const tsScenarioSessions = new Map(); // token → { fault, spec, createdAt, clueUsed, ticket, hintsGiven }
 
 setInterval(() => {
   const cutoff = Date.now() - 7200000; // 2 hours
-  for (const [token, session] of quizSessions) {
-    if (session.createdAt < cutoff) quizSessions.delete(token);
+  for (const [token, session] of tsScenarioSessions) {
+    if (session.createdAt < cutoff) tsScenarioSessions.delete(token);
   }
 }, 300000); // prune every 5 minutes
 
@@ -38,6 +36,7 @@ const { buildNsxScripts } = require('./lib/generateNsx');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
 const { evaluateSizing } = require('./lib/sizing');
+const { selectFault } = require('./lib/faultLibrary');
 const { validateAnswers } = require('./lib/validateAnswers');
 
 // Locate mmdc (mermaid-cli) — checks local node_modules first, then PATH.
@@ -294,216 +293,112 @@ app.get('/diagram', (req, res) => {
 
 // ── Troubleshooting mode endpoints ─────────────────────────────────────────
 // These endpoints are intentionally not documented in README/UI — they are
-// activated via a hidden keyboard shortcut (Ctrl+Shift+T / Cmd+Shift+T).
+// activated via a hidden keyboard shortcut (Ctrl+Shift+X / Cmd+Shift+X).
 
-// POST /api/troubleshoot/generate-quiz
-// Returns questions with NO correct-answer flags. The answer key is stored
-// server-side keyed by a session token so it never reaches the browser.
-app.post('/api/troubleshoot/generate-quiz', (req, res) => {
+// POST /api/troubleshoot/scenario
+// Selects a fault from the library matching the given topics/difficulty,
+// creates a scenario session, and returns the customer-facing scenario text.
+app.post('/api/troubleshoot/scenario', (req, res) => {
   try {
-    const { spec } = req.body || {};
-    if (!spec || typeof spec !== 'object') {
-      return res.status(400).json({ error: 'spec object required' });
-    }
-    const { clientQuestions, answerKey } = buildQuizFromSpec(spec);
+    const { spec, topics, examObjectives, difficulty } = req.body || {};
+    const fault = selectFault(
+      Array.isArray(topics) ? topics : [],
+      Array.isArray(examObjectives) ? examObjectives : [],
+      typeof difficulty === 'string' ? difficulty : 'medium'
+    );
     const token = crypto.randomBytes(16).toString('hex');
-    quizSessions.set(token, { answerKey, answers: {}, createdAt: Date.now() });
-    res.json({ token, questions: clientQuestions });
+    tsScenarioSessions.set(token, {
+      fault,
+      spec: spec && typeof spec === 'object' ? spec : null,
+      createdAt: Date.now(),
+      clueUsed: false,
+      ticket: null,
+      hintsGiven: 0
+    });
+    res.json({
+      token,
+      scenario: {
+        callerName: fault.customer.callerName,
+        company: fault.customer.company,
+        message: fault.customer.message
+      }
+    });
   } catch (err) {
     console.error(err.message);
-    res.status(500).json({ error: 'Quiz generation failed.' });
+    res.status(500).json({ error: 'Scenario generation failed.' });
   }
 });
 
-// POST /api/troubleshoot/check-answer
-// Called after user selects an option. Returns correct/wrong + explanation.
-// The correctIndex is returned here (not on load) because the user has already
-// committed their answer — revealing it now is expected feedback, not pre-disclosure.
-app.post('/api/troubleshoot/check-answer', (req, res) => {
-  const { token, questionIndex, answerIndex } = req.body || {};
-  if (!token || typeof questionIndex !== 'number' || typeof answerIndex !== 'number') {
-    return res.status(400).json({ error: 'token, questionIndex, and answerIndex required' });
-  }
-  if (!/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
-  const session = quizSessions.get(token);
-  if (!session) return res.status(404).json({ error: 'Session not found or expired' });
-  const key = session.answerKey[questionIndex];
-  if (!key) return res.status(400).json({ error: 'Invalid question index' });
-  session.answers[questionIndex] = answerIndex;
-  const correct = answerIndex === key.correctIndex;
-  res.json({ correct, explanation: key.explanation, correctIndex: key.correctIndex });
-});
-
-// POST /api/troubleshoot/score-quiz
-// Called after all questions are answered. Computes the final score server-side
-// from the recorded answers, then deletes the session.
-app.post('/api/troubleshoot/score-quiz', (req, res) => {
+// POST /api/troubleshoot/customer-info
+// Returns the additional clue the customer can provide (one-time per session).
+app.post('/api/troubleshoot/customer-info', (req, res) => {
   const { token } = req.body || {};
-  if (!token) return res.status(400).json({ error: 'token required' });
-  if (!/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
-  const session = quizSessions.get(token);
+  if (!token || !/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
+  const session = tsScenarioSessions.get(token);
   if (!session) return res.status(404).json({ error: 'Session not found or expired' });
-  const total = session.answerKey.length;
-  let correct = 0;
-  for (let i = 0; i < total; i++) {
-    if (session.answers[i] !== undefined && session.answers[i] === session.answerKey[i].correctIndex) correct++;
-  }
-  quizSessions.delete(token);
-  const pct = Math.round((correct / total) * 100);
-  res.json({ correct, total, pct });
+  session.clueUsed = true;
+  res.json({ clue: session.fault.customer.clue });
 });
 
-function buildQuizFromSpec(spec) {
-  const rawQuestions = []; // { question, opts: string[], correctIndex, explanation }
-  const nc  = spec.nestedCluster || {};
-  const nets = spec.networks || {};
-  const dc  = spec.domainController || {};
-  const vyos = spec.vyos || {};
-  const nsx = spec.nsx || {};
-  const ra  = spec.remoteAccess || {};
-  const ntp = spec.ntp || {};
+// POST /api/troubleshoot/ticket
+// Records the support ticket — required before hints are unlocked.
+app.post('/api/troubleshoot/ticket', (req, res) => {
+  const { token, ticket } = req.body || {};
+  if (!token || !/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
+  const session = tsScenarioSessions.get(token);
+  if (!session) return res.status(404).json({ error: 'Session not found or expired' });
+  if (!ticket || !ticket.symptom) return res.status(400).json({ error: 'Symptom is required' });
+  session.ticket = ticket;
+  res.json({ ok: true });
+});
 
-  function distractVlan(v) {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return [];
-    return [n + 10, n - 10, n + 20, n + 5].filter((x) => x > 0 && x < 4095 && x !== n).slice(0, 3);
-  }
-  function shuffle(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }
-  function q(question, correct, distractors, explanation) {
-    const opts = shuffle([correct, ...distractors.slice(0, 3)]);
-    const correctIndex = opts.indexOf(correct);
-    rawQuestions.push({ question, opts: opts.map(String), correctIndex, explanation });
-  }
+// POST /api/troubleshoot/hint
+// Returns the hint for the requested level. Ticket must be submitted first.
+app.post('/api/troubleshoot/hint', (req, res) => {
+  const { token, level } = req.body || {};
+  if (!token || !/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
+  if (typeof level !== 'number' || level < 1 || level > 5) return res.status(400).json({ error: 'level must be 1–5' });
+  const session = tsScenarioSessions.get(token);
+  if (!session) return res.status(404).json({ error: 'Session not found or expired' });
+  if (!session.ticket) return res.status(403).json({ error: 'Submit a ticket first to unlock hints' });
+  const hint = session.fault.hints[level - 1];
+  if (!hint) return res.status(400).json({ error: 'Hint not found' });
+  if (level > session.hintsGiven) session.hintsGiven = level;
+  res.json({ hint, level });
+});
 
-  // Q: How many nested ESXi hosts?
-  if (nc.hostCount) {
-    const n = nc.hostCount;
-    q(`How many nested ESXi hosts does this design deploy?`,
-      String(n),
-      [String(n + 1), String(Math.max(1, n - 1)), String(n + 2)],
-      `The wizard was configured for ${n} nested ESXi host${n === 1 ? '' : 's'} in the ${nc.clusterName || 'mgmt-cluster'} cluster.`
-    );
-  }
+// POST /api/troubleshoot/debrief
+// Called when the user marks the fault as resolved.
+// Returns the full fault description, fix steps, and a basic ticket quality score.
+app.post('/api/troubleshoot/debrief', (req, res) => {
+  const { token, ticket, hintsUsed } = req.body || {};
+  if (!token || !/^[a-f0-9]{32}$/.test(token)) return res.status(400).json({ error: 'Invalid token' });
+  const session = tsScenarioSessions.get(token);
+  if (!session) return res.status(404).json({ error: 'Session not found or expired' });
 
-  // Q: vRAM per host
-  if (nc.vramPerHostGB) {
-    const v = nc.vramPerHostGB;
-    q(`How much vRAM is assigned to each nested ESXi host?`,
-      `${v}GB`,
-      [`${v * 2}GB`, `${Math.max(8, v - 8)}GB`, `${v + 16}GB`],
-      `Each nested host gets ${v}GB vRAM. This was set in the nested cluster step.`
-    );
-  }
-
-  // Q: vCPU per host
-  if (nc.vcpuPerHost) {
-    const v = nc.vcpuPerHost;
-    q(`How many vCPUs is each nested ESXi host configured with?`,
-      String(v),
-      [String(v * 2), String(Math.max(1, v - 2)), String(v + 4)],
-      `Each nested host gets ${v} vCPUs.`
-    );
+  const t = session.ticket || ticket || {};
+  let ticketScore = 'Not logged';
+  let ticketAnalysis = '';
+  if (t.symptom) {
+    const fields = [t.symptom, t.tried, t.cause, t.impact].filter(Boolean).length;
+    if (fields === 4) { ticketScore = 'Excellent'; ticketAnalysis = 'All four fields completed — thorough documentation.'; }
+    else if (fields === 3) { ticketScore = 'Good'; ticketAnalysis = 'Three fields completed. Adding all four helps replicate issues faster.'; }
+    else if (fields === 2) { ticketScore = 'Fair'; ticketAnalysis = 'Symptom plus one other field. More context speeds up triage.'; }
+    else { ticketScore = 'Minimal'; ticketAnalysis = 'Only the symptom was captured. Document steps tried and suspected cause to build better habits.'; }
   }
 
-  // Q: Management CIDR
-  if (nets.management?.cidr) {
-    const c = nets.management.cidr;
-    const parts = c.split('.');
-    const alt1 = `${parts[0]}.${parts[1]}.${Number(parts[2]) + 1}.0/24`;
-    const alt2 = `10.0.0.0/24`;
-    const alt3 = `172.16.0.0/24`;
-    q(`What is the management network CIDR?`, c, [alt1, alt2, alt3],
-      `The management network is ${c}. All control-plane components (ESXi hosts, vCenter, DC) use this subnet.`
-    );
-  }
-
-  // Q: Management VLAN
-  if (nets.management?.vlanId != null) {
-    const v = nets.management.vlanId;
-    const d = distractVlan(v);
-    q(`What VLAN ID is assigned to management traffic?`,
-      String(v),
-      d.map(String),
-      `Management VLAN is ${v}. This ID must match on the physical port group, VyOS sub-interface, and nested vmk0.`
-    );
-  }
-
-  // Q: Cluster name
-  if (nc.clusterName) {
-    q(`What is the vSphere cluster name?`,
-      nc.clusterName,
-      ['management', 'lab-cluster', 'nested-cluster'],
-      `The cluster name is "${nc.clusterName}". This propagates through all generated scripts and is visible in SDDC Manager if VCF is layered on top.`
-    );
-  }
-
-  // Q: SSO domain
-  if (nc.ssoDomain) {
-    q(`What is the vCenter SSO domain?`,
-      nc.ssoDomain,
-      ['vsphere.lab', dc.domainName || 'lab.local', 'administrator.local'],
-      `The SSO domain is "${nc.ssoDomain}". It must stay distinct from the AD domain to avoid VCF bring-up failures.`
-    );
-  }
-
-  // Q: NTP source
-  if (ntp.source) {
-    q(`What NTP server do all lab components reference?`,
-      ntp.source,
-      ['pool.ntp.org', '8.8.8.8', '1.1.1.1', '192.168.0.1'].filter((x) => x !== ntp.source).slice(0, 3),
-      `All lab components use "${ntp.source}" as their NTP source. Time consistency is required for cert validation and SSO.`
-    );
-  }
-
-  // Q: vSAN architecture
-  if (nc.vsanEnabled && nc.vsanArchitecture) {
-    const correct = nc.vsanArchitecture === 'esa' ? 'ESA (Express Storage Architecture)' : 'OSA (Original Storage Architecture)';
-    q(`Which vSAN storage architecture is this design using?`,
-      correct,
-      ['OSA (Original Storage Architecture)', 'ESA (Express Storage Architecture)', 'vSAN Stretched Cluster', 'vSAN 2-Node'].filter((x) => x !== correct).slice(0, 3),
-      `This design uses vSAN ${nc.vsanArchitecture.toUpperCase()}. ESA is single-tier (all-flash only); OSA uses cache + capacity tiers.`
-    );
-  }
-
-  // Q: ESXi version
-  if (spec.esxiVersion?.label) {
-    q(`What ESXi version is this lab deploying?`,
-      spec.esxiVersion.label,
-      ['ESXi 8.0 U3', 'ESXi 9.0', 'ESXi 8.0 U2', 'ESXi 9.1'].filter((x) => x !== spec.esxiVersion.label).slice(0, 3),
-      `This lab deploys ${spec.esxiVersion.label}.`
-    );
-  }
-
-  // Q: NSX topology (if NSX enabled)
-  if (nsx.enabled && nsx.topology) {
-    const topLabels = { T0T1: 'T0 and T1 Gateways only', T0T1DFW: 'T0, T1 Gateways + Distributed Firewall', full: 'Full (T0/T1/DFW + Advanced LB)' };
-    const correct = topLabels[nsx.topology] || nsx.topology;
-    q(`What NSX-T gateway topology was configured?`,
-      correct,
-      Object.values(topLabels).filter((x) => x !== correct).slice(0, 3),
-      `NSX topology: ${correct}.`
-    );
-  }
-
-  const selected = shuffle(rawQuestions).slice(0, 10);
-
-  // clientQuestions: sent to browser — no correct flags, no explanations
-  const clientQuestions = selected.map(({ question, opts }) => ({
-    question,
-    options: opts.map((text) => ({ text }))
-  }));
-
-  // answerKey: stays on server
-  const answerKey = selected.map(({ correctIndex, explanation }) => ({ correctIndex, explanation }));
-
-  return { clientQuestions, answerKey };
-}
+  res.json({
+    faultDescription: session.fault.faultDescription,
+    fixSteps: session.fault.fixSteps,
+    objectives: session.fault.objectives,
+    topic: session.fault.topic,
+    difficulty: session.fault.difficulty,
+    ticketScore,
+    ticketAnalysis,
+    hintsUsed: session.hintsGiven,
+    clueUsed: session.clueUsed
+  });
+});
 
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;

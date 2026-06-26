@@ -13,7 +13,8 @@ document, network diagram, and build guide. No framework (React/Vue/etc.) — pl
 HTML/CSS/JS in `public/`. Server-side generation only (no client-side bundling).
 
 Key files:
-- `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/from-spec`, `/diagram`, quiz endpoint
+- `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/from-spec`, `/diagram`, troubleshoot scenario endpoints
+- `lib/faultLibrary.js` — 10 faults (topic, difficulty, customer scenario, hints, fix steps)
 - `public/index.html` — all wizard steps in one HTML file
 - `public/wizard.js` — all client state, step logic, form wiring
 - `public/style.css` — all styles
@@ -111,21 +112,23 @@ network diagram, prerequisites.
   wizard; only new/changed scripts are regenerated.
 - Troubleshooting mode (hidden, Ctrl+Shift+X / Cmd+Shift+X):
   - Amber fixed badge; step 14 added to rail (hidden by default)
-  - Part 1: choose spec source (current answers or load spec.json)
-  - Ticket logging form (symptom / tried / cause / impact); completeness gates hint level
-  - Part 2: 5–10 MC quiz questions generated from actual spec values via
-    `/api/troubleshoot/generate-quiz`; pass = ≥70%; fail shows hint system
-  - Progressive hint system: 5 levels (Nudge → Direction → Clue → Near-answer →
-    Full solution); personalized to spec values; ticket quality sets starting level
-  - After ticket submit: "Ticket logged. Hint system ready for when fault injection
-    is added in v2."
   - **No mention of troubleshooting mode anywhere in UI, docs, or README.**
 
-### v2a — Fault injection (future)
-- Inject deliberate misconfigurations into generated scripts/configs
-- Broken VLAN, wrong NTP, misconfigured vSAN witness, MTU mismatch, etc.
-- Troubleshooting mode quiz becomes a live diagnostic exercise
-- Fault injection toggle in troubleshooting step (still hidden from normal users)
+### v0.4.14-beta (current build — scenario-based troubleshooting)
+- **Troubleshooting mode complete redesign** (replaces spec quiz):
+  - Phase 1: lab confirmation + optional spec.json load
+  - Phase 2: learning goals — topic chips (10 topics), exam objectives (5), difficulty
+    selector, file upload with topic extraction
+  - Phase 3: investigation — customer scenario card (callerName, company, message),
+    investigation notes, "Ask customer" (one-time clue), ticket form gates hints,
+    5 progressive hint levels via `/api/troubleshoot/hint`, "I've fixed it" → debrief
+  - Phase 4: debrief — fault description, fix steps, stat grid (hints/ticket/clue),
+    ticket quality analysis, learning objective, download session summary (.md)
+  - Backend: 5 new endpoints (`/scenario`, `/customer-info`, `/ticket`, `/hint`,
+    `/debrief`); old quiz endpoints removed; `tsScenarioSessions` Map replaces
+    `quizSessions`
+  - Fault library: `lib/faultLibrary.js` — 10 faults across 7 topics, 3 difficulties,
+    mapped to exam objectives; `selectFault()` with topic/exam/difficulty filtering
 
 ### v2b — Ticket logging wired (future)
 - Replace placeholder ticket message with real ServiceNow / Jira / plain-file logging
