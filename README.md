@@ -220,4 +220,16 @@ output/                      Generated files (one subfolder per run, gitignored)
 
 ---
 
+## Acknowledgements
+
+**[William Lam](https://williamlam.com)** — The nested ESXi path in this wizard is built around William's [Nested ESXi Virtual Appliance](https://williamlam.com/nested-virtualization/nested-esxi-virtual-appliance). His OVA handles the hard parts of nested deployment (OVF property injection, pre-configured networking, version-specific hardware compatibility) and his blog is the authoritative reference for nested vSphere gotchas, ESXi 9.x minimum specs, VCF local depot patterns, and everything in between. If you're serious about nested virtualisation, his site is the first place to look.
+
+**[VyOS Project](https://vyos.io)** — Open-source network OS used as the lab's virtual router and firewall. The generated scripts deploy and configure VyOS for NAT, DHCP, DNS forwarding, and optionally BGP or site-to-site WireGuard.
+
+**[govmomi / govc](https://github.com/vmware/govmomi)** — Go library and CLI for the vSphere API. The generated `vcenter-deploy.ps1` uses govc for VCSA OVA deployment when available — it handles large OVA files more reliably than PowerCLI's `Import-VApp`.
+
+**[Mermaid](https://mermaid.js.org)** — JavaScript diagramming library used to generate the network topology diagram. The wizard embeds the Mermaid source in `build-guide.md` so diagrams are viewable without any extra tooling via [mermaid.live](https://mermaid.live).
+
+---
+
 *Built by [CloudITBlog.com](https://CloudITBlog.com)*
