@@ -164,6 +164,109 @@ function val(v, suffix = '') {
   return (v === null || v === undefined || v === '') ? '—' : `${v}${suffix}`;
 }
 
+// --- Inline field validation ---
+
+const RE_IP   = /^(\d{1,3}\.){3}\d{1,3}$/;
+const RE_CIDR = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+
+function fieldError(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let err = el.parentNode.querySelector('.field-inline-error');
+  if (!err) {
+    err = document.createElement('p');
+    err.className = 'field-inline-error hint';
+    err.style.color = 'var(--danger)';
+    err.style.marginTop = '3px';
+    el.parentNode.insertBefore(err, el.nextSibling);
+  }
+  err.textContent = msg;
+  err.hidden = !msg;
+  el.style.borderColor = msg ? 'var(--danger)' : '';
+}
+
+function addIpValidation(id, label) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('blur', () => {
+    const v = el.value.trim();
+    if (!v) { fieldError(id, ''); return; }
+    if (!RE_IP.test(v)) { fieldError(id, `${label}: enter a valid IPv4 address (e.g. 192.168.1.10)`); return; }
+    const octets = v.split('.').map(Number);
+    if (octets.some((o) => o > 255)) { fieldError(id, `${label}: all octets must be 0–255`); return; }
+    fieldError(id, '');
+  });
+  el.addEventListener('focus', () => fieldError(id, ''));
+}
+
+function addCidrValidation(id, label) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('blur', () => {
+    const v = el.value.trim();
+    if (!v) { fieldError(id, ''); return; }
+    if (!RE_CIDR.test(v)) { fieldError(id, `${label}: enter CIDR notation (e.g. 192.168.10.0/24)`); return; }
+    const [addr, prefix] = v.split('/');
+    const octets = addr.split('.').map(Number);
+    const plen   = Number(prefix);
+    if (octets.some((o) => o > 255)) { fieldError(id, `${label}: all octets must be 0–255`); return; }
+    if (plen < 8 || plen > 30)       { fieldError(id, `${label}: prefix length must be /8 – /30`); return; }
+    fieldError(id, '');
+  });
+  el.addEventListener('focus', () => fieldError(id, ''));
+}
+
+function addRangeValidation(id, label, min, max) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('blur', () => {
+    const v = el.value.trim();
+    if (!v) { fieldError(id, ''); return; }
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < min || n > max) {
+      fieldError(id, `${label} must be ${min}–${max}`);
+    } else {
+      fieldError(id, '');
+    }
+  });
+  el.addEventListener('focus', () => fieldError(id, ''));
+}
+
+function wireInlineValidation() {
+  // Physical host
+  addIpValidation('host1Ip',     'Physical host IP');
+  addRangeValidation('cpuCores',  'CPU cores',   4,    512);
+  addRangeValidation('ramGB',     'RAM',         16,   4096);
+  addRangeValidation('nicCount',  'NIC count',   1,    32);
+
+  // Domain controller
+  addIpValidation('dcIpAddress', 'DC IP address');
+
+  // Networks
+  ['mgmtCidr', 'vmotionCidr', 'vsanCidr', 'vmCidr'].forEach((id) => {
+    addCidrValidation(id, id.replace('Cidr', '').replace(/([A-Z])/g, ' $1').trim() + ' CIDR');
+  });
+
+  // Nested cluster
+  addRangeValidation('nestedHostCount', 'Nested host count', 1,   16);
+  addRangeValidation('vcpuPerHost',     'vCPU per host',     2,   64);
+  addRangeValidation('vramPerHostGB',   'RAM per host',      4,   2048);
+  addRangeValidation('nestedDiskGB',    'Boot disk',         8,   2048);
+
+  // NSX
+  addIpValidation('nsxIpAddress', 'NSX Manager IP');
+
+  // Depot
+  addIpValidation('depotIpAddress', 'Depot IP address');
+
+  // Memory tiering
+  addRangeValidation('nvmeSizeGB',  'NVMe tier disk size', 10, 2000);
+  addRangeValidation('tierNvmePct', 'Tier percentage',      1,  400);
+
+  // Workload VMs
+  addRangeValidation('workloadVmCount', 'Workload VM count', 1, 50);
+}
+
 // --- Field binding ---
 
 function bindNumber(id, obj, key, onChange) {
@@ -590,6 +693,7 @@ function wireForm() {
     if (g.memTieringEnabled) renderNvmeDiskPicker(onChange);
     onChange();
   });
+  bindNumber('nvmeSizeGB',  g, 'nvmeSizeGB',  onChange);
   bindNumber('tierNvmePct', g, 'tierNvmePct', onChange);
 
   // NSX step (step 8)
@@ -960,6 +1064,13 @@ function renderNvmeDiskPicker(onChange) {
   // Auto-select first NVMe if nothing selected (or selection no longer valid)
   if (g.nvmeTieringDiskIndex === null || !nvmeDisks.find(({ idx }) => idx === g.nvmeTieringDiskIndex)) {
     g.nvmeTieringDiskIndex = nvmeDisks[0].idx;
+    // Pre-fill tier disk size from the physical disk unless the user has already set a custom value
+    if (!g.nvmeSizeGB || g.nvmeSizeGB === 100) {
+      const firstDev = nvmeDisks[0].dev;
+      const firstRaw = Number(firstDev.capacityGB) || 0;
+      const firstGB  = firstDev.capacityUnit === 'TB' ? firstRaw * 1000 : firstRaw;
+      if (firstGB) { g.nvmeSizeGB = firstGB; const el = document.getElementById('nvmeSizeGB'); if (el) el.value = firstGB; }
+    }
   }
 
   nvmeDisks.forEach(({ dev, idx }) => {
@@ -979,6 +1090,9 @@ function renderNvmeDiskPicker(onChange) {
     radio.checked = g.nvmeTieringDiskIndex === idx;
     radio.addEventListener('change', () => {
       g.nvmeTieringDiskIndex = idx;
+      g.nvmeSizeGB = sizeGB;
+      const sizeInput = document.getElementById('nvmeSizeGB');
+      if (sizeInput) sizeInput.value = sizeGB;
       if (onChange) onChange();
     });
 
@@ -992,7 +1106,7 @@ function renderNvmeDiskPicker(onChange) {
 
     const desc = document.createElement('span');
     desc.className = 'nvme-disk-desc';
-    desc.textContent = `Disk #${idx + 1} — memory tiering VMDKs will be provisioned from this device`;
+    desc.textContent = `Disk #${idx + 1} — tier VMDKs will be provisioned from a datastore on this device`;
 
     label.append(radio, badge, size, desc);
     container.appendChild(label);
@@ -2832,5 +2946,6 @@ document.addEventListener('keydown', (e) => {
 wireForm();
 wireNav();
 wireGenerate();
+wireInlineValidation();
 showStep(0);
 renderTopology();

@@ -433,17 +433,21 @@
 
         <div id="mem-tiering-fields" hidden>
           <div class="field">
-            <label>Which physical NVMe disk to dedicate to memory tiering?</label>
+            <label for="nvmeSizeGB">Virtual NVMe tier disk size per host (GB)</label>
+            <input type="number" id="nvmeSizeGB" min="10" max="2000" value="100">
+            <p class="hint">Size of the virtual NVMe VMDK added to each nested ESXi host VM. This is separate from vSAN disks — memory tiering uses its own dedicated NVMe device inside the nested host.</p>
+          </div>
+          <div class="field">
+            <label>Which physical datastore to place the tier VMDKs on? <span class="hint" style="font-size:11px;">(optional)</span></label>
             <div id="nvme-disk-options" class="nvme-disk-options"></div>
             <p id="nvme-disk-warning" class="hint" style="color:var(--danger);" hidden>
-              Memory tiering requires an NVMe device — none were found in your hardware inventory.
-              Go back to Physical host (step 3) to add one.
+              No NVMe devices found in your hardware inventory — the generated script will use whichever datastore you specify at run time.
             </p>
           </div>
           <div class="field">
             <label for="tierNvmePct">Memory tier percentage (%)</label>
             <input type="number" id="tierNvmePct" min="1" max="400" value="25">
-            <p class="hint">Percentage of host RAM to back with the NVMe tier. VMware supports up to 4× DRAM (400%).</p>
+            <p class="hint">Percentage of host RAM to back with the NVMe tier. VMware supports up to 4&times; DRAM (400%).</p>
           </div>
         </div>
 
