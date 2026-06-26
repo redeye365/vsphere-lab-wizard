@@ -15,6 +15,8 @@ HTML/CSS/JS in `public/`. Server-side generation only (no client-side bundling).
 Key files:
 - `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/from-spec`, `/diagram`, troubleshoot scenario endpoints
 - `lib/scenarioLibrary.js` — scenario CRUD (loadScenarios, getScenario, saveScenario, deleteScenario, getActive, setActive)
+- `lib/vcenterClient.js` — vSphere REST API client (createSession, listVMs, findSnapshot, revertAllToSnapshot, testConnection)
+- `lib/vcenterConfig.js` — load/save vcenter-config.json from BASE_DIR (gitignored)
 - `scenarios/<id>.json` — scenario metadata files (10 starters ship with the wizard)
 - `scenarios/verify/<name>.ps1` — PowerShell verify scripts (check FAULT_PRESENT/FAULT_RESOLVED)
 - `public/index.html` — all wizard steps in one HTML file
@@ -142,7 +144,7 @@ network diagram, prerequisites.
 - **Backend endpoints** (admin — not in README):
   - `GET  /api/admin/scenario-list` — all scenarios
   - `GET  /api/admin/scenario-active` — currently loaded scenario
-  - `POST /api/admin/scenario-load` — set active scenario (manual snapshot revert required)
+  - `POST /api/admin/scenario-load` — set active + auto-revert vCenter snapshot if configured
   - `POST /api/admin/scenario-unload` — clear active
   - `POST /api/admin/scenario-save` — create/update scenario + verify script
   - `DELETE /api/admin/scenario/:id` — delete
@@ -150,6 +152,9 @@ network diagram, prerequisites.
   - `POST /api/admin/scenario-import` — import `.labscenario` bundle
   - `POST /api/admin/scenario-capture` — record snapshot name in metadata
   - `POST /api/admin/scenario-verify` — run PS1 verify script (requires pwsh)
+  - `GET  /api/admin/vcenter-config` — return saved vCenter settings (password redacted)
+  - `POST /api/admin/vcenter-config` — save vCenter connection settings to vcenter-config.json
+  - `POST /api/admin/vcenter-test` — test vCenter connectivity (auth + immediate log-out)
 - **Backend endpoints** (troubleshooter):
   - `POST /api/troubleshoot/start` — begin session with scenario id, returns token
   - `POST /api/troubleshoot/customer-info` — one-time clue (customerFollowUp)
@@ -168,12 +173,22 @@ network diagram, prerequisites.
   9. monitor.allowLegacyCPU Missing — monitor-allow-legacy-cpu
   10. Local Datastore Missing Before vSAN — local-datastore-missing
 
-### v2b — vCenter snapshot integration (future)
-- Wire `/api/admin/scenario-load` to the vCenter REST API to perform the snapshot revert
-  automatically (currently requires manual revert in vCenter)
-- Wire `/api/admin/scenario-capture` to call the vCenter VM snapshot API
-- Store vCenter credentials securely (local config file, not in scenario JSON)
-- Admin panel: vCenter connection settings section
+### v0.5.1-beta (current build — vCenter snapshot revert)
+- **vCenter snapshot revert wired** in `POST /api/admin/scenario-load`:
+  - Connects to vCenter using `vcenter-config.json` (gitignored, stored at BASE_DIR)
+  - Lists all VMs via vSphere REST API, reverts any VM that has the named snapshot
+  - Error `SNAPSHOT_NOT_FOUND`: surfaced to admin with clear message pointing to Capture button
+  - Graceful fallback if vCenter not configured (admin can still revert manually)
+- **vCenter Settings panel** (⚙ vCenter button in Admin toolbar):
+  - Form: server, username, password, trust self-signed cert checkbox
+  - "Test Connection" — authenticate + immediate log-out to verify credentials
+  - Credentials stored in `vcenter-config.json`, never in git
+- **New endpoints**: `GET/POST /api/admin/vcenter-config`, `POST /api/admin/vcenter-test`
+- **New lib files**: `lib/vcenterClient.js`, `lib/vcenterConfig.js` (no new npm deps — built-in `https` only)
+
+### v2b — vCenter capture automation (future)
+- Wire `/api/admin/scenario-capture` to call the vCenter VM snapshot API to create the
+  snapshot automatically (currently admin must create it in vCenter then click Capture)
 
 ### v3 — VCF layer (future)
 - SDDC Manager bring-up JSON generation

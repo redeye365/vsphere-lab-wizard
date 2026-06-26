@@ -1930,12 +1930,80 @@ async function tsLibLoad_scenario(id) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Load failed');
     tsRenderActiveBanner(data.scenario);
-    const note = data.snapshotNote ? `\n\n${data.snapshotNote}` : '';
-    alert(`Scenario loaded: ${data.scenario.name}${note}`);
+    if (data.snapshotError) {
+      alert(`Scenario loaded: ${data.scenario.name}\n\n⚠ Snapshot revert failed:\n${data.snapshotError}`);
+    } else if (data.reverted && data.reverted.length > 0) {
+      const names = data.reverted.map(v => v.name).join(', ');
+      alert(`Scenario loaded: ${data.scenario.name}\n\nReverted ${data.reverted.length} VM(s): ${names}`);
+    } else {
+      const note = data.snapshotNote ? `\n\n${data.snapshotNote}` : '';
+      alert(`Scenario loaded: ${data.scenario.name}${note}`);
+    }
   } catch (err) {
     alert('Failed to load scenario: ' + err.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Load'; }
+  }
+}
+
+// ── vCenter Settings ────────────────────────────────────────────────────────
+
+async function tsVcenterSettingsToggle() {
+  const panel = document.getElementById('ts-vcenter-settings');
+  if (!panel) return;
+  if (panel.hidden) {
+    panel.hidden = false;
+    await tsVcenterSettingsLoad();
+  } else {
+    panel.hidden = true;
+  }
+}
+
+async function tsVcenterSettingsLoad() {
+  try {
+    const res  = await fetch('/api/admin/vcenter-config');
+    const data = await res.json();
+    if (data.configured) {
+      document.getElementById('vc-server').value   = data.server   || '';
+      document.getElementById('vc-user').value     = data.user     || '';
+      document.getElementById('vc-insecure').checked = !!data.insecure;
+    }
+  } catch { /* ignore — fields stay blank */ }
+}
+
+async function tsVcenterSave() {
+  const server   = (document.getElementById('vc-server')  .value || '').trim();
+  const user     = (document.getElementById('vc-user')    .value || '').trim();
+  const password =  document.getElementById('vc-password').value || '';
+  const insecure =  document.getElementById('vc-insecure').checked;
+  const status   =  document.getElementById('vc-status');
+  if (!server || !user) { status.textContent = 'Server and username are required.'; status.style.color = 'var(--danger)'; return; }
+  try {
+    const res  = await fetch('/api/admin/vcenter-config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ server, user, password, insecure }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    status.textContent = 'Saved.';
+    status.style.color = 'var(--accent)';
+    document.getElementById('vc-password').value = '';
+  } catch (err) {
+    status.textContent = 'Save failed: ' + err.message;
+    status.style.color = 'var(--danger)';
+  }
+}
+
+async function tsVcenterTest() {
+  const status = document.getElementById('vc-status');
+  status.textContent = 'Testing…';
+  status.style.color = 'var(--text-dim)';
+  try {
+    const res  = await fetch('/api/admin/vcenter-test', { method: 'POST', headers: {'Content-Type':'application/json'} });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    status.textContent = data.message;
+    status.style.color = 'var(--accent)';
+  } catch (err) {
+    status.textContent = 'Connection failed: ' + err.message;
+    status.style.color = 'var(--danger)';
   }
 }
 
@@ -2144,6 +2212,13 @@ function initTroubleshootStep() {
   const captureBtn = document.getElementById('ts-capture-btn');
   const importFile = document.getElementById('ts-import-file');
   const unloadBtn  = document.getElementById('ts-unload-btn');
+  const vcSettingsBtn = document.getElementById('ts-vcenter-settings-btn');
+  const vcSaveBtn     = document.getElementById('vc-save-btn');
+  const vcTestBtn     = document.getElementById('vc-test-btn');
+
+  if (vcSettingsBtn) vcSettingsBtn.onclick = () => tsVcenterSettingsToggle();
+  if (vcSaveBtn)     vcSaveBtn.onclick     = () => tsVcenterSave();
+  if (vcTestBtn)     vcTestBtn.onclick     = () => tsVcenterTest();
 
   if (newBtn)    newBtn.onclick    = () => tsLibOpenBuild(null);
   if (saveBtn)   saveBtn.onclick   = () => tsLibSave();

@@ -1898,3 +1898,27 @@ select:focus {
 
 .ts-pick-list { max-height: 400px; overflow-y: auto; }
 .ts-pick-card .ts-lib-card-actions { flex-direction: row; }
+
+.ts-vcenter-settings {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.ts-vcenter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.ts-vcenter-insecure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  align-self: end;
+  padding-bottom: 8px;
+}
+.ts-vcenter-btns { display: flex; align-items: center; gap: 8px; }

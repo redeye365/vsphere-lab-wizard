@@ -39,6 +39,8 @@ const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
 const { evaluateSizing } = require('./lib/sizing');
 const { loadScenarios, getScenario, saveScenario, deleteScenario, getVerifyScript, saveVerifyScript, getActive, setActive, nameToId } = require('./lib/scenarioLibrary');
 const { validateAnswers } = require('./lib/validateAnswers');
+const { revertAllToSnapshot, testConnection: vcenterTestConnection } = require('./lib/vcenterClient');
+const vcenterConfig = require('./lib/vcenterConfig');
 
 // Locate mmdc (mermaid-cli) — checks local node_modules first, then PATH.
 // Returns the path string if found and executable, otherwise null.
@@ -311,21 +313,30 @@ app.get('/api/admin/scenario-active', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/admin/scenario-load — set the active scenario (triggers snapshot revert if configured)
-app.post('/api/admin/scenario-load', (req, res) => {
+// POST /api/admin/scenario-load — set the active scenario and revert the vCenter snapshot
+app.post('/api/admin/scenario-load', async (req, res) => {
   const { id } = req.body || {};
   if (!id || typeof id !== 'string') return res.status(400).json({ error: 'id required' });
   try {
     const scenario = getScenario(id);
     if (!scenario) return res.status(404).json({ error: 'Scenario not found' });
     setActive(id);
-    // Snapshot revert: not yet wired — would require vCenter credentials.
-    // The admin should manually revert the snapshot named in scenario.snapshotName,
-    // or use the generated capture script.
-    const snapshotNote = scenario.snapshotName
-      ? `Revert vCenter snapshot '${scenario.snapshotName}' to put the lab in the broken state.`
-      : 'No snapshot captured yet — introduce the fault manually in the lab.';
-    res.json({ ok: true, scenario, snapshotNote });
+
+    if (!scenario.snapshotName) {
+      return res.json({ ok: true, scenario, snapshotNote: 'No snapshot captured yet — introduce the fault manually in the lab.' });
+    }
+
+    const cfg = vcenterConfig.load(BASE_DIR);
+    if (!cfg || !cfg.server) {
+      return res.json({ ok: true, scenario, snapshotNote: `vCenter not configured — revert snapshot '${scenario.snapshotName}' manually, or save vCenter credentials using the vCenter Settings button.` });
+    }
+
+    try {
+      const reverted = await revertAllToSnapshot(cfg, scenario.snapshotName);
+      res.json({ ok: true, scenario, reverted, snapshotNote: `Reverted ${reverted.length} VM(s) to snapshot '${scenario.snapshotName}'.` });
+    } catch (vcErr) {
+      res.json({ ok: true, scenario, snapshotError: vcErr.message });
+    }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -333,6 +344,42 @@ app.post('/api/admin/scenario-load', (req, res) => {
 app.post('/api/admin/scenario-unload', (req, res) => {
   try { setActive(null); res.json({ ok: true }); }
   catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/vcenter-config — return saved vCenter settings (password redacted)
+app.get('/api/admin/vcenter-config', (req, res) => {
+  const cfg = vcenterConfig.load(BASE_DIR);
+  if (!cfg) return res.json({ configured: false });
+  const { password: _pw, ...safe } = cfg;
+  res.json({ configured: true, ...safe });
+});
+
+// POST /api/admin/vcenter-config — save vCenter connection settings
+app.post('/api/admin/vcenter-config', (req, res) => {
+  const { server, user, password, insecure } = req.body || {};
+  if (!server || typeof server !== 'string') return res.status(400).json({ error: 'server is required' });
+  if (!user   || typeof user   !== 'string') return res.status(400).json({ error: 'user is required' });
+  try {
+    vcenterConfig.save(BASE_DIR, {
+      server:   server.trim(),
+      user:     user.trim(),
+      password: password || '',
+      insecure: !!insecure
+    });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/vcenter-test — authenticate and immediately log out to verify credentials
+app.post('/api/admin/vcenter-test', async (req, res) => {
+  const cfg = vcenterConfig.load(BASE_DIR);
+  if (!cfg || !cfg.server) return res.status(400).json({ error: 'No vCenter configuration saved — fill in the settings form first.' });
+  try {
+    await vcenterTestConnection(cfg);
+    res.json({ ok: true, message: `Connected to ${cfg.server} as ${cfg.user}` });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // POST /api/admin/scenario-save — create or update a scenario + optional verify script

@@ -702,11 +702,37 @@
               <option value="">All topics</option>
             </select>
             <div style="flex:1"></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="ts-vcenter-settings-btn" title="vCenter connection settings">&#9881; vCenter</button>
             <label class="btn btn-secondary" style="cursor:pointer;">
               Import .labscenario
               <input type="file" id="ts-import-file" accept=".labscenario,.json" style="display:none;">
             </label>
             <button type="button" class="btn btn-primary" id="ts-new-scenario-btn">+ New Scenario</button>
+          </div>
+
+          <!-- vCenter connection settings panel (hidden by default) -->
+          <div id="ts-vcenter-settings" class="ts-vcenter-settings" hidden>
+            <h3 class="ts-build-section-heading" style="margin:0 0 10px">vCenter Connection</h3>
+            <p class="hint" style="margin-bottom:12px">Used to revert snapshots automatically when a scenario is loaded. Credentials are stored in <code>vcenter-config.json</code> next to the wizard executable and are never committed to git.</p>
+            <div class="ts-vcenter-grid">
+              <label class="form-label">vCenter Server
+                <input type="text" id="vc-server" class="ts-snapshot-input" placeholder="vcsa.lab.local or 192.168.1.10">
+              </label>
+              <label class="form-label">Username
+                <input type="text" id="vc-user" class="ts-snapshot-input" placeholder="administrator@vsphere.local">
+              </label>
+              <label class="form-label">Password
+                <input type="password" id="vc-password" class="ts-snapshot-input" placeholder="leave blank to keep saved">
+              </label>
+              <label class="form-label ts-vcenter-insecure">
+                <input type="checkbox" id="vc-insecure"> Trust self-signed certificate
+              </label>
+            </div>
+            <div class="ts-vcenter-btns">
+              <button type="button" class="btn btn-secondary btn-sm" id="vc-test-btn">Test Connection</button>
+              <button type="button" class="btn btn-primary btn-sm" id="vc-save-btn">Save</button>
+              <span id="vc-status" class="hint" style="margin-left:10px"></span>
+            </div>
           </div>
 
           <p id="ts-lib-status" class="hint" style="margin-bottom:8px;color:var(--text-dim);"></p>
