@@ -6,6 +6,8 @@ The pitch: **every consultant who has built a nested vSphere lab has spent days 
 
 Blog posts explaining the background: **[CloudITBlog.com](https://CloudITBlog.com)**
 
+Community scenario library: **[github.com/redeye365/vsphere-lab-scenarios](https://github.com/redeye365/vsphere-lab-scenarios)** — download and share troubleshooting scenarios for the built-in lab trainer.
+
 ---
 
 ## What it produces
