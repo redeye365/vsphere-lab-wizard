@@ -130,7 +130,7 @@ const state = {
       ipAddress: null,
       cpuCores: null, ramGB: null,
       storageDevices: [{ type: '', capacityGB: null, capacityUnit: 'GB' }],
-      nicCount: null, nicSpeed: null,
+      nicCount: null, nicSpeed: null, nicModel: null,
       additionalHosts: []
     },
     design: {
@@ -143,7 +143,10 @@ const state = {
       vmCidr: null, vmVlan: null,
       vsanEnabled: false, vsanCidr: null, vsanVlan: null,
       nsxEnabled: false, nsxSize: 'small', nsxTopology: 'T0T1',
+      nsxEdgeCount: 1, nsxEdgeSize: 'medium',
       nsxIpAddress: null, nsxBgpLocalAs: 65001, nsxBgpPeerAs: 65002,
+      nsxBgpRouteAdvert: 'all', nsxBgpPrefixes: '',
+      nsxRedistConnected: true, nsxRedistStatic: false, nsxRedistT1Lb: false,
       depotEnabled: false, depotMode: 'linux', depotIpAddress: null,
       nestedHostCount: 3, vcpuPerHost: 4, vramPerHostGB: 16, nestedDiskGB: 32,
       clusterName: 'mgmt-cluster', datacenterName: 'Lab-DC', ssoDomain: 'vsphere.local',
@@ -168,6 +171,57 @@ function val(v, suffix = '') {
 
 const RE_IP   = /^(\d{1,3}\.){3}\d{1,3}$/;
 const RE_CIDR = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+
+// HCL compatibility patterns (mirrors lib/hclData.js)
+const HCL_FLAGGED = [
+  { re: /realtek|rtl\s*\d{3,4}/i,                      chipsets: 'RTL8111/8168/8125',   reason: 'No native inbox driver in ESXi 8.0+. Community drivers exist but are unsupported.' },
+  { re: /intel.*(i210|i211)|\bi210\b|\bi211\b/i,        chipsets: 'Intel I210/I211',      reason: 'Removed from inbox net-igb driver in ESXi 8.0. Requires a community driver.' },
+  { re: /killer|rivet\s*networks?/i,                    chipsets: 'Killer E2x00/E3x00',   reason: 'Not on the ESXi HCL — PCI vendor ID differs from Intel retail NICs.' },
+  { re: /atheros|qualcomm.*qca|qca\d{4}|\bar\d{4,5}\b/i, chipsets: 'Qualcomm/Atheros',  reason: 'No ESXi driver available.' },
+  { re: /marvell.*9235|88se9235/i,                      chipsets: 'Marvell 88SE9235',     reason: 'Not supported in ESXi 8.0+.' },
+  { re: /jmicron|jmb\d{3}/i,                            chipsets: 'JMicron JMB36x',       reason: 'No ESXi driver available.' }
+];
+const HCL_GOOD = [
+  { re: /intel.*(x710|xl710|x520|x540|x550|82599|82576|82574|82579|\bi350\b|\bi354\b)/i, label: 'Intel X-series / I350' },
+  { re: /broadcom.*(57\d{3}|bcm57|5709|5720|578\d{2})/i, label: 'Broadcom BCM57xx' },
+  { re: /mellanox|connectx[-\s]?[2-6]/i,                 label: 'Mellanox ConnectX' },
+  { re: /chelsio\s*t\d/i,                                label: 'Chelsio T-series' },
+  { re: /solarflare|xilinx.*sfc|sfc\d{4}/i,              label: 'Solarflare/AMD SFC' }
+];
+
+function checkNicHcl(model) {
+  if (!model || !model.trim()) return null;
+  for (const e of HCL_FLAGGED) { if (e.re.test(model)) return { status: 'flagged', chipsets: e.chipsets, reason: e.reason }; }
+  for (const e of HCL_GOOD)    { if (e.re.test(model)) return { status: 'good', label: e.label }; }
+  return { status: 'unknown' };
+}
+
+function fieldHclStatus(id, result) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let msg = el.parentNode.querySelector('.field-hcl-msg');
+  if (!msg) {
+    msg = document.createElement('p');
+    msg.className = 'field-hcl-msg hint';
+    msg.style.marginTop = '3px';
+    el.parentNode.insertBefore(msg, el.nextSibling);
+  }
+  if (!result) { msg.hidden = true; el.style.borderColor = ''; return; }
+  if (result.status === 'flagged') {
+    msg.style.color = 'var(--warn)';
+    msg.textContent = `⚠ ${result.chipsets} — ${result.reason}`;
+    el.style.borderColor = 'var(--warn)';
+  } else if (result.status === 'good') {
+    msg.style.color = 'var(--accent)';
+    msg.textContent = `✓ ${result.label} — confirmed on ESXi HCL`;
+    el.style.borderColor = 'var(--accent)';
+  } else {
+    msg.style.color = 'var(--text-dim)';
+    msg.textContent = 'Not in the known-good list — verify against the VMware HCL before purchasing.';
+    el.style.borderColor = '';
+  }
+  msg.hidden = false;
+}
 
 function fieldError(id, msg) {
   const el = document.getElementById(id);
@@ -238,6 +292,19 @@ function wireInlineValidation() {
   addRangeValidation('cpuCores',  'CPU cores',   4,    512);
   addRangeValidation('ramGB',     'RAM',         16,   4096);
   addRangeValidation('nicCount',  'NIC count',   1,    32);
+
+  // NIC HCL check
+  const nicModelEl = document.getElementById('nicModel');
+  if (nicModelEl) {
+    nicModelEl.addEventListener('blur', () => {
+      fieldHclStatus('nicModel', checkNicHcl(nicModelEl.value));
+    });
+    nicModelEl.addEventListener('focus', () => {
+      const msg = nicModelEl.parentNode.querySelector('.field-hcl-msg');
+      if (msg) msg.hidden = true;
+      nicModelEl.style.borderColor = '';
+    });
+  }
 
   // Domain controller
   addIpValidation('dcIpAddress', 'DC IP address');
@@ -541,6 +608,7 @@ function wireForm() {
 
   bindNumber('nicCount', h, 'nicCount', onChange);
   bindSelect('nicSpeed', h, 'nicSpeed', onChange);
+  bindText('nicModel', h, 'nicModel', onChange);
 
   document.getElementById('esxiVersion').addEventListener('change', (e) => {
     g.esxiVersion = e.target.value || null;
@@ -708,9 +776,29 @@ function wireForm() {
   }
   bindRadio('nsxSize', g, 'nsxSize', onChange);
   bindRadio('nsxTopology', g, 'nsxTopology', onChange);
+  bindRadio('nsxEdgeCount', g, 'nsxEdgeCount', onChange, Number);
+  bindSelect('nsxEdgeSize', g, 'nsxEdgeSize', onChange);
   bindText('nsxIpAddress', g, 'nsxIpAddress', onChange);
   bindNumber('nsxBgpLocalAs', g, 'nsxBgpLocalAs', onChange);
   bindNumber('nsxBgpPeerAs', g, 'nsxBgpPeerAs', onChange);
+  bindRadio('nsxBgpRouteAdvert', g, 'nsxBgpRouteAdvert', onChange);
+  bindCheckbox('nsxRedistConnected', g, 'nsxRedistConnected', onChange);
+  bindCheckbox('nsxRedistStatic', g, 'nsxRedistStatic', onChange);
+  bindCheckbox('nsxRedistT1Lb', g, 'nsxRedistT1Lb', onChange);
+
+  const nsxBgpPrefixesEl = document.getElementById('nsxBgpPrefixes');
+  if (nsxBgpPrefixesEl) {
+    nsxBgpPrefixesEl.addEventListener('input', () => {
+      g.nsxBgpPrefixes = nsxBgpPrefixesEl.value;
+      onChange();
+    });
+  }
+  document.querySelectorAll('input[name="nsxBgpRouteAdvert"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      const prefixFields = document.getElementById('nsx-bgp-prefix-fields');
+      if (prefixFields) prefixFields.hidden = (el.value !== 'specific' || !el.checked);
+    });
+  });
 
   function updateNsxBgpVisibility() {
     const bgpSection = document.getElementById('nsx-bgp-section');
@@ -1529,6 +1617,7 @@ function renderReview() {
       `${dev.capacityGB || '?'}${dev.capacityUnit || 'GB'} ${DEVICE_TYPE_LABELS[dev.type] || '?'}`
     ])),
     ['NICs / host', h.nicCount ? `${h.nicCount} × ${h.nicSpeed || '?'}` : '—'],
+    ...(h.nicModel ? [['NIC model', h.nicModel]] : []),
     ...((h.additionalHosts || []).map((ah, i) => [
       `Host ${i + 2} IP`,
       val(ah.ipAddress) + (ah.sameAsFirst !== false ? ' (same specs as host 1)' : ` — ${ah.cpuCores || '?'} cores / ${ah.ramGB || '?'}GB`)
@@ -1620,15 +1709,30 @@ function renderReview() {
 
   // --- NSX ---
   if (g.nsxEnabled) {
-    const bgpLabel = (g.vyosEnabled && g.vyosNetworkMode === 'bgp')
+    const bgpEnabled = g.vyosEnabled && g.vyosNetworkMode === 'bgp';
+    const bgpLabel = bgpEnabled
       ? `AS ${g.nsxBgpLocalAs} ↔ VyOS AS ${g.nsxBgpPeerAs}`
       : 'Disabled';
-    container.appendChild(reviewCard('NSX-T', [
+    const edgeSizeLabels = { small: 'Small (2 vCPU / 4 GB)', medium: 'Medium (4 vCPU / 8 GB)', large: 'Large (8 vCPU / 32 GB)' };
+    const nsxRows = [
       ['Size', g.nsxSize === 'medium' ? 'Medium (6 vCPU / 24GB)' : 'Small (3 vCPU / 12GB)'],
       ['Topology', NSX_TOPOLOGY_LABELS[g.nsxTopology] || val(g.nsxTopology)],
+      ['Edge nodes', `${g.nsxEdgeCount || 1} × ${edgeSizeLabels[g.nsxEdgeSize] || g.nsxEdgeSize}`],
       ['Manager IP', val(g.nsxIpAddress)],
       ['BGP peering', bgpLabel]
-    ]));
+    ];
+    if (bgpEnabled) {
+      const redistParts = [];
+      if (g.nsxRedistConnected !== false) redistParts.push('Connected');
+      if (g.nsxRedistStatic) redistParts.push('Static');
+      if (g.nsxRedistT1Lb)   redistParts.push('T1 LB VIPs');
+      nsxRows.push(['BGP redistribute', redistParts.length ? redistParts.join(', ') : '—']);
+      if (g.nsxBgpRouteAdvert === 'specific') {
+        const prefixes = (g.nsxBgpPrefixes || '').split('\n').map((s) => s.trim()).filter(Boolean);
+        nsxRows.push(['BGP prefix list', prefixes.length ? prefixes.join(', ') : '—']);
+      }
+    }
+    container.appendChild(reviewCard('NSX-T', nsxRows));
   }
 
   // --- Security & access ---
@@ -1645,6 +1749,16 @@ function renderReview() {
   container.appendChild(reviewCard('Security & access', accessRows));
 
   // --- Inline warnings ---
+  const hclResult = checkNicHcl(h.nicModel);
+  if (hclResult && hclResult.status === 'flagged') {
+    const warn = document.createElement('div');
+    warn.className = 'review-warn';
+    warn.style.borderColor = 'var(--warn)';
+    warn.style.color = 'var(--warn)';
+    warn.textContent = `⚠ NIC compatibility: ${h.nicModel} matches ${hclResult.chipsets} — ${hclResult.reason}`;
+    container.appendChild(warn);
+  }
+
   if (g.vsanEnabled) {
     const isEsa = g.vsanArch !== 'osa';
     const hasStorageDisk = isEsa
@@ -1879,9 +1993,16 @@ function loadSpecIntoState(spec) {
     g.nsxEnabled = !!spec.nsx.enabled;
     if (spec.nsx.size) g.nsxSize = spec.nsx.size;
     if (spec.nsx.topology) g.nsxTopology = spec.nsx.topology;
+    if (spec.nsx.edgeCount) g.nsxEdgeCount = spec.nsx.edgeCount;
+    if (spec.nsx.edgeSize) g.nsxEdgeSize = spec.nsx.edgeSize;
     if (spec.nsx.ipAddress) g.nsxIpAddress = spec.nsx.ipAddress;
     if (spec.nsx.bgpLocalAs) g.nsxBgpLocalAs = spec.nsx.bgpLocalAs;
     if (spec.nsx.bgpPeerAs) g.nsxBgpPeerAs = spec.nsx.bgpPeerAs;
+    if (spec.nsx.bgpRouteAdvert) g.nsxBgpRouteAdvert = spec.nsx.bgpRouteAdvert;
+    if (spec.nsx.bgpPrefixes) g.nsxBgpPrefixes = spec.nsx.bgpPrefixes.join('\n');
+    if (spec.nsx.redistConnected != null) g.nsxRedistConnected = !!spec.nsx.redistConnected;
+    if (spec.nsx.redistStatic != null) g.nsxRedistStatic = !!spec.nsx.redistStatic;
+    if (spec.nsx.redistT1Lb != null) g.nsxRedistT1Lb = !!spec.nsx.redistT1Lb;
   }
   if (spec.workloadVms) {
     g.workloadVmsEnabled = !!spec.workloadVms.enabled;
@@ -2859,12 +2980,12 @@ function wireGenerate() {
           // step: data-step value (0-indexed); railNum: user-visible step number shown in rail
           const sectionHint = (msg) => {
             const map = [
-              [/^(cpuCores|ramGB|nicCount|nicSpeed|hostCount|storageDevice)/,  {label: 'Hardware',          step: 1,  railNum: 2}],
+              [/^(cpuCores|ramGB|nicCount|nicSpeed|nicModel|hostCount|storageDevice)/,  {label: 'Hardware',          step: 1,  railNum: 2}],
               [/^(mgmtCidr|mgmtVlan|vmotionCidr|vmotionVlan|vsanCidr|vsanVlan|vmCidr|vmVlan)/, {label: 'Lab networks',     step: 6,  railNum: 7}],
               [/^(dcIpAddress|dcDomainName)/,                                  {label: 'Domain controller', step: 4,  railNum: 5}],
               [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 3,  railNum: 4}],
               [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering)/, {label: 'Nested cluster',    step: 7,  railNum: 8}],
-              [/^(nsxSize|nsxTopology|nsxIpAddress|nsxBgp)/,                   {label: 'NSX-T',             step: 8,  railNum: 9}],
+              [/^(nsxSize|nsxTopology|nsxEdge|nsxIpAddress|nsxBgp|nsxRedist)/,   {label: 'NSX-T',             step: 8,  railNum: 9}],
               [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 9,  railNum: 10}],
               [/^depot/,                                                        {label: 'Bundle depot',      step: 10, railNum: 11}],
               [/^workloadVm/,                                                   {label: 'Workload VMs',      step: 11, railNum: 12}],

@@ -133,6 +133,12 @@
           </div>
         </div>
 
+        <div class="field">
+          <label for="nicModel">NIC vendor / model <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional &mdash; HCL check)</span></label>
+          <input type="text" id="nicModel" placeholder="e.g. Intel X710-DA2, Broadcom BCM5720">
+          <p class="hint">Enter the chipset or product name. Realtek, Intel I210/I211, Killer, and Atheros NICs are flagged as incompatible with ESXi 8.0+ without community drivers.</p>
+        </div>
+
         <!-- Additional physical hosts (shown dynamically when hostCount > 1) -->
         <div id="additional-hosts-section" hidden>
           <hr style="margin:18px 0;border-color:var(--border);">
@@ -491,6 +497,25 @@
             <p class="hint hint-info" id="nsx-vcf-note">For VCF: NSX must be configured to Broadcom&rsquo;s BOM sizing and topology requirements. This lab topology is suitable for learning and practice, not for a VCF management domain bring-up.</p>
           </div>
 
+          <div class="field-row" style="margin-top:4px;">
+            <div class="field">
+              <label>Edge transport nodes <span class="info-icon">i<span class="info-tooltip">Edge transport nodes host the T0/T1 datapath and BGP sessions. They are separate VMs from NSX Manager and must be deployed from the NSX UI after NSX Manager is up. For labs, a single edge node is sufficient; 2 nodes give an HA pair closer to production topology.</span></span></label>
+              <div class="radio-group">
+                <label class="radio-row"><input type="radio" name="nsxEdgeCount" value="1" checked><span>1 node &mdash; single edge (saves 4&ndash;32 GB RAM, fine for lab routing)</span></label>
+                <label class="radio-row"><input type="radio" name="nsxEdgeCount" value="2"><span>2 nodes &mdash; HA pair (simulates production redundancy)</span></label>
+              </div>
+            </div>
+            <div class="field">
+              <label for="nsxEdgeSize">Edge node size <span class="info-icon tip-left">i<span class="info-tooltip">Small (2 vCPU / 4 GB) handles lab routing and BGP. Medium (4 vCPU / 8 GB) supports more concurrent flows and LB instances. Large (8 vCPU / 32 GB) for Edge performance testing.</span></span></label>
+              <select id="nsxEdgeSize">
+                <option value="small">Small &mdash; 2 vCPU / 4 GB RAM</option>
+                <option value="medium" selected>Medium &mdash; 4 vCPU / 8 GB RAM</option>
+                <option value="large">Large &mdash; 8 vCPU / 32 GB RAM</option>
+              </select>
+              <p class="hint">Edge cluster is created by the configure script after you deploy the edge node(s) from the NSX UI.</p>
+            </div>
+          </div>
+
           <div class="field-row">
             <div class="field">
               <label for="nsxIpAddress">NSX Manager IP address <span class="info-icon tip-left">i<span class="info-tooltip">Must be a static IP in your management network range (configured in the Lab networks step). This is the IP you&rsquo;ll browse to for the NSX Manager web UI and API. It must be reachable from your management subnet.</span></span></label>
@@ -512,6 +537,27 @@
               </div>
             </div>
             <p class="hint">NSX T0 (AS 65001) will peer with VyOS (AS 65002). These are auto-populated from the VyOS BGP selection. Adjust if you use different ASNs.</p>
+
+            <div class="field" style="margin-top:14px;">
+              <label>Route advertisement <span class="info-icon">i<span class="info-tooltip">Controls which NSX prefixes are advertised to VyOS via BGP. &ldquo;All connected&rdquo; advertises every overlay segment attached to T0/T1. &ldquo;Specific prefixes&rdquo; adds a BGP prefix list so only the listed CIDRs are sent to VyOS &mdash; useful if you want finer control over what is reachable upstream.</span></span></label>
+              <div class="radio-group">
+                <label class="radio-row"><input type="radio" name="nsxBgpRouteAdvert" value="all" checked><span>Advertise all connected overlay segments</span></label>
+                <label class="radio-row"><input type="radio" name="nsxBgpRouteAdvert" value="specific"><span>Advertise specific prefixes only (BGP prefix list)</span></label>
+              </div>
+            </div>
+
+            <div id="nsx-bgp-prefix-fields" hidden>
+              <label for="nsxBgpPrefixes">Prefixes to advertise (one per line, CIDR)</label>
+              <textarea id="nsxBgpPrefixes" rows="3" style="width:100%;margin-top:6px;font-family:monospace;font-size:12.5px;padding:8px;background:var(--bg-2);border:1px solid var(--border);border-radius:6px;color:var(--text);resize:vertical;" placeholder="10.0.1.0/24&#10;10.0.2.0/24"></textarea>
+              <p class="hint">These CIDRs are added as a BGP outbound prefix list on the T0 gateway and applied to the VyOS neighbour.</p>
+            </div>
+
+            <div class="field" style="margin-top:12px;">
+              <label>Redistribute into BGP <span class="info-icon">i<span class="info-tooltip">Route redistribution controls which internal NSX routes are injected into the BGP table and then advertised to VyOS. Connected routes (T0+T1) is the most common choice and lets VyOS reach overlay workloads. Enable T1 LB VIPs if you use NSX Advanced Load Balancer.</span></span></label>
+              <label class="checkbox-row"><input type="checkbox" id="nsxRedistConnected" checked><span>Connected routes &mdash; T0 + T1 directly attached segments</span></label>
+              <label class="checkbox-row"><input type="checkbox" id="nsxRedistStatic"><span>Static routes configured on T0</span></label>
+              <label class="checkbox-row"><input type="checkbox" id="nsxRedistT1Lb"><span>T1 load balancer VIPs (NSX Advanced LB)</span></label>
+            </div>
           </div>
         </div>
       </section>
