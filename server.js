@@ -34,6 +34,7 @@ const { buildBuildGuide } = require('./lib/generateBuildGuide');
 const { buildPrerequisites } = require('./lib/generatePrerequisites');
 const { buildDepotFiles } = require('./lib/generateDepot');
 const { buildNsxScripts } = require('./lib/generateNsx');
+const { buildVcfFiles }  = require('./lib/generateVcf');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
 const { evaluateSizing } = require('./lib/sizing');
@@ -207,6 +208,12 @@ app.post('/api/generate', (req, res) => {
       fs.writeFileSync(path.join(dir, filename), content);
       const kind = Object.entries(SCRIPT_KINDS).find(([, fn]) => fn === filename)?.[0];
       if (kind) generatedScripts.push(kind);
+    }
+
+    // VCF bring-up files (only when VCF is enabled)
+    const vcfFiles = buildVcfFiles(spec);
+    for (const [filename, content] of Object.entries(vcfFiles)) {
+      fs.writeFileSync(path.join(dir, filename), content);
     }
 
     res.json({

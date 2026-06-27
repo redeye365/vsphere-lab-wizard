@@ -18,10 +18,11 @@ function isValidSpecStructure(obj) {
   return required.every((k) => k in obj);
 }
 
-const TOTAL_STEPS = 15;
-const DEPOT_STEP = 10;      // skipped when vSAN + local datastore not both configured
+const TOTAL_STEPS = 16;
+const DEPOT_STEP = 11;      // skipped when vSAN + local datastore not both configured
 const NSX_STEP = 8;         // always shown
-const TROUBLESHOOT_STEP = 14; // only reachable when troubleshooting mode is active
+const VCF_STEP = 9;         // always shown; gated by vcfEnabled inside
+const TROUBLESHOOT_STEP = 15; // only reachable when troubleshooting mode is active
 
 const USE_CASE_LABELS = {
   certification: 'Certification study',
@@ -147,6 +148,13 @@ const state = {
       nsxIpAddress: null, nsxBgpLocalAs: 65001, nsxBgpPeerAs: 65002,
       nsxBgpRouteAdvert: 'all', nsxBgpPrefixes: '',
       nsxRedistConnected: true, nsxRedistStatic: false, nsxRedistT1Lb: false,
+      vcfEnabled: false,
+      vcfSddcMgrIp: null, vcfSddcMgrHostname: 'sddcmgr',
+      vcfVcenterIp: null,
+      vcfVtepCidr: null, vcfVtepVlan: null,
+      vcfEdgeUplink1Cidr: null, vcfEdgeUplink1Vlan: null,
+      vcfEdgeUplink2Cidr: null, vcfEdgeUplink2Vlan: null,
+      vcfEsxiPassword: '', vcfEsxiLicense: '', vcfVcenterLicense: '',
       depotEnabled: false, depotMode: 'linux', depotIpAddress: null,
       nestedHostCount: 3, vcpuPerHost: 4, vramPerHostGB: 16, nestedDiskGB: 32,
       clusterName: 'mgmt-cluster', datacenterName: 'Lab-DC', ssoDomain: 'vsphere.local',
@@ -813,6 +821,29 @@ function wireForm() {
   });
   document.getElementById('vyosEnabled').addEventListener('change', origVyosHandler);
 
+  // VCF step (step 9)
+  const vcfCheckbox = document.getElementById('vcfEnabled');
+  if (vcfCheckbox) {
+    vcfCheckbox.addEventListener('change', () => {
+      g.vcfEnabled = vcfCheckbox.checked;
+      const vcfFields = document.getElementById('vcf-fields');
+      if (vcfFields) vcfFields.hidden = !g.vcfEnabled;
+      onChange();
+    });
+  }
+  bindText('vcfSddcMgrIp',       g, 'vcfSddcMgrIp',       onChange);
+  bindText('vcfSddcMgrHostname', g, 'vcfSddcMgrHostname', onChange);
+  bindText('vcfVcenterIp',       g, 'vcfVcenterIp',       onChange);
+  bindText('vcfVtepCidr',        g, 'vcfVtepCidr',        onChange);
+  bindNumber('vcfVtepVlan',      g, 'vcfVtepVlan',        onChange);
+  bindText('vcfEdgeUplink1Cidr', g, 'vcfEdgeUplink1Cidr', onChange);
+  bindNumber('vcfEdgeUplink1Vlan', g, 'vcfEdgeUplink1Vlan', onChange);
+  bindText('vcfEdgeUplink2Cidr', g, 'vcfEdgeUplink2Cidr', onChange);
+  bindNumber('vcfEdgeUplink2Vlan', g, 'vcfEdgeUplink2Vlan', onChange);
+  bindText('vcfEsxiPassword',    g, 'vcfEsxiPassword',    onChange);
+  bindText('vcfEsxiLicense',     g, 'vcfEsxiLicense',     onChange);
+  bindText('vcfVcenterLicense',  g, 'vcfVcenterLicense',  onChange);
+
   // Spec versioning — "Extend existing lab" file picker
   const extendRadios = document.querySelectorAll('input[name="labMode"]');
   const specFileField = document.getElementById('spec-file-field');
@@ -1345,7 +1376,16 @@ function validateStep(n) {
     case 8:
       // NSX step — no required fields (nsxEnabled is optional)
       return null;
-    case 9: {
+    case 9:
+      // VCF step — no required fields (vcfEnabled is optional)
+      if (g.vcfEnabled) {
+        if (!g.vcfSddcMgrIp) return 'Enter the SDDC Manager IP address.';
+        if (!g.vcfVcenterIp) return 'Enter the vCenter IP address for the VCF bring-up.';
+        if (!g.vcfVtepCidr) return 'Enter the NSX VTEP CIDR for overlay TEP traffic.';
+        if (!g.vcfEdgeUplink1Cidr) return 'Enter the NSX Edge Uplink 1 CIDR.';
+      }
+      return null;
+    case 10: {
       const ndisks = g.nestedDisks || [];
       if (g.vsanEnabled) {
         const isEsa = g.vsanArch !== 'osa';
@@ -1363,16 +1403,16 @@ function validateStep(n) {
       }
       return null;
     }
-    case 10:
+    case 11:
       // Depot step — only reached when depotStepVisible(); no required fields
       return null;
-    case 11:
+    case 12:
       if (g.workloadVmsEnabled) {
         if (!g.workloadVmCount || g.workloadVmCount < 1) return 'Enter the number of workload VMs.';
         if (!g.workloadVmSize) return 'Select a workload VM size.';
       }
       return null;
-    case 12:
+    case 13:
       if (g.remoteAccessMethod === 'vpn' && !g.vpnType) {
         return 'Select a VPN type (WireGuard or VyOS site-to-site) to continue.';
       }
@@ -1735,6 +1775,19 @@ function renderReview() {
     container.appendChild(reviewCard('NSX-T', nsxRows));
   }
 
+  // --- VCF Bring-up ---
+  if (g.vcfEnabled) {
+    container.appendChild(reviewCard('VCF Bring-up', [
+      ['SDDC Manager', `${val(g.vcfSddcMgrIp)} (${g.vcfSddcMgrHostname || 'sddcmgr'})`],
+      ['vCenter IP', val(g.vcfVcenterIp)],
+      ['NSX VTEP', g.vcfVtepCidr ? `${g.vcfVtepCidr}${g.vcfVtepVlan ? ` VLAN ${g.vcfVtepVlan}` : ''}` : '—'],
+      ['Edge Uplink 1', g.vcfEdgeUplink1Cidr ? `${g.vcfEdgeUplink1Cidr}${g.vcfEdgeUplink1Vlan ? ` VLAN ${g.vcfEdgeUplink1Vlan}` : ''}` : '—'],
+      ['Edge Uplink 2', g.vcfEdgeUplink2Cidr ? `${g.vcfEdgeUplink2Cidr}${g.vcfEdgeUplink2Vlan ? ` VLAN ${g.vcfEdgeUplink2Vlan}` : ''}` : 'Not configured'],
+      ['ESXi license', g.vcfEsxiLicense ? 'Provided' : '60-day eval'],
+      ['vCenter license', g.vcfVcenterLicense ? 'Provided' : '60-day eval']
+    ]));
+  }
+
   // --- Security & access ---
   const accessRows = [
     ['Isolated segment', g.isolateLab ? 'Yes' : 'No'],
@@ -1779,6 +1832,26 @@ function renderReview() {
     warn.className = 'review-warn';
     warn.textContent = '⚠ Bundle depot is set to IIS mode but no domain controller is included. Enable the DC (step 4) or switch to Linux/nginx mode.';
     container.appendChild(warn);
+  }
+
+  if (g.vcfEnabled) {
+    const sso = (g.ssoDomain || '').toLowerCase().replace(/\.$/, '');
+    const ad  = (g.dcDomainName || '').toLowerCase().replace(/\.$/, '');
+    if (sso && ad && sso === ad) {
+      const warn = document.createElement('div');
+      warn.className = 'review-warn';
+      warn.textContent = `⚠ SSO domain "${g.ssoDomain}" matches the AD domain "${g.dcDomainName}" — this causes VCF bring-up failures. Change the SSO domain in Nested cluster (step 7) to a subdomain, e.g. vsphere.${g.dcDomainName}.`;
+      container.appendChild(warn);
+    }
+    const nestedCount = Number(g.nestedHostCount) || 0;
+    if (nestedCount < 4) {
+      const warn = document.createElement('div');
+      warn.className = 'review-warn';
+      warn.style.borderColor = 'var(--warn)';
+      warn.style.color = 'var(--warn)';
+      warn.textContent = `⚠ VCF management domain requires 4 ESXi hosts (3 minimum with vSAN ESA). You have ${nestedCount}. Cloud Builder will reject the bring-up unless the host count is met.`;
+      container.appendChild(warn);
+    }
   }
 
   document.getElementById('results').hidden = true;
@@ -2023,6 +2096,18 @@ function loadSpecIntoState(spec) {
     g.depotEnabled = !!spec.bundleDepot.enabled;
     if (spec.bundleDepot.mode) g.depotMode = spec.bundleDepot.mode;
     if (spec.bundleDepot.ipAddress) g.depotIpAddress = spec.bundleDepot.ipAddress;
+  }
+  if (spec.vcf) {
+    g.vcfEnabled = !!spec.vcf.enabled;
+    if (spec.vcf.sddcManagerIp) g.vcfSddcMgrIp = spec.vcf.sddcManagerIp;
+    if (spec.vcf.sddcManagerHostname) g.vcfSddcMgrHostname = spec.vcf.sddcManagerHostname;
+    if (spec.vcf.vcenterIp) g.vcfVcenterIp = spec.vcf.vcenterIp;
+    if (spec.vcf.vtepCidr) g.vcfVtepCidr = spec.vcf.vtepCidr;
+    if (spec.vcf.vtepVlan) g.vcfVtepVlan = spec.vcf.vtepVlan;
+    if (spec.vcf.edgeUplink1Cidr) g.vcfEdgeUplink1Cidr = spec.vcf.edgeUplink1Cidr;
+    if (spec.vcf.edgeUplink1Vlan) g.vcfEdgeUplink1Vlan = spec.vcf.edgeUplink1Vlan;
+    if (spec.vcf.edgeUplink2Cidr) g.vcfEdgeUplink2Cidr = spec.vcf.edgeUplink2Cidr;
+    if (spec.vcf.edgeUplink2Vlan) g.vcfEdgeUplink2Vlan = spec.vcf.edgeUplink2Vlan;
   }
   renderStorageDevices(() => {});
   renderNestedDisks(() => {});
@@ -2986,10 +3071,11 @@ function wireGenerate() {
               [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 3,  railNum: 4}],
               [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering)/, {label: 'Nested cluster',    step: 7,  railNum: 8}],
               [/^(nsxSize|nsxTopology|nsxEdge|nsxIpAddress|nsxBgp|nsxRedist)/,   {label: 'NSX-T',             step: 8,  railNum: 9}],
-              [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 9,  railNum: 10}],
-              [/^depot/,                                                        {label: 'Bundle depot',      step: 10, railNum: 11}],
-              [/^workloadVm/,                                                   {label: 'Workload VMs',      step: 11, railNum: 12}],
-              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            {label: 'Security & access', step: 12, railNum: 13}],
+              [/^vcf/,                                                          {label: 'VCF Bring-up',      step: 9,  railNum: 10}],
+              [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 10, railNum: 11}],
+              [/^depot/,                                                        {label: 'Bundle depot',      step: 11, railNum: 12}],
+              [/^workloadVm/,                                                   {label: 'Workload VMs',      step: 12, railNum: 13}],
+              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            {label: 'Security & access', step: 13, railNum: 14}],
             ];
             for (const [re, hint] of map) {
               if (re.test(msg)) return hint;

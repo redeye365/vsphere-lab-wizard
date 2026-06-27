@@ -27,12 +27,13 @@
       <li data-step="6"><span class="rail-num">07</span><span>Lab networks</span></li>
       <li data-step="7"><span class="rail-num">08</span><span>Nested cluster</span></li>
       <li data-step="8"><span class="rail-num">09</span><span>NSX-T</span></li>
-      <li data-step="9"><span class="rail-num">10</span><span>Nested disks</span></li>
-      <li data-step="10"><span class="rail-num">11</span><span>Bundle depot</span></li>
-      <li data-step="11"><span class="rail-num">12</span><span>Workload VMs</span></li>
-      <li data-step="12"><span class="rail-num">13</span><span>Security &amp; access</span></li>
-      <li data-step="13"><span class="rail-num">14</span><span>Review &amp; generate</span></li>
-      <li data-step="14" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
+      <li data-step="9"><span class="rail-num">10</span><span>VCF Bring-up</span></li>
+      <li data-step="10"><span class="rail-num">11</span><span>Nested disks</span></li>
+      <li data-step="11"><span class="rail-num">12</span><span>Bundle depot</span></li>
+      <li data-step="12"><span class="rail-num">13</span><span>Workload VMs</span></li>
+      <li data-step="13"><span class="rail-num">14</span><span>Security &amp; access</span></li>
+      <li data-step="14"><span class="rail-num">15</span><span>Review &amp; generate</span></li>
+      <li data-step="15" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
     </ol>
     <div class="rail-footer">
       <a href="/diagram" target="_blank" rel="noopener" class="rail-diagram-btn" id="rail-diagram-btn">&#x1F5A7; View Diagram</a>
@@ -562,8 +563,104 @@
         </div>
       </section>
 
-      <!-- Step 9: Nested host disk layout -->
+      <!-- Step 9: VCF Bring-up -->
       <section class="step" data-step="9">
+        <h1>VCF bring-up spec</h1>
+        <p class="step-intro">VMware Cloud Foundation uses a Cloud Builder appliance to orchestrate the full management domain deployment &mdash; vCenter, NSX-T, and SDDC Manager all installed and configured from a single JSON file. Enable this to generate that file alongside the standard lab scripts.</p>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="vcfEnabled"><span>Generate VCF bring-up JSON for Cloud Builder</span></label>
+          <p class="hint">This produces <code>vcf-bringup.json</code> ready to upload to Cloud Builder. The standard deploy scripts are still generated alongside it &mdash; use whichever path suits your goals.</p>
+        </div>
+
+        <div id="vcf-fields" hidden>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfSddcMgrIp">SDDC Manager IP <span class="info-icon">i<span class="info-tooltip">The static IP address Cloud Builder will assign to SDDC Manager during bring-up. Must be in the management network range and not already in use.</span></span></label>
+              <input type="text" id="vcfSddcMgrIp" placeholder="e.g. 192.168.10.6">
+            </div>
+            <div class="field">
+              <label for="vcfSddcMgrHostname">SDDC Manager hostname</label>
+              <input type="text" id="vcfSddcMgrHostname" value="sddcmgr" placeholder="sddcmgr">
+              <p class="hint">Short hostname, not FQDN. Cloud Builder appends the domain automatically.</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfVcenterIp">vCenter IP <span class="info-icon">i<span class="info-tooltip">Static IP VCF will assign to vCenter Server during bring-up. Must be pre-allocated in your management network and not already in use. VCF deploys vCenter itself &mdash; you do not run the vcenter-deploy.ps1 script in VCF mode.</span></span></label>
+              <input type="text" id="vcfVcenterIp" placeholder="e.g. 192.168.10.40">
+            </div>
+          </div>
+
+          <hr style="margin:18px 0;border-color:var(--border);">
+          <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">VCF-specific networks</h3>
+          <p class="hint" style="margin-bottom:14px;">These networks are required by VCF and are separate from the lab networks defined in step 6. Add them to your physical switch trunk and define CIDRs that do not overlap with any of your existing ranges.</p>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfVtepCidr">NSX VTEP CIDR <span class="info-icon">i<span class="info-tooltip">The Tunnel Endpoint (TEP) network carries NSX overlay traffic (Geneve encapsulation) between hosts. VCF assigns one or two TEP IPs per host from this range. Recommend /24, MTU 9000.</span></span></label>
+              <input type="text" id="vcfVtepCidr" placeholder="192.168.13.0/24">
+            </div>
+            <div class="field">
+              <label for="vcfVtepVlan">NSX VTEP VLAN ID</label>
+              <input type="number" id="vcfVtepVlan" min="1" max="4094" placeholder="e.g. 13">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfEdgeUplink1Cidr">NSX Edge Uplink 1 CIDR <span class="info-icon">i<span class="info-tooltip">The primary uplink network for NSX Edge nodes. North-south routed traffic between NSX T0 and the physical network (VyOS) flows over this VLAN. Standard MTU (1500) unless your upstream supports jumbo frames.</span></span></label>
+              <input type="text" id="vcfEdgeUplink1Cidr" placeholder="192.168.14.0/24">
+            </div>
+            <div class="field">
+              <label for="vcfEdgeUplink1Vlan">Edge Uplink 1 VLAN ID</label>
+              <input type="number" id="vcfEdgeUplink1Vlan" min="1" max="4094" placeholder="e.g. 14">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfEdgeUplink2Cidr">NSX Edge Uplink 2 CIDR <span class="hint-inline" style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span> <span class="info-icon">i<span class="info-tooltip">Secondary uplink for Edge HA. Required if you want both Edge nodes to have independent north-south paths. Leave blank for a single uplink lab design.</span></span></label>
+              <input type="text" id="vcfEdgeUplink2Cidr" placeholder="192.168.15.0/24">
+            </div>
+            <div class="field">
+              <label for="vcfEdgeUplink2Vlan">Edge Uplink 2 VLAN ID <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
+              <input type="number" id="vcfEdgeUplink2Vlan" min="1" max="4094" placeholder="e.g. 15">
+            </div>
+          </div>
+
+          <hr style="margin:18px 0;border-color:var(--border);">
+          <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">Credentials &amp; licenses</h3>
+
+          <div class="field">
+            <label for="vcfEsxiPassword">ESXi host root password</label>
+            <input type="password" id="vcfEsxiPassword" placeholder="Temporary bring-up password">
+            <p class="hint hint-warning">This password appears in plaintext in <code>vcf-bringup.json</code>. Use a temporary password and rotate it immediately after Cloud Builder completes.</p>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfEsxiLicense">ESXi license key <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
+              <input type="text" id="vcfEsxiLicense" placeholder="Leave blank for 60-day eval">
+              <p class="hint">VCF/VVF subscription key, or leave blank for evaluation mode.</p>
+            </div>
+            <div class="field">
+              <label for="vcfVcenterLicense">vCenter license key <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
+              <input type="text" id="vcfVcenterLicense" placeholder="Leave blank for 60-day eval">
+            </div>
+          </div>
+
+          <div class="notice-block notice-info" style="margin-top:8px;">
+            <strong>VCF vs standard scripts:</strong> In VCF mode, Cloud Builder deploys vCenter, NSX-T, and SDDC Manager. Do not run <code>vcenter-deploy.ps1</code>, <code>vsan-cluster.ps1</code>, or <code>nsx-deploy.ps1</code> — VCF handles all of that. Run <code>deploy-lab.ps1</code> first to create the nested ESXi VMs, then hand off to Cloud Builder.
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Step 10: Nested host disk layout -->
+      <section class="step" data-step="10">
         <h1>Nested host disk layout</h1>
         <p class="step-intro">Virtual disks added to each nested ESXi host VM on top of the boot disk. Purpose options adapt to the vSAN architecture chosen in the previous step.</p>
 
@@ -578,8 +675,8 @@
         </div>
       </section>
 
-      <!-- Step 10: Bundle depot (conditional — shown only when vSAN + local datastore both configured) -->
-      <section class="step" data-step="10">
+      <!-- Step 11: Bundle depot (conditional — shown only when vSAN + local datastore both configured) -->
+      <section class="step" data-step="11">
         <h1>VCF bundle depot?</h1>
         <p class="step-intro">A local HTTPS file server hosting VCF bundles on your LAN. During VCF bring-up, SDDC Manager downloads bundles from Broadcom's CDN — a local depot gives LAN-speed downloads instead and enables air-gapped deployments.</p>
 
@@ -608,8 +705,8 @@
         </div>
       </section>
 
-      <!-- Step 11: Workload VMs -->
-      <section class="step" data-step="11">
+      <!-- Step 12: Workload VMs -->
+      <section class="step" data-step="12">
         <h1>Deploy test workload VMs?</h1>
         <p class="step-intro">Blank VM shells on the cluster for practising vMotion, DRS, and HA — no OS required, but you can install one later.</p>
 
@@ -636,8 +733,8 @@
         </div>
       </section>
 
-      <!-- Step 12: Security & access -->
-      <section class="step" data-step="12">
+      <!-- Step 13: Security & access -->
+      <section class="step" data-step="13">
         <h1>Security and remote access</h1>
 
         <div class="field checkbox-field">
@@ -687,8 +784,8 @@
         </div>
       </section>
 
-      <!-- Step 13: Review & generate -->
-      <section class="step" data-step="13">
+      <!-- Step 14: Review & generate -->
+      <section class="step" data-step="14">
         <h1>Review and generate</h1>
         <p class="step-intro">Checks out? Generate the spec, deployment scripts, and the design doc.</p>
 
@@ -720,8 +817,8 @@
         </div>
       </section>
 
-      <!-- Step 14: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
-      <section class="step" data-step="14">
+      <!-- Step 15: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
+      <section class="step" data-step="15">
         <h1>Troubleshooting Lab</h1>
 
         <!-- Mode tabs -->
