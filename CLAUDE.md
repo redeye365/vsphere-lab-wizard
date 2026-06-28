@@ -252,7 +252,7 @@ network diagram, prerequisites.
     - **Option A (Kickstart, recommended):** Shift+O at boot menu, `ks=` URL format, `-WizardIp` URL reference, post-install state (IP, hostname, SSH, NTP), `<REPLACE_ME>` warning when no password set, self-hosting fallback note
     - **Option B (Manual):** existing DCUI walkthrough, updated to note VMs are already powered on
 
-### v0.6.5-beta (current — scenario library expansion)
+### v0.6.5-beta (scenario library expansion)
 - **12 new scenarios** added to `scenarios/` and mirrored to `vsphere-lab-scenarios` repo:
   - **Easy (3):** vm-snapshot-consolidation, host-disconnected-vcenter, vmotion-failing
   - **Medium (4):** ha-admission-control, nsx-t0-uplink-wrong, nsx-dfw-blocking, vsan-disk-claimed
@@ -260,6 +260,16 @@ network diagram, prerequisites.
 - Wizard now ships 22 scenarios total (was 10); verify scripts added for all 12 in `scenarios/verify/`
 - `vsphere-lab-scenarios` README updated: count corrected, table split into vSphere/NSX/VCF sections
 - Authors: Jon — CloudITBlog.com
+
+### v0.6.6-beta (current — pre-v1.0 security audit)
+- **Server binding**: `app.listen` now binds to `127.0.0.1` only (was `0.0.0.0`)
+- **Admin endpoint protection**: `requireLocalhost` middleware added to all `/api/admin/*` routes; rejects non-loopback connections with 403
+- **Path traversal fix**: `saveScenario` now validates `verifyScript` field with `^[a-zA-Z0-9-]+\.ps1$`; admin-verify re-validates the filename before `path.join` + `spawnSync` — blocks malicious `.labscenario` imports
+- **Sensitive field stripping**: `rootPassword`, `esxiPassword`, `esxiLicense`, `vcenterLicense` stripped from spec before returning in `/api/generate` response
+- **Debrief response cleaned**: `verifyScript` filename removed from `/api/troubleshoot/debrief` response
+- **XSS hardening**: resource tip rendering replaced with `setRichText()` helper (only `<code>` elements permitted); mermaid diagram preview switched from `innerHTML = svg` to `DOMParser` + `document.adoptNode`
+- **Client cleanup**: `console.error` removed from debrief error path in `wizard.js`
+- **Housekeeping**: `scenarios/active.json` added to `.gitignore`; `package.json` version updated from `0.2.0` to `0.6.5`
 
 ---
 
@@ -274,3 +284,11 @@ network diagram, prerequisites.
 - Step visibility in `showStep()` uses `TOTAL_STEPS - 2` for the review step index so
   the troubleshooting step can follow without hardcoding.
 - Troubleshooting endpoints intentionally not in README, UI text, or any error messages.
+- Server binds to `127.0.0.1` only — never `0.0.0.0`. All `/api/admin/*` routes are
+  additionally protected by `requireLocalhost` middleware as defence-in-depth.
+- `saveScenario` and the admin-verify endpoint both validate `verifyScript` filenames
+  with `^[a-zA-Z0-9-]+\.ps1$` to prevent path traversal via imported `.labscenario` files.
+- Sensitive spec fields (`rootPassword`, `esxiPassword`, `esxiLicense`, `vcenterLicense`)
+  are stripped before the spec is returned to the browser in the generate response.
+- `setRichText(el, html)` in `wizard.js` is the safe alternative to `innerHTML` for
+  strings that need `<code>` formatting — all other tags are rendered as plain text.
