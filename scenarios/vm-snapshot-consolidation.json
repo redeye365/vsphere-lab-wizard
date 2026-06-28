@@ -1,0 +1,28 @@
+{
+  "id": "vm-snapshot-consolidation",
+  "name": "VM Won't Power On — Snapshot Issue",
+  "description": "A VM is stuck and won't power on. Snapshot consolidation is needed but the customer doesn't know what that means.",
+  "difficulty": "easy",
+  "examObjectives": ["VCP-DCV Section 4"],
+  "topics": ["vSphere", "Storage", "Snapshots"],
+  "customerScenario": "Hi, one of our VMs has just stopped working. We can see it in vCenter but when we try to power it on nothing happens. It was working fine yesterday. We haven't changed anything. Can you help?",
+  "customerFollowUp": "Actually we did take a backup last week and I think it involved some kind of snapshot. Could that be related?",
+  "snapshotName": "",
+  "verifyScript": "verify-vm-snapshot-consolidation.ps1",
+  "fixSteps": [
+    "Right-click VM in vCenter",
+    "Snapshots → Consolidate",
+    "Confirm consolidation",
+    "Power on VM"
+  ],
+  "hints": [
+    "Start by checking the VM's current state in vCenter. What does the summary tab show?",
+    "Look at the VM's storage and snapshot status. Is there anything unusual showing in the datastore or snapshot manager?",
+    "Check if the VM has any unconsolidated snapshots — vCenter may be showing a warning about this on the VM summary screen.",
+    "Right-click the VM in vCenter and look for a consolidation option. Snapshots that weren't cleaned up properly can prevent a VM from powering on.",
+    "Go to VM → Snapshots → Consolidate. This merges the snapshot delta files back into the base disk. Once complete the VM should power on normally."
+  ],
+  "labRequirements": ["nested-cluster", "vcenter"],
+  "author": "Jon — CloudITBlog.com",
+  "created": "2026-06-26"
+}
