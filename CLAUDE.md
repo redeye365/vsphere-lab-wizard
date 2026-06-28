@@ -13,7 +13,7 @@ document, network diagram, and build guide. No framework (React/Vue/etc.) — pl
 HTML/CSS/JS in `public/`. Server-side generation only (no client-side bundling).
 
 Key files:
-- `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/from-spec`, `/diagram`, troubleshoot scenario endpoints
+- `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/from-spec`, `/api/ks/:sessionId/:hostIndex`, `/diagram`, troubleshoot scenario endpoints
 - `lib/scenarioLibrary.js` — scenario CRUD (loadScenarios, getScenario, saveScenario, deleteScenario, getActive, setActive)
 - `lib/vcenterClient.js` — vSphere REST API client (createSession, listVMs, findSnapshot, revertAllToSnapshot, testConnection)
 - `lib/vcenterConfig.js` — load/save vcenter-config.json from BASE_DIR (gitignored)
@@ -35,6 +35,7 @@ Key files:
 - `lib/generateNetworkDiagram.js` — Mermaid flowchart
 - `lib/generateDiagramHtml.js` — standalone diagram.html with embedded mermaid source
 - `lib/generatePrerequisites.js` — PREREQUISITES.md (VCF section conditional on vcf.enabled)
+- `lib/generateKickstart.js` — per-host ks.cfg files for unattended ESXi install (buildKickstartFiles, buildKickstartForHost)
 - `lib/generateDepot.js` — optional local depot scripts
 
 ### Packaging
@@ -88,6 +89,7 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 | 4 | v0.4.8-beta | `physicalHosts[]` array (multi-host); `nestedCluster.hosts[]` placement; `nestedCluster.hostPlacement` ('auto'/'manual') |
 | 4 (extended) | v0.5.3-beta | Added to existing v4: `physicalHost.nicModel`; `nsx.edgeCount`, `nsx.edgeSize`, `nsx.bgpRouteAdvert`, `nsx.bgpPrefixes[]`, `nsx.redistConnected/Static/T1Lb`; `nestedCluster.memoryTiering`, `vsanArchitecture` |
 | 4 (extended) | v0.6.0-beta | Added to existing v4: `vcf` section (enabled, sddcManagerIp, sddcManagerHostname, vcenterIp, vtepCidr/Vlan, edgeUplink1/2 Cidr/Vlan, esxiPassword, esxiLicense, vcenterLicense) |
+| 4 (extended) | v0.6.3-beta | Added to existing v4: `nestedCluster.rootPassword` |
 
 ---
 
@@ -222,13 +224,26 @@ network diagram, prerequisites.
 - **New spec section**: `vcf` (enabled, sddcManagerIp, sddcManagerHostname, vcenterIp, vtepCidr/Vlan, edgeUplink1/2 Cidr/Vlan, esxiPassword, esxiLicense, vcenterLicense)
 - **Community repo**: `github.com/redeye365/vsphere-lab-scenarios` — 10 starter troubleshooting scenarios, contributor README, `.labscenario` import/export
 
-### v0.6.1-beta (current — VCF prerequisites)
+### v0.6.1-beta (VCF prerequisites)
 - **VCF prerequisites** added to `generatePrerequisites.js` (all conditional on `vcf.enabled`):
   - Broadcom portal section split into vSphere + VCF download locations
   - Cloud Builder OVA subsection: download location, manual deploy steps 1–4, bundle depot note
   - **VCF bring-up requirements** section: DNS records table (personalised from spec IPs/hostnames), NTP sync note, VLAN trunk table (all 6 types), license key check (confirms if entered / reminds if blank), minimum 4-host warning, ordered 7-step bring-up checklist
   - Cloud Builder OVA entry in recommended folder layout tree
   - Time table: Cloud Builder download/deploy, bring-up, bundle depot sync rows
+
+### v0.6.2-beta (CLAUDE.md housekeeping)
+- CLAUDE.md updated to reflect v0.6.1-beta state: step table, constants, key files, schema history, roadmap
+
+### v0.6.3-beta (current — Kickstart generator)
+- **Unattended ESXi install via Kickstart** — eliminates the main manual step in the build guide:
+  - `lib/generateKickstart.js`: new — `buildKickstartFiles(spec)` generates one `ks-esxi-N.cfg` per nested host
+    - Management IP `.101`/`.102`/… in management CIDR (matches vcf-bringup.json convention)
+    - VLAN ID, gateway, DNS (DC if enabled, else `1.1.1.1`), hostname (`esxi-N.<domain>`), NTP from spec
+    - `%firstboot` section: enables SSH persistently via `esxcli`, configures NTP, suppresses shell warning
+  - `server.js`: writes `ks-esxi-N.cfg` files to output on every generate; adds `GET /api/ks/:sessionId/:hostIndex` endpoint — wizard serves ks.cfg files directly at boot time
+  - `deploy-lab.ps1` (`generatePowerShell.js`): new `-WizardIp` param; embeds `$KsSessionId` constant; powers on VMs with `Start-VM`; prints `ks=http://$WizardIp:3000/api/ks/<id>/<n>` URL per host when `-WizardIp` is set
+  - New wizard field: "Nested ESXi root password" (step 7) → `spec.nestedCluster.rootPassword`; blank → `<REPLACE_ME>` placeholder in ks.cfg
 
 ---
 
