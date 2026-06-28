@@ -222,10 +222,17 @@ app.post('/api/generate', (req, res) => {
       fs.writeFileSync(path.join(dir, filename), content);
     }
 
+    // Strip sensitive fields before returning spec to browser — rootPassword and
+    // VCF passwords are written to files on disk and not needed in the response.
+    const { nestedCluster: nc, vcf: vcfSection, ...restSpec } = spec;
+    const { rootPassword: _rp, ...safeNc } = nc || {};
+    const { esxiPassword: _ep, esxiLicense: _el, vcenterLicense: _vl, ...safeVcf } = vcfSection || {};
+    const safeSpec = { ...restSpec, nestedCluster: safeNc, vcf: safeVcf };
+
     res.json({
       id,
       warnings: sizing.warnings,
-      spec,
+      spec: safeSpec,
       markdownPreview: designDoc,
       svgGenerated,
       generatedScripts
@@ -330,6 +337,19 @@ app.post('/api/diagram/from-spec', (req, res) => {
 app.get('/diagram', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'diagram.html'));
 });
+
+// ── Admin middleware ────────────────────────────────────────────────────────
+// All /api/admin/* routes are restricted to localhost connections only.
+// The server also binds exclusively to 127.0.0.1 (see app.listen below),
+// so this middleware acts as a defence-in-depth check.
+function requireLocalhost(req, res, next) {
+  const raw   = req.ip || req.connection.remoteAddress || '';
+  const clean = raw.replace(/^::ffff:/, '');
+  if (clean === '127.0.0.1' || clean === '::1') return next();
+  res.status(403).json({ error: 'Admin endpoints are only accessible from localhost' });
+}
+
+app.use('/api/admin', requireLocalhost);
 
 // ── Admin: Scenario Library endpoints ──────────────────────────────────────
 // Activated via Cmd+Shift+X — not documented in README or public UI.
@@ -520,7 +540,10 @@ app.post('/api/admin/scenario-verify', (req, res) => {
     const script = getVerifyScript(id);
     if (!script) return res.status(404).json({ error: 'Verify script not found for this scenario' });
     const scenario = getScenario(id);
-    const scriptPath = path.join(__dirname, 'scenarios', 'verify', (scenario && scenario.verifyScript) || `verify-${id}.ps1`);
+    const scriptFilename = (scenario && scenario.verifyScript) || `verify-${id}.ps1`;
+    // Validate filename before using it in a path — defence-in-depth against stored path traversal
+    if (!/^[a-zA-Z0-9-]+\.ps1$/.test(scriptFilename)) return res.status(400).json({ error: 'Invalid verify script filename' });
+    const scriptPath = path.join(__dirname, 'scenarios', 'verify', scriptFilename);
     const pwsh = process.platform === 'win32' ? 'powershell.exe' : 'pwsh';
     const result = require('child_process').spawnSync(pwsh, ['-NoProfile', '-File', scriptPath], { timeout: 30000, encoding: 'utf8' });
     if (result.status === null) return res.json({ result: 'ERROR', output: 'Script timed out or PowerShell not found. Install PowerShell Core (pwsh) to run verify scripts.' });
@@ -617,12 +640,12 @@ app.post('/api/troubleshoot/debrief', (req, res) => {
     ticketScore,
     ticketAnalysis,
     hintsUsed:       session.hintsGiven,
-    clueUsed:        session.clueUsed,
-    verifyScript:    s.verifyScript    || null
+    clueUsed:        session.clueUsed
   });
 });
 
-app.listen(PORT, () => {
+// Bind to 127.0.0.1 only — this is a local tool and must not be reachable from the network.
+app.listen(PORT, '127.0.0.1', () => {
   const url = `http://localhost:${PORT}`;
   console.log(`vSphere Lab Wizard running at ${url}`);
   if (IS_PKG) {

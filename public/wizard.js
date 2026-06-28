@@ -9,6 +9,22 @@ function escHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+// Renders a string that may contain <code> tags into el safely.
+// Only <code> elements are permitted — everything else is plain text.
+function setRichText(el, html) {
+  el.innerHTML = '';
+  html.split(/(<code>[^<]*<\/code>)/).forEach(part => {
+    const m = part.match(/^<code>([^<]*)<\/code>$/);
+    if (m) {
+      const code = document.createElement('code');
+      code.textContent = m[1];
+      el.appendChild(code);
+    } else {
+      el.appendChild(document.createTextNode(part));
+    }
+  });
+}
+
 // Basic structural check — a valid spec must be a plain object with at least
 // the top-level keys the wizard generates. Rejects arrays, strings, or
 // completely unrelated JSON files.
@@ -560,7 +576,7 @@ function renderResourceTips() {
     badge.textContent = tip.saving;
     const text = document.createElement('span');
     text.className = 'resource-tip-text';
-    text.innerHTML = tip.text;
+    setRichText(text, tip.text);
     item.append(badge, text);
     list.appendChild(item);
   });
@@ -1893,7 +1909,10 @@ function renderReviewDiagram() {
       if (!data.mermaid) throw new Error('No mermaid source returned');
       const id = 'review-diag-' + Date.now();
       const { svg } = await mermaid.render(id, data.mermaid);
-      inner.innerHTML = svg;
+      // Parse as SVG rather than injecting raw HTML string
+      const svgDoc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+      inner.innerHTML = '';
+      inner.appendChild(document.adoptNode(svgDoc.documentElement));
       const svgEl = inner.querySelector('svg');
       if (svgEl) { svgEl.style.maxWidth = '100%'; svgEl.style.height = 'auto'; }
       empty.style.display = 'none';
@@ -2879,8 +2898,7 @@ async function tsMarkResolved() {
     state.troubleshootSessionData = data;
     tsShowPhase(4);
     tsWirePhase4(data);
-  } catch (err) {
-    console.error('Debrief failed:', err.message);
+  } catch {
     tsShowPhase(4);
     tsWirePhase4(null);
   }
