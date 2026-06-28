@@ -120,6 +120,17 @@ const SCRIPT_LABELS = {
 
 const state = {
   step: 0,
+  modeSelected: false,
+  learningMode: false,
+  designRationale: {
+    useCase: '',
+    routerChoice: '',
+    networkSecurity: '',
+    availabilityRequirement: '',
+    nsxRationale: ''
+  },
+  troubleshootLearningMode: false,
+  tsMethodology: { symptom: '', scope: '', layer: '' },
   troubleshootingMode: false,
   troubleshootPhase: 1,
   troubleshootSpec: null,
@@ -1465,6 +1476,18 @@ function showStep(n) {
   if (n === 7) { renderSizingRecommendations(); renderResourceTips(); updateVramWarning(); }
   updateDcNotice();
   updateEsxi9Notices();
+
+  // Learning mode: toggle the learn-block panels for this step and refresh
+  // any computed insights that belong to it.
+  document.querySelectorAll('.learn-block').forEach((el) => {
+    const learnStep = Number(el.dataset.learnStep);
+    el.style.display = (state.learningMode && learnStep === n) ? '' : 'none';
+  });
+  if (state.learningMode) {
+    if (n === 1) updateLearnRamContext();
+    if (n === 7) updateLearnRamHeadroom();
+    if (n === 14) renderScorecard();
+  }
 }
 
 function getNextStep(n) {
@@ -2552,14 +2575,16 @@ function initTroubleshootStep() {
   state.troubleshootResolved        = false;
   state.troubleshootSessionData     = null;
   state.tsAllScenarios              = [];
+  state.troubleshootLearningMode    = false;
+  state.tsMethodology               = { symptom: '', scope: '', layer: '' };
 
   // Default to library mode when the step opens
   tsSwitchMode('library');
 
-  // Wire mode tabs
+  // Wire mode tabs — the session tab opens the troubleshoot mode selector (phase 0)
   document.querySelectorAll('.ts-mode-tab').forEach(tab => {
     tab.onclick = () => {
-      if (tab.dataset.mode === 'session') { tsSwitchMode('session'); tsShowPhase(1); tsWirePhase1(); }
+      if (tab.dataset.mode === 'session') { tsSwitchMode('session'); tsShowPhase(0); tsWirePhase0(); }
       else tsSwitchMode('library');
     };
   });
@@ -2605,15 +2630,31 @@ function initTroubleshootStep() {
 
 function tsShowPhase(n) {
   state.troubleshootPhase = n;
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 0; i <= 4; i++) {
     const el = document.getElementById(`ts-phase-${i}`);
     if (el) el.hidden = i !== n;
   }
 }
 
+// ── Phase 0: Troubleshoot mode selector (Fix vs Learn) ──────────────────────
+function tsWirePhase0() {
+  const fixBtn   = document.getElementById('ts-mode-fix');
+  const learnBtn = document.getElementById('ts-mode-learn');
+  const proceed = (learning) => {
+    state.troubleshootLearningMode = learning;
+    tsShowPhase(1);
+    tsWirePhase1();
+  };
+  if (fixBtn)   fixBtn.onclick   = () => proceed(false);
+  if (learnBtn) learnBtn.onclick = () => proceed(true);
+}
+
 // ── Phase 1: Lab confirmation ───────────────────────────────────────────────
 
 function tsWirePhase1() {
+  const methodology = document.getElementById('ts-learn-methodology');
+  if (methodology) methodology.hidden = !state.troubleshootLearningMode;
+
   const check1   = document.getElementById('ts-check-1');
   const check2   = document.getElementById('ts-check-2');
   const startBtn = document.getElementById('ts-start-btn');
@@ -2757,6 +2798,20 @@ function tsWirePhase3() {
   if (headerEl)  headerEl.innerHTML  = `<span class="ts-caller-icon">&#128222;</span><strong class="ts-caller-name">${escHtml(scenario.callerName || 'Customer')}</strong>`;
   if (messageEl) messageEl.textContent = scenario.message || '';
 
+  // Learning mode: guided methodology prompts above the investigation notes.
+  const promptsPanel = document.getElementById('ts-learn-prompts');
+  if (promptsPanel) {
+    promptsPanel.hidden = !state.troubleshootLearningMode;
+    if (state.troubleshootLearningMode) {
+      const sym = document.getElementById('ts-prompt-symptom-text');
+      const scp = document.getElementById('ts-prompt-scope-text');
+      const lay = document.getElementById('ts-prompt-layer-select');
+      if (sym) { sym.value = state.tsMethodology.symptom; sym.oninput = () => { state.tsMethodology.symptom = sym.value; }; }
+      if (scp) { scp.value = state.tsMethodology.scope;   scp.oninput = () => { state.tsMethodology.scope = scp.value; }; }
+      if (lay) { lay.value = state.tsMethodology.layer;   lay.onchange = () => { state.tsMethodology.layer = lay.value; }; }
+    }
+  }
+
   const notesEl = document.getElementById('ts-notes');
   if (notesEl) {
     notesEl.value = state.troubleshootNotes;
@@ -2870,6 +2925,13 @@ function tsRenderHints() {
   if (!container) return;
   if (badge) badge.textContent = `Level ${state.troubleshootHintLevel} of 5`;
   const levelLabels = ['Customer nudge', 'Technical nudge', 'Specific direction', 'Near-answer', 'Full solution'];
+  const hintMeta = [
+    'This hint teaches you to identify which layer the fault is at — before checking specific components.',
+    'This hint teaches you to check the calling machine before assuming the target is broken — one of the most common troubleshooting mistakes.',
+    'This hint shows you exactly where to look in the UI or CLI — this is the diagnostic step a senior engineer would do first.',
+    'This hint describes what you will see when you look at the right place. You still have to find it and fix it.',
+    'Full solution — exact command or click sequence. Review this carefully to understand the fix.'
+  ];
   container.innerHTML = '';
   Object.entries(state.troubleshootHints).forEach(([level, text]) => {
     const i    = Number(level) - 1;
@@ -2881,10 +2943,17 @@ function tsRenderHints() {
     lbadge.className = 'ts-hint-level-badge';
     lbadge.textContent = `Level ${level}: ${levelLabels[i] || ''}`;
     hdr.appendChild(lbadge);
+    card.appendChild(hdr);
+    if (state.troubleshootLearningMode && hintMeta[i]) {
+      const meta = document.createElement('div');
+      meta.className = 'ts-hint-meta';
+      meta.textContent = hintMeta[i];
+      card.appendChild(meta);
+    }
     const body = document.createElement('div');
     body.className = 'ts-hint-body';
     body.textContent = text;
-    card.append(hdr, body);
+    card.appendChild(body);
     container.appendChild(card);
   });
 }
@@ -2951,6 +3020,14 @@ function tsWirePhase4(data) {
       <p>${escHtml(data.objectives || '—')}</p>`;
   }
 
+  const learnDebrief = document.getElementById('ts-learn-debrief');
+  if (learnDebrief) {
+    learnDebrief.hidden = !(state.troubleshootLearningMode && data);
+    if (state.troubleshootLearningMode && data) {
+      learnDebrief.innerHTML = tsBuildLearnDebrief(data);
+    }
+  }
+
   document.getElementById('ts-another-scenario').onclick = () => {
     state.troubleshootToken = null; state.troubleshootScenario = null;
     state.troubleshootClueText = null; state.troubleshootClueUsed = false;
@@ -2962,6 +3039,93 @@ function tsWirePhase4(data) {
   };
   document.getElementById('ts-end-session').onclick    = () => initTroubleshootStep();
   document.getElementById('ts-download-summary').onclick = () => tsDownloadSummary(data);
+}
+
+// Builds the enhanced learning-mode debrief HTML: the "why" behind the fault,
+// what made it hard, a topic learning point, a methodology scorecard, and a
+// connection back to wizard design decisions where relevant.
+function tsBuildLearnDebrief(data) {
+  const topicsStr = (data.topics || '').toLowerCase();
+  const topicList = (data.topics || '').split(',').map(s => s.trim()).filter(Boolean);
+  const topicArea = topicList[0] || 'this area';
+  const fault = data.faultDescription || 'a misconfiguration';
+
+  // Topic-specific learning point.
+  let learningPoint;
+  if (/dns/.test(topicsStr)) {
+    learningPoint = 'Always validate both forward and reverse DNS records — missing PTR records cause failures in systems that validate identity by reverse lookup, not just forward resolution.';
+  } else if (/bgp|routing|nsx-routing/.test(topicsStr)) {
+    learningPoint = 'Routing faults are almost always symmetric — check that AS numbers, neighbour IPs, and advertised prefixes match on both ends before assuming a device is broken.';
+  } else if (/vsan|storage/.test(topicsStr)) {
+    learningPoint = 'Storage faults often present as latency or VM hangs rather than outright errors — check vSAN health and disk-group status before blaming the workload.';
+  } else if (/vlan|network|networking|portgroup/.test(topicsStr)) {
+    learningPoint = 'A single mismatched VLAN tag or trunk setting can isolate traffic silently — verify tagging end-to-end from the port group to the physical uplink.';
+  } else if (/cert|identity|sso|ad/.test(topicsStr)) {
+    learningPoint = 'Identity and certificate faults cascade — one expired or mismatched certificate can break authentication across multiple services at once.';
+  } else {
+    learningPoint = 'Work from the symptom toward the cause methodically — confirm each layer before moving to the next rather than guessing.';
+  }
+
+  // "What made it hard" framing based on difficulty.
+  let hardness;
+  if (data.difficulty === 'hard') {
+    hardness = 'The symptom pointed away from the root cause — a classic misdirection pattern. The obvious component looked healthy while the real fault sat one layer deeper.';
+  } else if (data.difficulty === 'easy') {
+    hardness = 'The fault was relatively localised, but it still rewards a disciplined check of the calling side before assuming the target is broken.';
+  } else {
+    hardness = 'The symptom did not map cleanly onto a single component, so scoping the impact was essential before diving into any one layer.';
+  }
+
+  // Methodology scorecard.
+  const scoped   = !!(state.tsMethodology.scope && state.tsMethodology.scope.trim());
+  const layered  = !!(state.tsMethodology.layer && state.tsMethodology.layer.trim());
+  const hints    = state.troubleshootHintLevel;
+  const ticket   = state.troubleshootTicket || {};
+  const allFour  = !!(ticket.symptom && ticket.tried && ticket.cause && ticket.impact);
+  const mark = (ok) => ok ? '&#10003;' : '&#10007;';
+  let hintQuality;
+  if (hints === 0) hintQuality = '&#10003; Excellent — no hints needed';
+  else if (hints <= 2) hintQuality = '&#10003; Strong — solved with minimal guidance';
+  else if (hints <= 4) hintQuality = '&#10003; Good — needed some direction';
+  else hintQuality = '&#10007; Used the full hint chain';
+
+  let pattern;
+  if (hints === 0) pattern = 'Independent — solved without guidance';
+  else if (hints > 3) pattern = `Developing — consider reviewing the ${topicArea} area before your exam`;
+  else pattern = 'Methodical — used guidance proportionately';
+
+  // Connection back to wizard design decisions, if a learning-mode design was loaded.
+  let connection = '';
+  const spec = state.troubleshootSpec || state.generated?.spec || null;
+  if (spec && spec.learningMode && spec.designRationale &&
+      (spec.designRationale.networkSecurity || spec.designRationale.routerChoice)) {
+    connection = `
+      <h3 class="ts-debrief-heading">Connecting back to your design</h3>
+      <p>Looking back at your design decisions — did anything you chose make this fault harder or easier to diagnose?</p>`;
+  }
+
+  return `
+    <h3 class="ts-debrief-heading">Why did this fault happen?</h3>
+    <p>${escHtml(fault)} Faults like this typically stem from a configuration value that drifted out of sync with what another component expects.</p>
+
+    <h3 class="ts-debrief-heading">What made it hard to spot?</h3>
+    <p>${escHtml(hardness)}</p>
+
+    <h3 class="ts-debrief-heading">What does this teach you about ${escHtml(topicArea)}?</h3>
+    <p>${escHtml(learningPoint)}</p>
+
+    <h3 class="ts-debrief-heading">How would you prevent this in future?</h3>
+    <p>Build a verification checklist for ${escHtml(topicArea)} and run it after every change — most faults of this kind are caught by confirming both ends of a configuration agree before declaring work done.</p>
+
+    <h3 class="ts-debrief-heading">Methodology scorecard</h3>
+    <ul class="ts-methodology-scorecard">
+      <li>${mark(scoped)} Scoped the problem before diving in</li>
+      <li>${mark(layered)} Identified a starting layer</li>
+      <li>${hintQuality}</li>
+      <li>${mark(allFour)} Ticket submitted with all four fields</li>
+    </ul>
+    <p class="ts-methodology-pattern"><strong>Your troubleshooting pattern:</strong> ${escHtml(pattern)}</p>
+    ${connection}`;
 }
 
 function tsDownloadSummary(data) {
@@ -3076,7 +3240,11 @@ function wireGenerate() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state.answers)
+        body: JSON.stringify({
+          ...state.answers,
+          learningMode: state.learningMode,
+          designRationale: state.designRationale
+        })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -3168,11 +3336,243 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// =============================================================================
+// Learning mode
+// =============================================================================
+
+// Wires the opening mode selector. Until a mode is chosen the .app is hidden
+// and only #mode-select-screen is shown.
+function wireModeSelect() {
+  const screen = document.getElementById('mode-select-screen');
+  const app    = document.querySelector('.app');
+  const enter  = (learning) => {
+    state.modeSelected = true;
+    state.learningMode = learning;
+    if (learning) document.body.classList.add('learning-mode');
+    if (screen) screen.hidden = true;
+    if (app)    app.hidden    = false;
+    showStep(0);
+    renderTopology();
+  };
+  document.getElementById('mode-build')?.addEventListener('click', () => enter(false));
+  document.getElementById('mode-learn')?.addEventListener('click', () => enter(true));
+}
+
+// Captures the free-text / select rationale fields into state.designRationale.
+function wireLearningInputs() {
+  const dr = state.designRationale;
+  const bind = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => { dr[key] = el.value; });
+  };
+  bind('learn-use-case-text', 'useCase');
+  bind('learn-router-choice', 'routerChoice');
+  bind('learn-network-security', 'networkSecurity');
+  bind('learn-nsx-rationale', 'nsxRationale');
+  const avail = document.getElementById('learn-availability-req');
+  if (avail) avail.addEventListener('change', () => { dr.availabilityRequirement = avail.value; });
+
+  // Refresh the RAM insight when RAM (step 1) changes.
+  document.getElementById('ramGB')?.addEventListener('input', () => {
+    if (state.learningMode && state.step === 1) updateLearnRamContext();
+  });
+}
+
+// Step 1 insight: what cluster sizes are realistically possible at this RAM.
+function updateLearnRamContext() {
+  const el = document.getElementById('learn-ram-context');
+  if (!el) return;
+  const h = state.answers.hardware;
+  const g = state.answers.design;
+  const physRam = Number(h.ramGB) || 0;
+  const esxiVer = g.esxiVersion && ESXI9X_VERSIONS.has(g.esxiVersion) ? g.esxiVersion : '9.1';
+  if (!physRam) { el.hidden = true; return; }
+  const t = calcHostTiers(physRam, esxiVer);
+  const opts = [];
+  if (t.tiers[0].feasible) opts.push('a single nested host (vSphere basics)');
+  if (t.tiers[1].feasible) opts.push('a 3-host cluster with vSAN');
+  if (t.maxHosts >= 4) opts.push(`up to ${t.maxHosts} nested hosts at maximum density`);
+  if (!opts.length) opts.push('limited capacity — consider a single minimal host');
+  el.hidden = false;
+  el.textContent = `With ${physRam} GB RAM you can realistically support: ${opts.join('; ')}. ` +
+    `(Roughly ${t.fixedRam} GB is reserved for vCenter and infrastructure before nested hosts.)`;
+}
+
+// Step 7 insight: remaining RAM headroom after the cluster, in plain language.
+function updateLearnRamHeadroom() {
+  const el = document.getElementById('learn-ram-headroom');
+  if (!el) return;
+  const h = state.answers.hardware;
+  const g = state.answers.design;
+  const physRam = Number(h.ramGB) || 0;
+  if (!physRam) { el.hidden = true; return; }
+  const used = computeUsedRam();
+  const remaining = physRam - used;
+  el.hidden = false;
+  if (remaining < 0) {
+    el.textContent = `This design needs ${used} GB but you only have ${physRam} GB — ` +
+      `you are over-committed by ${Math.abs(remaining)} GB. Reduce host count or per-host RAM.`;
+  } else {
+    // small VM ~= 4 GB, medium ~= 8 GB; use 4 GB as a rule of thumb
+    const workloadVms = Math.floor(remaining / 4);
+    el.textContent = `You have ${remaining} GB remaining after the cluster — ` +
+      `enough for roughly ${workloadVms} small workload VM${workloadVms === 1 ? '' : 's'}.`;
+  }
+}
+
+// Shared RAM-usage estimate used by the headroom insight and the scorecard.
+function computeUsedRam() {
+  const g = state.answers.design;
+  const hosts = Number(g.nestedHostCount) || 0;
+  const perHost = Number(g.vramPerHostGB) || 0;
+  let used = hosts * perHost + 21 /* vCenter */;
+  if (g.dcEnabled)  used += 4;
+  if (g.nsxEnabled) used += 48;
+  return used;
+}
+
+// =============================================================================
+// Architecture scorecard (step 14, learning mode)
+// =============================================================================
+
+function scoreIsolation() {
+  const g = state.answers.design;
+  const mgmt = g.mgmtVlan, vsan = g.vsanVlan, vmot = g.vmotionVlan;
+  const hasMgmt = mgmt !== null && mgmt !== '' && mgmt !== undefined;
+  const hasVsan = !g.vsanEnabled || (vsan !== null && vsan !== '' && vsan !== undefined);
+  const hasVmot = vmot !== null && vmot !== '' && vmot !== undefined;
+  if (!hasMgmt && !hasVmot && !(g.vsanEnabled && vsan)) {
+    return { rating: 'red', label: 'No VLANs configured', reason: 'Management, vMotion, and vSAN traffic are not separated — a misbehaving VM or storage I/O can starve host management.' };
+  }
+  if (hasMgmt && hasVsan && hasVmot) {
+    return { rating: 'green', label: 'Good', reason: 'Management, vMotion, and vSAN each have dedicated VLANs.' };
+  }
+  return { rating: 'amber', label: 'Partial', reason: 'Management has a VLAN but vSAN or vMotion is missing dedicated isolation — high-bandwidth traffic may contend with the control plane.' };
+}
+
+function scoreResilience() {
+  const n = Number(state.answers.design.nestedHostCount) || 0;
+  if (n >= 3) return { rating: 'green', label: 'Resilient', reason: `${n} nested hosts — HA can tolerate a host failure.` };
+  if (n === 2) return { rating: 'amber', label: 'Limited', reason: 'Two hosts allow basic HA but vSAN and full resilience need three.' };
+  return { rating: 'red', label: 'Single point of failure', reason: 'One host means no HA — any failure takes the whole lab down.' };
+}
+
+function scoreScalability() {
+  const physRam = Number(state.answers.hardware.ramGB) || 0;
+  const used = computeUsedRam();
+  const remaining = physRam - used;
+  if (remaining < 0) return { rating: 'red', label: 'Over-committed', reason: `Design needs ${used} GB but only ${physRam} GB is available (${Math.abs(remaining)} GB short).`, remaining };
+  if (remaining >= 32) return { rating: 'green', label: 'Room to grow', reason: `${remaining} GB headroom remains for additional workloads.`, remaining };
+  return { rating: 'amber', label: 'Tight', reason: `${remaining} GB headroom — workable but little room for additional workloads.`, remaining };
+}
+
+function scoreComplexity() {
+  const g = state.answers.design;
+  const useCase = state.answers.discovery.useCase;
+  const nsx = !!g.nsxEnabled;
+  const n = Number(g.nestedHostCount) || 0;
+  if (g.vcfEnabled && n < 4) return { rating: 'red', label: 'Under-provisioned for VCF', reason: 'VCF requires at least four hosts in the management domain.' };
+  if (nsx && (useCase === 'homelab' || useCase === 'devtest')) {
+    return { rating: 'amber', label: 'Possibly over-engineered', reason: 'NSX adds significant overhead for a homelab/dev-test use case — make sure you need it.' };
+  }
+  if (nsx && (useCase === 'certification' || useCase === 'feature_testing')) {
+    return { rating: 'green', label: 'Appropriate', reason: 'NSX matches a certification / feature-testing goal.' };
+  }
+  if (!nsx) return { rating: 'green', label: 'Appropriate', reason: 'A focused design without NSX overhead suits the stated use case.' };
+  return { rating: 'amber', label: 'Review', reason: 'Confirm the complexity matches your goal.' };
+}
+
+function scoreVcfReadiness() {
+  const g = state.answers.design;
+  if (!g.vcfEnabled) return null;
+  const n = Number(g.nestedHostCount) || 0;
+  if (n < 4) return { rating: 'red', label: 'Not ready', reason: 'VCF needs a minimum of four hosts in the management domain.' };
+  if (!g.nsxEnabled) return { rating: 'amber', label: 'Missing NSX', reason: 'VCF bring-up deploys NSX — enable it to match the reference architecture.' };
+  return { rating: 'green', label: 'Ready', reason: 'Four or more hosts with NSX enabled — aligned with the VCF reference architecture.' };
+}
+
+function collectAntiPatterns() {
+  const g = state.answers.design;
+  const n = Number(g.nestedHostCount) || 0;
+  const out = [];
+  if (n === 1) {
+    out.push({ title: 'HA with a single host', text: 'HA only makes sense with two or more hosts — a single-host cluster cannot tolerate a failure.' });
+  }
+  if (g.vsanEnabled && n < 3) {
+    out.push({ title: 'vSAN below minimum host count', text: `vSAN requires a minimum of 3 hosts — your current cluster size of ${n} won't work.` });
+  }
+  if (g.nsxEnabled && g.vyosEnabled && g.vyosNetworkMode !== 'bgp') {
+    out.push({ title: 'NSX without BGP peering', text: "VyOS is deployed but BGP is not configured — you're missing the opportunity to practice T0 BGP peering." });
+  }
+  if (g.mgmtVlanMode === 'untagged') {
+    out.push({ title: 'Management on an untagged VLAN', text: 'Management traffic is on an untagged VLAN — consider whether this is intentional for your lab setup.' });
+  }
+  return out;
+}
+
+// Returns the full set of scored dimensions (used by both the UI and the
+// markdown design-doc summary).
+function computeScorecard() {
+  const dims = [
+    { key: 'Isolation',   ...scoreIsolation() },
+    { key: 'Resilience',  ...scoreResilience() },
+    { key: 'Scalability', ...scoreScalability() },
+    { key: 'Complexity',  ...scoreComplexity() }
+  ];
+  const vcf = scoreVcfReadiness();
+  if (vcf) dims.push({ key: 'VCF readiness', ...vcf });
+  return dims;
+}
+
+function renderScorecard() {
+  const el = document.getElementById('learn-scorecard');
+  if (!el) return;
+  const dims = computeScorecard();
+  el.innerHTML = '';
+  dims.forEach((d) => {
+    const row = document.createElement('div');
+    row.className = 'learn-score-row';
+    const dot = document.createElement('span');
+    dot.className = `learn-score-dot ${d.rating}`;
+    const body = document.createElement('div');
+    body.className = 'learn-score-body';
+    const head = document.createElement('div');
+    head.className = 'learn-score-head';
+    head.textContent = `${d.key}: ${d.label}`;
+    const reason = document.createElement('div');
+    reason.className = 'learn-score-reason';
+    reason.textContent = d.reason;
+    body.append(head, reason);
+    row.append(dot, body);
+    el.appendChild(row);
+  });
+
+  const apEl = document.getElementById('learn-antipatterns');
+  if (apEl) {
+    const aps = collectAntiPatterns();
+    apEl.innerHTML = '';
+    apEl.hidden = aps.length === 0;
+    aps.forEach((ap) => {
+      const card = document.createElement('div');
+      card.className = 'learn-antipattern-card';
+      const title = document.createElement('div');
+      title.className = 'learn-antipattern-title';
+      title.textContent = ap.title;
+      const text = document.createElement('div');
+      text.className = 'learn-antipattern-text';
+      text.textContent = ap.text;
+      card.append(title, text);
+      apEl.appendChild(card);
+    });
+  }
+}
+
 // --- Init ---
 
 wireForm();
 wireNav();
 wireGenerate();
 wireInlineValidation();
-showStep(0);
+wireModeSelect();
+wireLearningInputs();
 renderTopology();

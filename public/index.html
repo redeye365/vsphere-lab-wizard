@@ -10,7 +10,28 @@
 
 <div id="ts-badge" class="ts-badge" hidden>Troubleshooting Mode</div>
 
-<div class="app">
+<div id="mode-select-screen" class="mode-select-screen">
+  <div class="mode-select-hero">
+    <h1 class="mode-select-title">vSphere Lab Wizard</h1>
+    <p class="mode-select-tagline">Design your nested vSphere lab</p>
+  </div>
+  <div class="mode-card-row">
+    <button type="button" id="mode-build" class="mode-card mode-card-standard">
+      <span class="mode-card-badge">Standard</span>
+      <span class="mode-card-heading">Build my lab</span>
+      <span class="mode-card-desc">Answer questions and get your scripts &mdash; fast.</span>
+      <span class="mode-card-cta">Start building &rarr;</span>
+    </button>
+    <button type="button" id="mode-learn" class="mode-card mode-card-learn">
+      <span class="mode-card-badge">Learning</span>
+      <span class="mode-card-heading">Learn to design my lab</span>
+      <span class="mode-card-desc">Guided design thinking &mdash; understand the why behind every decision. Adds 15&ndash;20 minutes. Recommended for anyone studying for VMware certifications or new to infrastructure design.</span>
+      <span class="mode-card-cta">Start learning &rarr;</span>
+    </button>
+  </div>
+</div>
+
+<div class="app" hidden>
 
   <aside class="rail">
     <div class="rail-brand">
@@ -49,6 +70,16 @@
         <h1>What's this lab for?</h1>
         <p class="step-intro">This shapes the defaults for cluster size and sizing checks later. You can override anything.</p>
 
+        <div class="learn-block" data-learn-step="0">
+          <div class="learn-context">
+            <p>Good design starts with understanding the requirement. Before we talk about hardware and software, let's be clear on what you are trying to achieve and why. The answers here will shape every decision we make.</p>
+          </div>
+          <div class="field">
+            <label for="learn-use-case-text">In your own words, what problem is this lab solving?</label>
+            <textarea id="learn-use-case-text" class="learn-textarea" rows="3" placeholder="e.g. I'm studying for VCP-DCV and need hands-on practice with vSAN and HA configuration..."></textarea>
+          </div>
+        </div>
+
         <div class="field">
           <label>Lab session</label>
           <div class="choice-row">
@@ -84,6 +115,13 @@
       <section class="step" data-step="1">
         <h1>What are you running this on?</h1>
         <p class="step-intro">The physical host's specs decide how big the nested cluster can realistically be.</p>
+
+        <div class="learn-block" data-learn-step="1">
+          <div class="learn-context">
+            <p>Your physical hardware defines your constraints. Every design decision we make has to work within what you actually have. There are no wrong answers here &mdash; but being honest about your constraints leads to a better design.</p>
+          </div>
+          <div id="learn-ram-context" class="learn-insight" hidden></div>
+        </div>
 
         <div class="field-row">
           <div class="field">
@@ -186,6 +224,33 @@
         <h1>Top-of-rack virtual router?</h1>
         <p class="step-intro">A VyOS VM acts as the lab's router and firewall — gives nested hosts a routable path and provides NAT, DHCP, and DNS forwarding.</p>
 
+        <div class="learn-block" data-learn-step="3">
+          <div class="learn-context">
+            <p>Your virtual router choice shapes your networking options throughout the lab. Consider the trade-offs before deciding:</p>
+            <div class="learn-comparison">
+              <div class="learn-compare-card">
+                <div class="learn-compare-heading">VyOS</div>
+                <div class="learn-compare-body">Open source, highly configurable, supports BGP &mdash; steeper learning curve but teaches real routing concepts used in enterprise VMware environments.</div>
+                <div class="learn-compare-tag learn-tag-good">Best for certification study</div>
+              </div>
+              <div class="learn-compare-card">
+                <div class="learn-compare-heading">pfSense</div>
+                <div class="learn-compare-body">GUI-driven, easier to start with, good firewall features &mdash; less relevant to enterprise VMware environments.</div>
+                <div class="learn-compare-tag learn-tag-neutral">Best for general networking</div>
+              </div>
+              <div class="learn-compare-card">
+                <div class="learn-compare-heading">No router</div>
+                <div class="learn-compare-body">Simplest setup &mdash; limits what you can learn about network segmentation. Fine for basic vSphere practice.</div>
+                <div class="learn-compare-tag learn-tag-warn">Limits learning scope</div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="learn-router-choice">Which fits your learning goal and why?</label>
+            <textarea id="learn-router-choice" class="learn-textarea" rows="2" placeholder="e.g. VyOS because I'm targeting VCP-NV and want to understand BGP peering with NSX..."></textarea>
+          </div>
+        </div>
+
         <div class="field checkbox-field">
           <label class="checkbox-row"><input type="checkbox" id="vyosEnabled"><span>Deploy a VyOS virtual router/firewall for this lab</span></label>
           <p class="hint">VyOS is free and open source. The script builds the VM shell and attaches the ISO; you configure it manually after boot. Very low overhead — 2 vCPU, 1GB RAM.</p>
@@ -232,6 +297,12 @@
         <h1>What does the network around this look like?</h1>
         <p class="step-intro">Not the lab itself yet &mdash; the network the physical host already sits on.</p>
 
+        <div class="learn-block" data-learn-step="5">
+          <div class="learn-context">
+            <p>Understanding your existing network is critical &mdash; your lab has to coexist with it. The most common lab networking mistakes come from not thinking through how lab traffic interacts with the home or office network. An IP conflict or broadcast storm from the lab can knock out your main network.</p>
+          </div>
+        </div>
+
         <div class="field">
           <label>Network type <span class="info-icon">i<span class="info-tooltip">Flat means all devices share a single broadcast domain with no VLAN separation &mdash; typical of a home router with one LAN port. VLANs allow traffic isolation and require a managed switch. If your switch has a web UI or CLI for configuration, it&rsquo;s probably managed and VLAN-capable.</span></span></label>
           <div class="choice-row">
@@ -265,6 +336,23 @@
 
         <h1>Lay out the lab's networks</h1>
         <p class="step-intro">Each one becomes its own tagged port group on the physical vSwitch.</p>
+
+        <div class="learn-block" data-learn-step="6">
+          <div class="learn-context">
+            <p>Network segmentation is one of the most important design decisions in any VMware environment. We are going to design separate VLANs for different traffic types &mdash; here is why each one matters:</p>
+            <div class="learn-traffic-types">
+              <div class="learn-traffic-row"><span class="learn-traffic-name">Management</span><span class="learn-traffic-desc">ESXi host management, vCenter, and infrastructure services. Needs to be reachable but should be separated from VM workload traffic.</span></div>
+              <div class="learn-traffic-row"><span class="learn-traffic-name">vMotion</span><span class="learn-traffic-desc">Live migration traffic between hosts. High bandwidth, latency-sensitive. Should never share a VLAN with management or VM traffic.</span></div>
+              <div class="learn-traffic-row"><span class="learn-traffic-name">vSAN</span><span class="learn-traffic-desc">Storage replication between hosts. Very high bandwidth. Dedicated VLAN prevents storage I/O from affecting management or vMotion.</span></div>
+              <div class="learn-traffic-row"><span class="learn-traffic-name">TEP (NSX)</span><span class="learn-traffic-desc">Tunnel Endpoint traffic for NSX overlay networking. Required if you are deploying NSX &mdash; carries all east-west VM traffic over VXLAN/Geneve tunnels.</span></div>
+              <div class="learn-traffic-row"><span class="learn-traffic-name">VM network</span><span class="learn-traffic-desc">Workload VM traffic. Separate from infrastructure traffic so a misbehaving VM can't affect host management.</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="learn-network-security">What is your approach to management network security &mdash; and why?</label>
+            <textarea id="learn-network-security" class="learn-textarea" rows="2" placeholder="e.g. Putting management on a dedicated VLAN with no internet access — only jumpbox can reach it..."></textarea>
+          </div>
+        </div>
 
         <!-- Port group context cards -->
         <div class="pg-context-grid">
@@ -345,6 +433,22 @@
       <section class="step" data-step="7">
         <h1>Size the nested cluster</h1>
         <p class="step-intro">The wizard checks this against the physical RAM and CPU from step 2.</p>
+
+        <div class="learn-block" data-learn-step="7">
+          <div class="learn-context">
+            <p>Cluster design involves balancing three things that often conflict: <strong>availability</strong> (more hosts = more resilience), <strong>resource headroom</strong> (more VMs need more capacity), and <strong>cost</strong> (more hosts = more hardware). There is no universally right answer &mdash; it depends on your use case.</p>
+            <div id="learn-ram-headroom" class="learn-insight" hidden></div>
+          </div>
+          <div class="field">
+            <label for="learn-availability-req">What availability requirement are you designing for?</label>
+            <select id="learn-availability-req" class="learn-select">
+              <option value="">Select&hellip;</option>
+              <option value="devtest">Dev/test &mdash; no HA needed, single host acceptable</option>
+              <option value="learning">Learning &mdash; basic HA configured, 2&ndash;3 hosts</option>
+              <option value="productionlike">Production-like &mdash; full HA + DRS, minimum 3 hosts</option>
+            </select>
+          </div>
+        </div>
 
         <div id="sizing-recommendations" hidden>
           <div class="field">
@@ -479,6 +583,21 @@
       <section class="step" data-step="8">
         <h1>Add NSX-T to this lab?</h1>
         <p class="step-intro">NSX-T adds software-defined networking, micro-segmentation, and optional BGP routing on top of the vSphere cluster. Deployment is after the cluster is healthy.</p>
+
+        <div class="learn-block" data-learn-step="8">
+          <div class="learn-context">
+            <p>NSX adds significant capability &mdash; micro-segmentation, overlay networking, distributed routing &mdash; but also significant complexity and resource overhead. Before choosing NSX, be clear on why you need it.</p>
+            <div class="learn-reasons">
+              <div class="learn-reason-item">&#10003; Learning NSX for certification (VCP-NV, VCAP-NV, VCF)</div>
+              <div class="learn-reason-item">&#10003; Practising micro-segmentation for a customer project</div>
+              <div class="learn-reason-item">&#10003; Building a full VCF environment</div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="learn-nsx-rationale">What is driving your decision to include NSX?</label>
+            <textarea id="learn-nsx-rationale" class="learn-textarea" rows="2" placeholder="e.g. Studying for VCP-NV exam, need to practice DFW rule creation and T0/T1 gateway config..."></textarea>
+          </div>
+        </div>
 
         <div class="field checkbox-field">
           <label class="checkbox-row"><input type="checkbox" id="nsxEnabled"><span>Deploy NSX-T Manager for this lab</span></label>
@@ -811,6 +930,15 @@
           </div>
         </div>
 
+        <div class="learn-block" data-learn-step="14">
+          <div class="learn-scorecard-wrap">
+            <h2 class="learn-scorecard-title">Architecture Review</h2>
+            <p class="learn-scorecard-intro">Your design rationale will be included in your design document &mdash; this is what separates a spec from a proper design.</p>
+            <div id="learn-scorecard" class="learn-scorecard"></div>
+            <div id="learn-antipatterns" class="learn-antipatterns" hidden></div>
+          </div>
+        </div>
+
         <div id="generate-error-block" class="generate-error-block" hidden></div>
 
         <button type="button" id="btn-generate" class="btn btn-primary">Generate lab design</button>
@@ -968,9 +1096,38 @@
         <!-- ── TROUBLESHOOTER: Session flow ───────────────────────────── -->
         <div id="ts-session-panel" class="ts-panel" hidden>
 
+          <!-- Phase 0: Mode selector (learning mode only) -->
+          <div id="ts-phase-0" class="ts-phase" hidden>
+            <div class="ts-mode-select">
+              <h2>How do you want to troubleshoot?</h2>
+              <div class="ts-mode-cards">
+                <button class="ts-mode-card ts-mode-card-standard" id="ts-mode-fix">
+                  <div class="ts-mode-card-heading">Fix my lab</div>
+                  <div class="ts-mode-card-desc">Standard mode &mdash; diagnose and fix the fault. No guided prompts.</div>
+                </button>
+                <button class="ts-mode-card ts-mode-card-learn" id="ts-mode-learn">
+                  <div class="ts-mode-card-heading">Learn to troubleshoot</div>
+                  <div class="ts-mode-card-desc">Guided methodology mode &mdash; work through a structured diagnostic framework with prompts at each stage.</div>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Phase 1: Confirm lab is ready -->
           <div id="ts-phase-1" class="ts-phase">
             <div class="ts-phase-header">Step 1 &mdash; Confirm lab is ready</div>
+            <div id="ts-learn-methodology" class="ts-learn-methodology" hidden>
+              <p class="ts-learn-method-intro">Good troubleshooters follow a consistent methodology. We will work through this together:</p>
+              <ol class="ts-methodology-steps">
+                <li><strong>Symptom</strong> &mdash; what is the customer reporting?</li>
+                <li><strong>Scope</strong> &mdash; how widespread is the impact?</li>
+                <li><strong>Isolate</strong> &mdash; which layer or component is affected?</li>
+                <li><strong>Identify</strong> &mdash; what is the root cause?</li>
+                <li><strong>Fix</strong> &mdash; resolve the issue</li>
+                <li><strong>Verify</strong> &mdash; confirm it is actually fixed</li>
+                <li><strong>Document</strong> &mdash; record what happened and why</li>
+              </ol>
+            </div>
             <div class="field checkbox-field">
               <label class="checkbox-row"><input type="checkbox" id="ts-check-1"><span>My lab is built and accessible</span></label>
             </div>
@@ -1024,6 +1181,31 @@
               <div id="ts-scenario-clue" class="ts-scenario-clue" hidden></div>
             </div>
 
+            <div id="ts-learn-prompts" class="ts-learn-prompts" hidden>
+              <div class="ts-learn-prompt-step" id="ts-prompt-symptom">
+                <div class="ts-prompt-label">Before you start investigating</div>
+                <div class="ts-prompt-question">What is the symptom in your own words? What is the customer actually experiencing?</div>
+                <textarea id="ts-prompt-symptom-text" class="learn-textarea" rows="2" placeholder="Describe the symptom..."></textarea>
+              </div>
+              <div class="ts-learn-prompt-step" id="ts-prompt-scope">
+                <div class="ts-prompt-label">Scope the problem</div>
+                <div class="ts-prompt-question">Is this affecting one VM, one host, one network segment, or everything? How would you find out?</div>
+                <textarea id="ts-prompt-scope-text" class="learn-textarea" rows="2" placeholder="Describe the scope..."></textarea>
+              </div>
+              <div class="ts-learn-prompt-step" id="ts-prompt-layer">
+                <div class="ts-prompt-label">Isolate the layer</div>
+                <div class="ts-prompt-question">Based on the scope, which layer would you investigate first?</div>
+                <select id="ts-prompt-layer-select" class="learn-select">
+                  <option value="">Select the layer you'll start with&hellip;</option>
+                  <option value="physical">Physical &mdash; cabling, switches, NICs</option>
+                  <option value="virtual-networking">Virtual networking &mdash; DVS, port groups, VLANs</option>
+                  <option value="storage">Storage &mdash; vSAN, datastores, paths</option>
+                  <option value="dns-identity">DNS / Identity &mdash; name resolution, AD, certificates</option>
+                  <option value="application">Application &mdash; service configuration, VM OS</option>
+                </select>
+              </div>
+            </div>
+
             <div class="field" style="margin-top:16px;">
               <label for="ts-notes">Investigation notes</label>
               <textarea id="ts-notes" class="ts-notes" placeholder="What are you checking? What commands are you running? What are you finding?"></textarea>
@@ -1063,6 +1245,7 @@
             <div id="ts-debrief-stats"      class="ts-debrief-stats"></div>
             <div id="ts-debrief-ticket"     class="ts-debrief-section"></div>
             <div id="ts-debrief-objectives" class="ts-debrief-section"></div>
+            <div id="ts-learn-debrief" class="ts-learn-debrief" hidden></div>
             <div class="ts-phase-actions" style="margin-top:20px;flex-wrap:wrap;gap:8px;">
               <button type="button" id="ts-another-scenario" class="btn btn-secondary">Try another scenario</button>
               <button type="button" id="ts-end-session"      class="btn btn-ghost">End session</button>

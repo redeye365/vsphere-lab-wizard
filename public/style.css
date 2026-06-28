@@ -1922,3 +1922,323 @@ select:focus {
   padding-bottom: 8px;
 }
 .ts-vcenter-btns { display: flex; align-items: center; gap: 8px; }
+
+/* =============================================================================
+   Learning Mode
+   ============================================================================= */
+
+/* --- Mode selector screen --- */
+.mode-select-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  padding: 40px 24px;
+  background: radial-gradient(circle at 50% 30%, #161d24 0%, var(--bg) 70%);
+  z-index: 50;
+  overflow-y: auto;
+}
+.mode-select-hero { text-align: center; }
+.mode-select-title {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+  background: linear-gradient(90deg, var(--accent-text), var(--warn));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.mode-select-tagline {
+  font-size: 17px;
+  color: var(--text-dim);
+  margin: 0;
+}
+.mode-card-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 880px;
+  width: 100%;
+}
+.mode-card {
+  flex: 1 1 360px;
+  max-width: 420px;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  padding: 32px 28px;
+  border-radius: 14px;
+  cursor: pointer;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--sans);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.mode-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,.4);
+}
+.mode-card-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 99px;
+}
+.mode-card-heading {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.mode-card-desc {
+  font-size: 14.5px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  flex: 1;
+}
+.mode-card-cta {
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.mode-card-standard {
+  border-color: rgba(79,179,164,.4);
+  background: linear-gradient(160deg, rgba(79,179,164,.10), var(--surface-raised) 60%);
+}
+.mode-card-standard:hover { border-color: var(--accent); }
+.mode-card-standard .mode-card-badge { background: var(--accent-soft); color: var(--accent-text); }
+.mode-card-standard .mode-card-cta { color: var(--accent-text); }
+.mode-card-learn {
+  border-color: rgba(217,154,78,.4);
+  background: linear-gradient(160deg, rgba(217,154,78,.12), var(--surface-raised) 60%);
+}
+.mode-card-learn:hover { border-color: var(--warn); }
+.mode-card-learn .mode-card-badge { background: var(--warn-soft); color: var(--warn); }
+.mode-card-learn .mode-card-cta { color: var(--warn); }
+
+/* --- Learning blocks (per-step) --- */
+.learn-block {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 18px;
+  margin: 0 0 22px;
+}
+.learn-context p {
+  margin: 0 0 12px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.learn-context p:last-child { margin-bottom: 0; }
+.learn-insight {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  font-size: 13.5px;
+  color: var(--accent-text);
+  line-height: 1.5;
+}
+.learn-textarea {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  resize: vertical;
+}
+.learn-textarea:focus { outline: none; border-color: var(--warn); }
+.learn-select {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+}
+.learn-select:focus { outline: none; border-color: var(--warn); }
+
+/* Router comparison cards */
+.learn-comparison {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 4px 0 4px;
+}
+.learn-compare-card {
+  flex: 1 1 200px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.learn-compare-heading { font-weight: 700; font-size: 15px; }
+.learn-compare-body { font-size: 13px; color: var(--text-dim); line-height: 1.5; flex: 1; }
+.learn-compare-tag {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 99px;
+  align-self: flex-start;
+}
+.learn-tag-good    { background: var(--accent-soft); color: var(--accent-text); }
+.learn-tag-neutral { background: rgba(140,151,163,.15); color: var(--text-dim); }
+.learn-tag-warn    { background: var(--warn-soft); color: var(--warn); }
+
+/* Traffic-type explanation table */
+.learn-traffic-types { display: flex; flex-direction: column; gap: 8px; margin: 6px 0; }
+.learn-traffic-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 8px 10px;
+  background: var(--surface-raised);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-soft);
+}
+.learn-traffic-name { font-weight: 700; font-size: 13.5px; color: var(--accent-text); }
+.learn-traffic-desc { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+/* NSX reasons */
+.learn-reasons { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.learn-reason-item { font-size: 13.5px; color: var(--text); }
+
+/* --- Scorecard --- */
+.learn-scorecard-wrap {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin: 0 0 20px;
+}
+.learn-scorecard-title { font-size: 14px; margin: 0 0 4px; }
+.learn-scorecard-intro { font-size: 13px; color: var(--text-dim); margin: 0 0 14px; }
+.learn-scorecard { display: flex; flex-direction: column; gap: 10px; }
+.learn-score-row { display: flex; gap: 12px; align-items: flex-start; }
+.learn-score-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  margin-top: 4px; flex: 0 0 auto;
+}
+.learn-score-dot.green { background: var(--accent); }
+.learn-score-dot.amber { background: var(--warn); }
+.learn-score-dot.red   { background: var(--danger); }
+.learn-score-head { font-weight: 600; font-size: 14px; }
+.learn-score-reason { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.learn-antipatterns { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.learn-antipattern-card {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 10px 14px;
+}
+.learn-antipattern-title { font-weight: 700; font-size: 13.5px; color: var(--warn); margin-bottom: 3px; }
+.learn-antipattern-text { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+/* =============================================================================
+   Troubleshoot Learning Mode
+   ============================================================================= */
+.ts-mode-select { text-align: center; padding: 12px 0; }
+.ts-mode-select h2 {
+  text-transform: none;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  margin-bottom: 18px;
+}
+.ts-mode-cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.ts-mode-card {
+  flex: 1 1 280px;
+  max-width: 360px;
+  text-align: left;
+  padding: 22px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--sans);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.ts-mode-card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(0,0,0,.4); }
+.ts-mode-card-heading { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.ts-mode-card-desc { font-size: 13.5px; color: var(--text-dim); line-height: 1.55; }
+.ts-mode-card-standard { border-color: rgba(79,179,164,.4); }
+.ts-mode-card-standard:hover { border-color: var(--accent); }
+.ts-mode-card-learn { border-color: rgba(217,154,78,.4); }
+.ts-mode-card-learn:hover { border-color: var(--warn); }
+
+.ts-learn-methodology {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 14px 18px;
+  margin: 0 0 18px;
+}
+.ts-learn-method-intro { margin: 0 0 8px; font-size: 14px; }
+.ts-methodology-steps { margin: 0; padding-left: 20px; }
+.ts-methodology-steps li { font-size: 13.5px; line-height: 1.7; color: var(--text-dim); }
+.ts-methodology-steps strong { color: var(--text); }
+
+.ts-learn-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 16px;
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 14px 18px;
+}
+.ts-learn-prompt-step { display: flex; flex-direction: column; gap: 6px; }
+.ts-prompt-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--warn);
+}
+.ts-prompt-question { font-size: 13.5px; color: var(--text); line-height: 1.5; }
+
+.ts-hint-meta {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  margin: 6px 0 8px;
+  line-height: 1.5;
+}
+
+.ts-learn-debrief {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 18px;
+  margin-top: 16px;
+}
+.ts-learn-debrief .ts-debrief-heading { margin-top: 14px; }
+.ts-learn-debrief .ts-debrief-heading:first-child { margin-top: 0; }
+.ts-methodology-scorecard { margin: 6px 0; padding-left: 18px; }
+.ts-methodology-scorecard li { font-size: 13.5px; line-height: 1.7; }
+.ts-methodology-pattern { font-size: 14px; margin-top: 10px; }
