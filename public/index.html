@@ -75,11 +75,12 @@
           <label for="learn-cert-target" class="learn-ob-sublabel">Which certification?</label>
           <select id="learn-cert-target" class="learn-ob-select">
             <option value="">Select&hellip;</option>
-            <option value="VCP-DCV">VCP-DCV &mdash; vSphere / Datacenter Virtualisation</option>
-            <option value="VCP-NV">VCP-NV &mdash; Network Virtualisation (NSX)</option>
-            <option value="VCAP-DCV">VCAP-DCV &mdash; Advanced vSphere</option>
-            <option value="VCAP-NV">VCAP-NV &mdash; Advanced NSX</option>
-            <option value="VCF">VCF &mdash; VMware Cloud Foundation</option>
+            <option value="VCP-VVF">VCP-VVF &mdash; VMware vSphere Foundation Administrator (2V0-16.25)</option>
+            <option value="VCP-NV">VCP-NV &mdash; Network Virtualisation / NSX (2V0-41.23)</option>
+            <option value="VCAP-DCV">VCAP-DCV Design &mdash; Advanced Data Centre Virtualisation</option>
+            <option value="VCAP-NV">VCAP-NV Design &mdash; Advanced Network Virtualisation</option>
+            <option value="VCP-VCF-Admin">VCP-VCF Administrator &mdash; Cloud Foundation Administrator (2V0-17.25)</option>
+            <option value="VCP-VCF-Architect">VCP-VCF Architect &mdash; Cloud Foundation Architect (2V0-13.25)</option>
           </select>
         </div>
         <div id="learn-tech-wrap" class="learn-ob-conditional" hidden>
@@ -118,7 +119,7 @@
         <label for="learn-success-stmt" class="learn-ob-label">What does success look like for you?</label>
         <p class="learn-ob-hint">Your words &mdash; this becomes the opening statement of your design rationale.</p>
         <textarea id="learn-success-stmt" class="learn-ob-textarea" rows="3"
-          placeholder="e.g. I want to build a 3-host vSAN cluster I can use to practise HA configuration for the VCP-DCV exam, and understand what each setting actually does rather than just memorising it&hellip;"></textarea>
+          placeholder="e.g. I want to build a 3-host vSAN cluster I can use to practise HA configuration for the VCP-VVF exam, and understand what each setting actually does rather than just memorising it&hellip;"></textarea>
       </div>
 
       <!-- Q4: Time available -->
@@ -154,7 +155,7 @@
           <input type="checkbox" id="learn-arch-toggle" class="learn-arch-checkbox">
           <div class="learn-arch-toggle-content">
             <div class="learn-arch-toggle-title">Enable Architect Thinking</div>
-            <div class="learn-arch-toggle-desc">Adds a consultant discovery session, requirements prioritisation (MoSCoW), options analysis at every major decision, a running decision log, and a risk register. Produces a design document you could hand to a customer. Recommended for VCAP Design or VCF architect certification study. Adds ~45 minutes.</div>
+            <div class="learn-arch-toggle-desc">Adds a consultant discovery session, requirements prioritisation (MoSCoW), options analysis at every major decision, a running decision log, and a risk register. Produces a design document you could hand to a customer. Recommended for VCAP-DCV Design, VCAP-NV Design, or VCP-VCF Architect certification study. Adds ~45 minutes.</div>
           </div>
         </label>
       </div>
@@ -933,7 +934,7 @@
           <div class="learn-context">
             <p>NSX adds significant capability &mdash; micro-segmentation, overlay networking, distributed routing &mdash; but also significant complexity and resource overhead. Before choosing NSX, be clear on why you need it.</p>
             <div class="learn-reasons">
-              <div class="learn-reason-item">&#10003; Learning NSX for certification (VCP-NV, VCAP-NV, VCF)</div>
+              <div class="learn-reason-item">&#10003; Learning NSX for certification (VCP-NV, VCAP-NV, VCP-VCF Administrator)</div>
               <div class="learn-reason-item">&#10003; Practising micro-segmentation for a customer project</div>
               <div class="learn-reason-item">&#10003; Building a full VCF environment</div>
             </div>

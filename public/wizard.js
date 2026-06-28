@@ -125,7 +125,7 @@ const state = {
   designRationale: {
     // Onboarding fields (captured before wizard starts)
     learningGoal: '',        // certification | technology | customer | homelab | role
-    certTarget: '',          // VCP-DCV | VCP-NV | VCAP-DCV | VCAP-NV | VCF
+    certTarget: '',          // VCP-VVF | VCP-NV | VCAP-DCV | VCAP-NV | VCP-VCF-Admin | VCP-VCF-Architect
     techFocus: '',           // vsphere | vsan | nsx | vcf
     experienceLevel: '',     // new | some | experienced
     successStatement: '',    // free text — opening statement of design rationale
@@ -3400,11 +3400,12 @@ document.addEventListener('keydown', (e) => {
 // =============================================================================
 
 const CERT_AREAS = {
-  'VCP-DCV':  ['ESXi deployment', 'vCenter and cluster management', 'vSAN configuration', 'HA and DRS'],
-  'VCP-NV':   ['NSX Manager deployment', 'T0/T1 gateway topology', 'DFW micro-segmentation', 'BGP peering'],
-  'VCAP-DCV': ['advanced vSphere configuration', 'storage policy design', 'performance tuning', 'cluster architecture'],
-  'VCAP-NV':  ['advanced NSX routing', 'BGP prefix filtering', 'advanced DFW design', 'NSX troubleshooting'],
-  'VCF':      ['VCF bring-up and SDDC Manager', 'management domain design', 'NSX in VCF context', 'workload domain provisioning'],
+  'VCP-VVF':           ['ESXi deployment', 'vCenter and cluster management', 'vSAN configuration', 'HA and DRS'],
+  'VCP-NV':            ['NSX Manager deployment', 'T0/T1 gateway topology', 'DFW micro-segmentation', 'BGP peering'],
+  'VCAP-DCV':          ['advanced vSphere configuration', 'storage policy design', 'performance tuning', 'cluster architecture'],
+  'VCAP-NV':           ['advanced NSX routing', 'BGP prefix filtering', 'advanced DFW design', 'NSX troubleshooting'],
+  'VCP-VCF-Admin':     ['VCF bring-up and SDDC Manager', 'management domain design', 'NSX in VCF context', 'workload domain provisioning'],
+  'VCP-VCF-Architect': ['VCF solution design and sizing', 'multi-domain architecture decisions', 'VCF security and compliance design', 'migration and lifecycle planning'],
 };
 
 const TECH_FOCUS_AREAS = {
@@ -3513,7 +3514,7 @@ function applyOnboardingToWizard() {
   // NSX is strongly implied by cert/tech focus — pre-tick it as a hint (user can untick)
   if (dr.certTarget === 'VCP-NV' || dr.certTarget === 'VCAP-NV' ||
       dr.techFocus === 'nsx' || dr.techFocus === 'vcf' ||
-      dr.certTarget === 'VCF') {
+      dr.certTarget === 'VCP-VCF-Admin' || dr.certTarget === 'VCP-VCF-Architect') {
     const nsxCheck = document.getElementById('nsxEnabled');
     if (nsxCheck && !nsxCheck.checked) nsxCheck.checked = true;
   }
@@ -4212,8 +4213,8 @@ const OPTIONS_ANALYSIS = {
     title: 'Virtual router decision',
     context: 'Your router choice sets the foundation for all lab networking. This decision affects BGP capability, NSX peering, and how much networking complexity you take on.',
     options: [
-      { label: 'VyOS with BGP', approach: 'VyOS VM with BGP peering to NSX T0', pros: ['Mirrors enterprise routing', 'Enables BGP peering practice', 'Required for advanced NSX study'], cons: ['More complex to configure', 'Requires understanding of BGP concepts'], risk: 'Misconfiguration can block all lab traffic', bestFor: 'Certification study (VCP-NV, VCAP-NV, VCF)' },
-      { label: 'VyOS basic NAT', approach: 'VyOS VM with NAT only, no dynamic routing', pros: ['Simpler to configure', 'Still provides NAT and DHCP', 'Good for vSphere-only labs'], cons: ['No BGP practice', 'Cannot peer with NSX T0 dynamically'], risk: 'Limits NSX routing capabilities', bestFor: 'vSphere basics study (VCP-DCV)' },
+      { label: 'VyOS with BGP', approach: 'VyOS VM with BGP peering to NSX T0', pros: ['Mirrors enterprise routing', 'Enables BGP peering practice', 'Required for advanced NSX study'], cons: ['More complex to configure', 'Requires understanding of BGP concepts'], risk: 'Misconfiguration can block all lab traffic', bestFor: 'Certification study (VCP-NV, VCAP-NV, VCP-VCF Administrator)' },
+      { label: 'VyOS basic NAT', approach: 'VyOS VM with NAT only, no dynamic routing', pros: ['Simpler to configure', 'Still provides NAT and DHCP', 'Good for vSphere-only labs'], cons: ['No BGP practice', 'Cannot peer with NSX T0 dynamically'], risk: 'Limits NSX routing capabilities', bestFor: 'vSphere basics study (VCP-VVF)' },
       { label: 'No router', approach: 'No virtual router — direct physical network access', pros: ['Simplest setup', 'No router configuration'], cons: ['No network segmentation practice', 'No NAT for nested hosts'], risk: 'All nested VMs on flat network', bestFor: 'Minimal vSphere basics only' },
     ],
     decisionKey: 'Virtual router'
@@ -4222,7 +4223,7 @@ const OPTIONS_ANALYSIS = {
     title: 'Storage architecture decision',
     context: 'Storage choice determines what you can practice and how resilient the lab is. vSAN requires 3+ hosts and significant RAM.',
     options: [
-      { label: 'vSAN', approach: 'Software-defined storage across all nested hosts', pros: ['Practise vSAN configuration', 'Required for VCF/VCAP study', 'Mirrors enterprise deployments'], cons: ['Requires 3+ hosts', 'High RAM overhead', 'Complex to troubleshoot'], risk: 'vSAN health issues can take down the whole cluster', bestFor: 'VCP-DCV, VCF, enterprise simulation' },
+      { label: 'vSAN', approach: 'Software-defined storage across all nested hosts', pros: ['Practise vSAN configuration', 'Required for VCF/VCAP study', 'Mirrors enterprise deployments'], cons: ['Requires 3+ hosts', 'High RAM overhead', 'Complex to troubleshoot'], risk: 'vSAN health issues can take down the whole cluster', bestFor: 'VCP-VVF, VCP-VCF Administrator, enterprise simulation' },
       { label: 'Local datastores', approach: 'Each nested host uses its own local disk', pros: ['Simple to configure', 'Lower resource overhead', 'Works on single host'], cons: ['No vMotion across hosts', 'No shared storage features'], risk: 'VMs pinned to one host', bestFor: 'Basic vSphere study, resource-constrained hardware' },
     ],
     decisionKey: 'Storage architecture'
@@ -4231,8 +4232,8 @@ const OPTIONS_ANALYSIS = {
     title: 'NSX deployment decision',
     context: 'NSX adds powerful networking capabilities but also significant resource overhead and complexity. Be clear on why you need it before committing.',
     options: [
-      { label: 'Deploy NSX', approach: 'NSX Manager + T0/T1 gateway topology', pros: ['Micro-segmentation with DFW', 'T0/T1 routing practice', 'Required for VCP-NV/VCAP-NV/VCF'], cons: ['48GB+ RAM for NSX Manager', 'Significantly more complex', 'Deployment takes hours'], risk: 'NSX misconfiguration can break all VM networking', bestFor: 'VCP-NV, VCAP-NV, VCF, customer NSX environments' },
-      { label: 'No NSX', approach: 'Standard vSphere networking only (VDS port groups)', pros: ['Much simpler', 'Lower resource requirements', 'Faster to build'], cons: ['No micro-segmentation', 'No overlay networking practice', 'Cannot study NSX features'], risk: 'Lab does not reflect modern enterprise networking', bestFor: 'VCP-DCV, basic vSphere, resource-constrained hardware' },
+      { label: 'Deploy NSX', approach: 'NSX Manager + T0/T1 gateway topology', pros: ['Micro-segmentation with DFW', 'T0/T1 routing practice', 'Required for VCP-NV/VCAP-NV/VCP-VCF'], cons: ['48GB+ RAM for NSX Manager', 'Significantly more complex', 'Deployment takes hours'], risk: 'NSX misconfiguration can break all VM networking', bestFor: 'VCP-NV, VCAP-NV, VCP-VCF Administrator, customer NSX environments' },
+      { label: 'No NSX', approach: 'Standard vSphere networking only (VDS port groups)', pros: ['Much simpler', 'Lower resource requirements', 'Faster to build'], cons: ['No micro-segmentation', 'No overlay networking practice', 'Cannot study NSX features'], risk: 'Lab does not reflect modern enterprise networking', bestFor: 'VCP-VVF, basic vSphere, resource-constrained hardware' },
     ],
     decisionKey: 'NSX deployment'
   },
@@ -4240,7 +4241,7 @@ const OPTIONS_ANALYSIS = {
     title: 'Cluster size decision',
     context: 'Cluster size is the single biggest factor in lab capability and resource consumption. Balance what you need to learn against what your hardware can support.',
     options: [
-      { label: '3 hosts', approach: '3 nested ESXi hosts with vSAN and full HA', pros: ['Full HA/DRS capability', 'vSAN minimum requirement met', 'Mirrors enterprise minimum'], cons: ['Highest resource consumption', 'Requires 192GB+ physical RAM with NSX'], risk: 'May hit physical RAM ceiling', bestFor: 'VCP-DCV with vSAN, VCF, production-like simulation' },
+      { label: '3 hosts', approach: '3 nested ESXi hosts with vSAN and full HA', pros: ['Full HA/DRS capability', 'vSAN minimum requirement met', 'Mirrors enterprise minimum'], cons: ['Highest resource consumption', 'Requires 192GB+ physical RAM with NSX'], risk: 'May hit physical RAM ceiling', bestFor: 'VCP-VVF with vSAN, VCP-VCF Administrator, production-like simulation' },
       { label: '2 hosts', approach: '2 nested ESXi hosts, no vSAN', pros: ['Basic vMotion practice', 'Lower resource than 3 hosts', 'HA configured (limited)'], cons: ['No vSAN possible', 'HA cannot tolerate host failure safely'], risk: 'HA admission control issues with only 2 hosts', bestFor: 'Basic vMotion study, resource-constrained hardware' },
       { label: '1 host', approach: 'Single nested ESXi host', pros: ['Lowest resource consumption', 'Fast to build', 'Good for vCenter-only study'], cons: ['No HA, no vMotion, no vSAN', 'No cluster features at all'], risk: 'Single point of failure — any issue takes down all nested VMs', bestFor: 'Minimal footprint, basic vSphere administration' },
     ],
