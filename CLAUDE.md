@@ -235,7 +235,7 @@ network diagram, prerequisites.
 ### v0.6.2-beta (CLAUDE.md housekeeping)
 - CLAUDE.md updated to reflect v0.6.1-beta state: step table, constants, key files, schema history, roadmap
 
-### v0.6.3-beta (current — Kickstart generator)
+### v0.6.3-beta (Kickstart generator)
 - **Unattended ESXi install via Kickstart** — eliminates the main manual step in the build guide:
   - `lib/generateKickstart.js`: new — `buildKickstartFiles(spec)` generates one `ks-esxi-N.cfg` per nested host
     - Management IP `.101`/`.102`/… in management CIDR (matches vcf-bringup.json convention)
@@ -244,6 +244,13 @@ network diagram, prerequisites.
   - `server.js`: writes `ks-esxi-N.cfg` files to output on every generate; adds `GET /api/ks/:sessionId/:hostIndex` endpoint — wizard serves ks.cfg files directly at boot time
   - `deploy-lab.ps1` (`generatePowerShell.js`): new `-WizardIp` param; embeds `$KsSessionId` constant; powers on VMs with `Start-VM`; prints `ks=http://$WizardIp:3000/api/ks/<id>/<n>` URL per host when `-WizardIp` is set
   - New wizard field: "Nested ESXi root password" (step 7) → `spec.nestedCluster.rootPassword`; blank → `<REPLACE_ME>` placeholder in ks.cfg
+
+### v0.6.4-beta (current — build guide kickstart section)
+- **`lib/generateBuildGuide.js`** — ISO-path nested ESXi install step updated:
+  - AUTOMATED step: command example shows `-WizardIp` flag; description notes VMs are powered on immediately and ks.cfg files land in the output folder
+  - MANUAL install step split into two options:
+    - **Option A (Kickstart, recommended):** Shift+O at boot menu, `ks=` URL format, `-WizardIp` URL reference, post-install state (IP, hostname, SSH, NTP), `<REPLACE_ME>` warning when no password set, self-hosting fallback note
+    - **Option B (Manual):** existing DCUI walkthrough, updated to note VMs are already powered on
 
 ---
 
