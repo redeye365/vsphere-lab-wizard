@@ -157,6 +157,7 @@ const state = {
       vcfEsxiPassword: '', vcfEsxiLicense: '', vcfVcenterLicense: '',
       depotEnabled: false, depotMode: 'linux', depotIpAddress: null,
       nestedHostCount: 3, vcpuPerHost: 4, vramPerHostGB: 16, nestedDiskGB: 32,
+      nestedEsxiPassword: '',
       clusterName: 'mgmt-cluster', datacenterName: 'Lab-DC', ssoDomain: 'vsphere.local',
       vsanArch: 'esa',
       legacyCpuCompat: false,
@@ -724,6 +725,7 @@ function wireForm() {
     onChange();
   });
 
+  bindText('nestedEsxiPassword', g, 'nestedEsxiPassword', onChange);
   bindText('clusterName', g, 'clusterName', onChange);
 
   function checkSsoCollision() {
@@ -3069,7 +3071,7 @@ function wireGenerate() {
               [/^(mgmtCidr|mgmtVlan|vmotionCidr|vmotionVlan|vsanCidr|vsanVlan|vmCidr|vmVlan)/, {label: 'Lab networks',     step: 6,  railNum: 7}],
               [/^(dcIpAddress|dcDomainName)/,                                  {label: 'Domain controller', step: 4,  railNum: 5}],
               [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 3,  railNum: 4}],
-              [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering)/, {label: 'Nested cluster',    step: 7,  railNum: 8}],
+              [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering|nestedEsxiPassword)/, {label: 'Nested cluster',    step: 7,  railNum: 8}],
               [/^(nsxSize|nsxTopology|nsxEdge|nsxIpAddress|nsxBgp|nsxRedist)/,   {label: 'NSX-T',             step: 8,  railNum: 9}],
               [/^vcf/,                                                          {label: 'VCF Bring-up',      step: 9,  railNum: 10}],
               [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 10, railNum: 11}],

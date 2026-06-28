@@ -428,6 +428,14 @@
           </div>
         </div>
 
+        <div class="field-row">
+          <div class="field">
+            <label for="nestedEsxiPassword">Nested ESXi root password</label>
+            <input type="password" id="nestedEsxiPassword" placeholder="Leave blank to use &lt;REPLACE_ME&gt; placeholder">
+            <p class="hint">Written into the generated Kickstart files (<code>ks-esxi-01.cfg</code>, etc.) for unattended ESXi installation. If left blank, the ks.cfg files will contain a <code>&lt;REPLACE_ME&gt;</code> placeholder and the installer will prompt you. Avoid special shell characters (<code>$ ' " \</code>).</p>
+          </div>
+        </div>
+
         <div class="field checkbox-field">
           <label class="checkbox-row"><input type="checkbox" id="legacyCpuCompat"><span>Apply legacy CPU compatibility (<code>monitor.allowLegacyCPU</code>)</span></label>
           <p class="hint">Needed on some older host CPUs for nested ESXi to boot. Safe to enable even if you're not sure.</p>

@@ -35,6 +35,7 @@ const { buildPrerequisites } = require('./lib/generatePrerequisites');
 const { buildDepotFiles } = require('./lib/generateDepot');
 const { buildNsxScripts } = require('./lib/generateNsx');
 const { buildVcfFiles }  = require('./lib/generateVcf');
+const { buildKickstartFiles, buildKickstartForHost } = require('./lib/generateKickstart');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
 const { evaluateSizing } = require('./lib/sizing');
@@ -164,13 +165,12 @@ app.post('/api/generate', (req, res) => {
 
     const sizing = evaluateSizing(answers);
     const spec = buildSpec(answers, sizing);
-    const scripts = buildPowerShellScripts(spec);
-    const designDoc = buildMarkdown(spec);
-    const buildGuide = buildBuildGuide(spec);
-
     const id = crypto.randomBytes(4).toString('hex');
     const dir = path.join(OUTPUT_DIR, id);
     fs.mkdirSync(dir, { recursive: true });
+    const scripts = buildPowerShellScripts(spec, id);
+    const designDoc = buildMarkdown(spec);
+    const buildGuide = buildBuildGuide(spec);
 
     const prerequisites = buildPrerequisites(spec);
     const depotFiles = buildDepotFiles(spec);
@@ -216,6 +216,12 @@ app.post('/api/generate', (req, res) => {
       fs.writeFileSync(path.join(dir, filename), content);
     }
 
+    // Kickstart files (ISO-based deploys only)
+    const ksFiles = buildKickstartFiles(spec);
+    for (const [filename, content] of Object.entries(ksFiles)) {
+      fs.writeFileSync(path.join(dir, filename), content);
+    }
+
     res.json({
       id,
       warnings: sizing.warnings,
@@ -227,6 +233,30 @@ app.post('/api/generate', (req, res) => {
   } catch (err) {
     console.error('Generate failed:', err.message);
     res.status(500).json({ error: 'Generation failed. Check the server log for details.' });
+  }
+});
+
+// Serve per-host ks.cfg files for kickstart unattended ESXi install.
+// URL format: GET /api/ks/:sessionId/:hostIndex  (hostIndex is 1-based)
+// Intended for use at the ESXi boot menu: press Shift+O and append
+//   ks=http://<wizard-machine-ip>:3000/api/ks/<sessionId>/<hostIndex>
+app.get('/api/ks/:id/:hostIndex', (req, res) => {
+  const { id, hostIndex } = req.params;
+  if (!/^[a-f0-9]{8}$/.test(id)) return res.status(400).send('Invalid session id');
+  const idx = parseInt(hostIndex, 10);
+  if (!Number.isFinite(idx) || idx < 1 || idx > 64) return res.status(400).send('Invalid host index');
+
+  const specPath = path.join(OUTPUT_DIR, id, 'lab-spec.json');
+  if (!fs.existsSync(specPath)) return res.status(404).send('Session not found');
+
+  try {
+    const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+    const content = buildKickstartForHost(spec, idx);
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `inline; filename="ks-esxi-${String(idx).padStart(2, '0')}.cfg"`);
+    res.send(content);
+  } catch (err) {
+    res.status(500).send('Failed to generate ks.cfg');
   }
 });
 
