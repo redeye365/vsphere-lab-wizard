@@ -1928,6 +1928,7 @@ select:focus {
    ============================================================================= */
 
 /* --- Mode selector screen --- */
+.mode-select-screen[hidden] { display: none !important; }
 .mode-select-screen {
   position: fixed;
   inset: 0;

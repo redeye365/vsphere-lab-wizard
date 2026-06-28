@@ -17,7 +17,8 @@
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.15.0",
-    "pkg": "^5.8.1"
+    "pkg": "^5.8.1",
+    "playwright": "^1.61.1"
   },
   "pkg": {
     "assets": [
