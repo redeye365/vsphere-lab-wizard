@@ -17,6 +17,7 @@ Key files:
 - `lib/scenarioLibrary.js` — scenario CRUD (loadScenarios, getScenario, saveScenario, deleteScenario, getActive, setActive)
 - `lib/vcenterClient.js` — vSphere REST API client (createSession, listVMs, findSnapshot, revertAllToSnapshot, testConnection)
 - `lib/vcenterConfig.js` — load/save vcenter-config.json from BASE_DIR (gitignored)
+- `lib/hclData.js` — NIC HCL database: FLAGGED_NICS, KNOWN_GOOD_NICS, checkNic(model)
 - `scenarios/<id>.json` — scenario metadata files (10 starters ship with the wizard)
 - `scenarios/verify/<name>.ps1` — PowerShell verify scripts (check FAULT_PRESENT/FAULT_RESOLVED)
 - `public/index.html` — all wizard steps in one HTML file
@@ -28,11 +29,12 @@ Key files:
 - `lib/validateAnswers.js` — server-side input validation
 - `lib/generatePowerShell.js` — main script generator
 - `lib/generateNsx.js` — NSX-T deploy/configure/BGP scripts
+- `lib/generateVcf.js` — VCF bring-up JSON (Cloud Builder workbook) + vcf-prep.ps1
 - `lib/generateBuildGuide.js` — step-by-step human build guide
 - `lib/generateMarkdown.js` — design-doc.md
 - `lib/generateNetworkDiagram.js` — Mermaid flowchart
 - `lib/generateDiagramHtml.js` — standalone diagram.html with embedded mermaid source
-- `lib/generatePrerequisites.js` — PREREQUISITES.md
+- `lib/generatePrerequisites.js` — PREREQUISITES.md (VCF section conditional on vcf.enabled)
 - `lib/generateDepot.js` — optional local depot scripts
 
 ### Packaging
@@ -42,27 +44,28 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 
 ---
 
-## Step numbering (as of v0.4.8-beta)
+## Step numbering (as of v0.6.0-beta)
 
 | # | Step name | Notes |
 |---|-----------|-------|
 | 0 | Use case | |
-| 1 | Hardware | Per-host specs when hostCount > 1 |
+| 1 | Hardware | NIC model + inline HCL check; per-host specs when hostCount > 1 |
 | 2 | ESXi version | |
 | 3 | Virtual router (VyOS) | |
 | 4 | Domain controller | |
 | 5 | Existing network | |
 | 6 | Lab networks | |
-| 7 | Nested cluster | Placement section shown when hostCount > 1 |
-| 8 | NSX-T | Always shown |
-| 9 | Nested disks | |
-| 10 | Bundle depot | `depotStepVisible()` gates on vSAN + local_datastore |
-| 11 | Workload VMs | |
-| 12 | Security & access | |
-| 13 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
-| 14 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
+| 7 | Nested cluster | ESA/OSA vSAN; memory tiering; placement when hostCount > 1 |
+| 8 | NSX-T | Edge node count/size; BGP route advert mode; redistribution checkboxes |
+| 9 | VCF Bring-up | Shown always; generates vcf-bringup.json + vcf-prep.ps1 when vcfEnabled |
+| 10 | Nested disks | |
+| 11 | Bundle depot | `depotStepVisible()` gates on vSAN + local_datastore |
+| 12 | Workload VMs | |
+| 13 | Security & access | |
+| 14 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
+| 15 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
 
-`TOTAL_STEPS = 15`, `DEPOT_STEP = 10`, `NSX_STEP = 8`, `TROUBLESHOOT_STEP = 14`
+`TOTAL_STEPS = 16`, `DEPOT_STEP = 11`, `NSX_STEP = 8`, `VCF_STEP = 9`, `TROUBLESHOOT_STEP = 15`
 
 ---
 
@@ -83,6 +86,8 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 | 2 | v0.2 | remoteAccess, workloadVms |
 | 3 | v0.4 | nsx section, extendMode flag |
 | 4 | v0.4.8-beta | `physicalHosts[]` array (multi-host); `nestedCluster.hosts[]` placement; `nestedCluster.hostPlacement` ('auto'/'manual') |
+| 4 (extended) | v0.5.3-beta | Added to existing v4: `physicalHost.nicModel`; `nsx.edgeCount`, `nsx.edgeSize`, `nsx.bgpRouteAdvert`, `nsx.bgpPrefixes[]`, `nsx.redistConnected/Static/T1Lb`; `nestedCluster.memoryTiering`, `vsanArchitecture` |
+| 4 (extended) | v0.6.0-beta | Added to existing v4: `vcf` section (enabled, sddcManagerIp, sddcManagerHostname, vcenterIp, vtepCidr/Vlan, edgeUplink1/2 Cidr/Vlan, esxiPassword, esxiLicense, vcenterLicense) |
 
 ---
 
@@ -93,7 +98,7 @@ Core wizard: physical host → networks → DC → VyOS → nested cluster → d
 workloads → security → review. Generates PowerShell scripts, design doc, build guide,
 network diagram, prerequisites.
 
-### v0.4.9-beta (current build — diagram viewer)
+### v0.4.9-beta (diagram viewer)
 - **Network diagram viewer** (`/diagram` route, `public/diagram.html`):
   - Live Mermaid render in review screen (step 13) — auto-updates on entry, "Open in viewer" link
   - Standalone `/diagram` viewer: file picker for spec.json, session ID load, zoom/pan, fullscreen, download SVG/PNG, component key
@@ -118,7 +123,7 @@ network diagram, prerequisites.
   - Amber fixed badge; step 14 added to rail (hidden by default)
   - **No mention of troubleshooting mode anywhere in UI, docs, or README.**
 
-### v0.4.15-beta (current build — scenario snapshot library)
+### v0.4.15-beta (scenario snapshot library)
 - **Architecture change**: fault injection replaced by scenario snapshot library
   - Scenarios are pre-built lab states with a fault already present, saved as vCenter
     snapshots. Troubleshooters load a scenario, lab reverts, they fix it for real.
@@ -173,7 +178,7 @@ network diagram, prerequisites.
   9. monitor.allowLegacyCPU Missing — monitor-allow-legacy-cpu
   10. Local Datastore Missing Before vSAN — local-datastore-missing
 
-### v0.5.1-beta (current build — full vCenter snapshot automation)
+### v0.5.1-beta (vCenter snapshot automation)
 - **vCenter snapshot revert** wired in `POST /api/admin/scenario-load`:
   - Connects to vCenter using `vcenter-config.json` (gitignored, stored at BASE_DIR)
   - Lists all VMs via vSphere REST API, reverts any VM that has the named snapshot
@@ -191,11 +196,39 @@ network diagram, prerequisites.
 - **New endpoints**: `GET/POST /api/admin/vcenter-config`, `POST /api/admin/vcenter-test`
 - **New lib files**: `lib/vcenterClient.js`, `lib/vcenterConfig.js` (no new npm deps — built-in `https` only)
 
-### v3 — VCF layer (future)
-- SDDC Manager bring-up JSON generation
-- VCF-aware step: commission hosts, define workload domains, network pools
-- NSX step extended with VCF-specific transport zones and host profiles
-- Warning when SSO domain clashes with AD domain (already tracked in quiz explanations)
+### v0.5.3-beta (HCL NIC validation + NSX full depth + ESA/memory tiering)
+- **HCL NIC validation** (step 1): inline check on blur against `lib/hclData.js`
+  - Flagged (Realtek, I210/I211, Killer, Atheros, Marvell 88SE9235, JMicron): amber warning + reason
+  - Known-good (Intel X-series, Broadcom BCM57xx, Mellanox ConnectX, etc.): teal badge
+  - Unknown: grey hint
+- **ESA / memory tiering** (step 7): ESA vs OSA vSAN architecture toggle; memory tiering with NVMe disk picker and `tierNvmePct` slider
+- **NSX full depth** (step 8):
+  - Edge transport node count + size (small / medium / large → vCPU/vRAM)
+  - BGP route advertisement: all connected vs. specific prefix list (CIDR textarea)
+  - Redistribution checkboxes: connected, static, T1 LB VIP
+  - `nsx-configure.ps1`: edge cluster creation via `POST /api/v1/edge-clusters`
+  - `nsx-bgp.ps1`: prefix list PATCH + outbound neighbour filter when `bgpRouteAdvert === 'specific'`
+- **New spec fields**: `physicalHost.nicModel`; `nsx.edgeCount/edgeSize/bgpRouteAdvert/bgpPrefixes[]/redistConnected/redistStatic/redistT1Lb`; `nestedCluster.memoryTiering`, `vsanArchitecture`
+
+### v0.6.0-beta (VCF layer)
+- **New step 9 — VCF Bring-up** (inserted between NSX-T and Nested disks; old steps 9–14 → 10–15):
+  - Generates `vcf-bringup.json` — VCF 5.x Cloud Builder deployment parameter workbook with all 6 network types (MANAGEMENT, VMOTION, VSAN, NSX_VTEP, NSX_EDGE_UPLINK1/2), per-host specs, dvs config, nsxSpec, vcenterSpec, sddcManagerSpec
+  - Generates `vcf-prep.ps1` — pre-flight: NTP running, SSH enabled, hostname report per nested host
+  - UI fields: SDDC Manager IP/hostname, vCenter IP, VTEP + Edge Uplink 1/2 CIDR/VLAN, ESXi password, ESXi/vCenter license keys
+  - Review warnings: SSO domain = AD domain collision; nested host count < 4
+  - Nested host IPs are sequential placeholders (.101+) in management CIDR — must match `deploy-lab.ps1` assignment
+- **Step constant changes**: TOTAL_STEPS 15 → 16, DEPOT_STEP 10 → 11, TROUBLESHOOT_STEP 14 → 15, VCF_STEP = 9 (new)
+- **New lib**: `lib/generateVcf.js` (buildVcfFiles, buildBringupJson, buildPrepScript, firstHostInCidr, cidrToMask, ipRange)
+- **New spec section**: `vcf` (enabled, sddcManagerIp, sddcManagerHostname, vcenterIp, vtepCidr/Vlan, edgeUplink1/2 Cidr/Vlan, esxiPassword, esxiLicense, vcenterLicense)
+- **Community repo**: `github.com/redeye365/vsphere-lab-scenarios` — 10 starter troubleshooting scenarios, contributor README, `.labscenario` import/export
+
+### v0.6.1-beta (current — VCF prerequisites)
+- **VCF prerequisites** added to `generatePrerequisites.js` (all conditional on `vcf.enabled`):
+  - Broadcom portal section split into vSphere + VCF download locations
+  - Cloud Builder OVA subsection: download location, manual deploy steps 1–4, bundle depot note
+  - **VCF bring-up requirements** section: DNS records table (personalised from spec IPs/hostnames), NTP sync note, VLAN trunk table (all 6 types), license key check (confirms if entered / reminds if blank), minimum 4-host warning, ordered 7-step bring-up checklist
+  - Cloud Builder OVA entry in recommended folder layout tree
+  - Time table: Cloud Builder download/deploy, bring-up, bundle depot sync rows
 
 ---
 
