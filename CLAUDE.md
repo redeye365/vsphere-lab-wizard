@@ -90,6 +90,7 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 | 4 (extended) | v0.5.3-beta | Added to existing v4: `physicalHost.nicModel`; `nsx.edgeCount`, `nsx.edgeSize`, `nsx.bgpRouteAdvert`, `nsx.bgpPrefixes[]`, `nsx.redistConnected/Static/T1Lb`; `nestedCluster.memoryTiering`, `vsanArchitecture` |
 | 4 (extended) | v0.6.0-beta | Added to existing v4: `vcf` section (enabled, sddcManagerIp, sddcManagerHostname, vcenterIp, vtepCidr/Vlan, edgeUplink1/2 Cidr/Vlan, esxiPassword, esxiLicense, vcenterLicense) |
 | 4 (extended) | v0.6.3-beta | Added to existing v4: `nestedCluster.rootPassword` |
+| 4 (extended) | v0.6.7-beta | Added to existing v4: `learningMode` (bool), `designRationale` (object with useCase, routerChoice, networkSecurity, availabilityRequirement, nsxRationale) |
 
 ---
 
@@ -261,7 +262,24 @@ network diagram, prerequisites.
 - `vsphere-lab-scenarios` README updated: count corrected, table split into vSphere/NSX/VCF sections
 - Authors: Jon — CloudITBlog.com
 
-### v0.6.6-beta (current — pre-v1.0 security audit)
+### v0.6.7-beta (current — Learning Mode)
+- **Wizard Learning Mode**: mode selector screen (Build vs Learn) before wizard enters
+  - Per-step `<div class="learn-block">` panels at steps 0, 1, 3, 5, 6, 7, 8, 14
+  - Design rationale capture: useCase, routerChoice, networkSecurity, availabilityRequirement, nsxRationale (all in `state.designRationale`)
+  - Architecture scorecard on step 14: Isolation / Resilience / Scalability / Complexity / VCF Readiness (Green/Amber/Red)
+  - Anti-pattern detection: single-host HA, vSAN < 3 hosts, NSX without BGP, untagged management VLAN
+  - RAM insights on steps 1 (cluster tier options) and 7 (headroom after cluster)
+  - `learningMode` + `designRationale` added to spec by `generateSpec.js`
+  - `generateMarkdown.js`: Design Rationale section (problem statement, router/networking, network security, availability, architecture assessment)
+  - `generateBuildGuide.js`: Learning objectives + certification mapping (when useCase === 'certification')
+- **Troubleshooter Learning Mode**: phase 0 mode selector (Fix vs Learn to troubleshoot)
+  - 7-step methodology framework shown in phase 1 header
+  - Guided prompts in phase 3: symptom, scope, layer isolation (saved to `state.tsMethodology`)
+  - Hint meta-context framing for each of the 5 hint levels
+  - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
+  - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
+
+### v0.6.6-beta (pre-v1.0 security audit)
 - **Server binding**: `app.listen` now binds to `127.0.0.1` only (was `0.0.0.0`)
 - **Admin endpoint protection**: `requireLocalhost` middleware added to all `/api/admin/*` routes; rejects non-loopback connections with 403
 - **Path traversal fix**: `saveScenario` now validates `verifyScript` field with `^[a-zA-Z0-9-]+\.ps1$`; admin-verify re-validates the filename before `path.join` + `spawnSync` — blocks malicious `.labscenario` imports
@@ -292,3 +310,10 @@ network diagram, prerequisites.
   are stripped before the spec is returned to the browser in the generate response.
 - `setRichText(el, html)` in `wizard.js` is the safe alternative to `innerHTML` for
   strings that need `<code>` formatting — all other tags are rendered as plain text.
+- Learning mode state lives in `state.learningMode` (bool) and `state.designRationale` (object).
+  Toggled at startup by `wireModeSelect()`. Per-step learn-blocks are shown/hidden in `showStep()`.
+- Architecture scorecard (`renderScorecard()`) and anti-pattern detection (`collectAntiPatterns()`)
+  run entirely in the browser on step 14; a server-side mirror in `generateMarkdown.js`
+  (`assessArchitecture`, `collectAntiPatterns`) reproduces the same logic for the design doc.
+- Troubleshoot learning mode: `state.troubleshootLearningMode` set in phase 0; methodology
+  prompts wired in `tsWirePhase3()`; enhanced debrief built by `tsBuildLearnDebrief(data)`.
