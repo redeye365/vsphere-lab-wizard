@@ -18,7 +18,7 @@ Key files:
 - `lib/vcenterClient.js` — vSphere REST API client (createSession, listVMs, findSnapshot, revertAllToSnapshot, testConnection)
 - `lib/vcenterConfig.js` — load/save vcenter-config.json from BASE_DIR (gitignored)
 - `lib/hclData.js` — NIC HCL database: FLAGGED_NICS, KNOWN_GOOD_NICS, checkNic(model)
-- `scenarios/<id>.json` — scenario metadata files (10 starters ship with the wizard)
+- `scenarios/<id>.json` — scenario metadata files (22 scenarios ship with the wizard)
 - `scenarios/verify/<name>.ps1` — PowerShell verify scripts (check FAULT_PRESENT/FAULT_RESOLVED)
 - `public/index.html` — all wizard steps in one HTML file
 - `public/wizard.js` — all client state, step logic, form wiring
@@ -245,12 +245,21 @@ network diagram, prerequisites.
   - `deploy-lab.ps1` (`generatePowerShell.js`): new `-WizardIp` param; embeds `$KsSessionId` constant; powers on VMs with `Start-VM`; prints `ks=http://$WizardIp:3000/api/ks/<id>/<n>` URL per host when `-WizardIp` is set
   - New wizard field: "Nested ESXi root password" (step 7) → `spec.nestedCluster.rootPassword`; blank → `<REPLACE_ME>` placeholder in ks.cfg
 
-### v0.6.4-beta (current — build guide kickstart section)
+### v0.6.4-beta (build guide kickstart section)
 - **`lib/generateBuildGuide.js`** — ISO-path nested ESXi install step updated:
   - AUTOMATED step: command example shows `-WizardIp` flag; description notes VMs are powered on immediately and ks.cfg files land in the output folder
   - MANUAL install step split into two options:
     - **Option A (Kickstart, recommended):** Shift+O at boot menu, `ks=` URL format, `-WizardIp` URL reference, post-install state (IP, hostname, SSH, NTP), `<REPLACE_ME>` warning when no password set, self-hosting fallback note
     - **Option B (Manual):** existing DCUI walkthrough, updated to note VMs are already powered on
+
+### v0.6.5-beta (current — scenario library expansion)
+- **12 new scenarios** added to `scenarios/` and mirrored to `vsphere-lab-scenarios` repo:
+  - **Easy (3):** vm-snapshot-consolidation, host-disconnected-vcenter, vmotion-failing
+  - **Medium (4):** ha-admission-control, nsx-t0-uplink-wrong, nsx-dfw-blocking, vsan-disk-claimed
+  - **Hard (5):** vcf-ssh-config-corruption, vcf-ntp-drift, vcf-dns-ptr-missing, nsx-edge-transport-zone, storage-all-paths-down
+- Wizard now ships 22 scenarios total (was 10); verify scripts added for all 12 in `scenarios/verify/`
+- `vsphere-lab-scenarios` README updated: count corrected, table split into vSphere/NSX/VCF sections
+- Authors: Jon — CloudITBlog.com
 
 ---
 
