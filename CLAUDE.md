@@ -91,6 +91,7 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 | 4 (extended) | v0.6.0-beta | Added to existing v4: `vcf` section (enabled, sddcManagerIp, sddcManagerHostname, vcenterIp, vtepCidr/Vlan, edgeUplink1/2 Cidr/Vlan, esxiPassword, esxiLicense, vcenterLicense) |
 | 4 (extended) | v0.6.3-beta | Added to existing v4: `nestedCluster.rootPassword` |
 | 4 (extended) | v0.6.7-beta | Added to existing v4: `learningMode` (bool), `designRationale` (object with useCase, routerChoice, networkSecurity, availabilityRequirement, nsxRationale) |
+| 4 (extended) | v0.6.8-beta | Added to existing v4: `architectMode` (bool), `discovery` (object), `decisionLog` (array), `riskRegister` (array) |
 
 ---
 
@@ -278,6 +279,33 @@ network diagram, prerequisites.
   - Hint meta-context framing for each of the 5 hint levels
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
+
+### v0.6.8-beta (current — Architect Thinking mode)
+- **Three-tier mode system**: Standard (fast wizard) / Learning (onboarding + learn-blocks + scorecard) /
+  Architect (Learning PLUS Phase 0 discovery, options analysis, decision log, risk register, architect design doc).
+  Architect mode is a secondary toggle (`#learn-arch-toggle`) shown at the bottom of the learn-onboard screen,
+  only visible once goal + experience + time are answered (`updateOnboardStart()` toggles `#learn-arch-toggle-wrap`).
+- **Architect state** (in `state`): `architectMode` (bool); `discovery` { stakeholders, problemStatement,
+  moscow{networking/compute/storage/security/management}, constraints{time/budget/skills/compliance},
+  successCriteria, successMeasure, risks[], designPrinciples[] }; `decisionLog[]`; `riskRegister[]`.
+- **Phase 0 discovery** (`#arch-discovery-screen`, full-screen, shown by `showArchDiscovery()` after onboarding when
+  architectMode on): 7 sections — stakeholders, problem statement, MoSCoW table, constraints, success criteria,
+  top-3 risks (with suggested-risk chips), design principles (8 toggles + custom). `finishDiscovery()` imports the
+  discovery risks into `riskRegister` (source:'discovery'), reveals the sidebar panels, then enters the wizard.
+- **Options analysis** (`OPTIONS_ANALYSIS` constant, 4 keys: `router`, `storage`, `nsx`, `clusterSize`):
+  full-page overlay (`#arch-options-panel`) shown once per session via `showOptionsAnalysis(key)`. Hooked into
+  `showStep()` (steps 3→router, 7→clusterSize, 8→nsx) and the vSAN toggle (→storage). Confirming logs a decision.
+- **Decision log + risk register** sidebar panels (`#arch-decision-log-panel`, `#arch-risk-register-panel`):
+  collapsible (`wireArchPanelToggles()`), rendered by `renderDecisionLog()` / `renderRiskRegister()`.
+  `addDecision()` appends to log; `addAutoRisk()` dedupes by description. `detectDesignRisks()`
+  (wired by `wireArchitectWizardSteps()` on nestedHostCount / vramPerHostGB / nsxEnabled / mgmtVlan / vsanEnabled)
+  auto-detects: single-host SPOF, >85% RAM overcommit, vSAN < 3 hosts, NSX without BGP, untagged management VLAN.
+- **generateMarkdown.js**: when `spec.architectMode && spec.learningMode`, emits a 10-section architect document
+  (Executive Summary, Stakeholder Analysis, Requirements/MoSCoW, Constraints, Design Principles, Architecture
+  Overview, Design Decisions, Risk Register, Component Specifications, Open Items) plus a **Design readiness %**
+  blockquote. Takes priority over the learning-mode Design Rationale block (`else if (spec.learningMode)`).
+- **generateSpec.js**: adds `architectMode`, `discovery`, `decisionLog`, `riskRegister` to the spec.
+- **Wizard → server**: `wireGenerate()` posts `architectMode`, `discovery`, `decisionLog`, `riskRegister`.
 
 ### v0.6.6-beta (pre-v1.0 security audit)
 - **Server binding**: `app.listen` now binds to `127.0.0.1` only (was `0.0.0.0`)

@@ -136,6 +136,30 @@ const state = {
     availabilityRequirement: '',
     nsxRationale: ''
   },
+  architectMode: false,
+  discovery: {
+    stakeholders: '',
+    problemStatement: '',
+    moscow: {
+      networking:  'must',
+      compute:     'must',
+      storage:     'should',
+      security:    'should',
+      management:  'must'
+    },
+    constraints: {
+      time:        '',
+      budget:      '',
+      skills:      '',
+      compliance:  ''
+    },
+    successCriteria: '',
+    successMeasure:  '',
+    risks: [],
+    designPrinciples: []
+  },
+  decisionLog: [],
+  riskRegister: [],
   troubleshootLearningMode: false,
   tsMethodology: { symptom: '', scope: '', layer: '' },
   troubleshootingMode: false,
@@ -741,6 +765,14 @@ function wireForm() {
     document.getElementById('vsan-network-hint').hidden = !g.vsanEnabled;
     document.getElementById('vsan-arch-field').hidden = !g.vsanEnabled;
     onChange();
+    if (state.architectMode) {
+      const alreadySeen = state._optionsAnalysisSeen || {};
+      if (!alreadySeen.storage) {
+        alreadySeen.storage = true;
+        state._optionsAnalysisSeen = alreadySeen;
+        showOptionsAnalysis('storage');
+      }
+    }
   });
   bindRadio('vsanArch', g, 'vsanArch', () => {
     const esa = g.vsanArch !== 'osa';
@@ -1494,6 +1526,18 @@ function showStep(n) {
     if (n === 1) updateLearnRamContext();
     if (n === 7) updateLearnRamHeadroom();
     if (n === 14) renderScorecard();
+  }
+
+  // In architect mode, show options analysis before certain steps (once per session)
+  if (state.architectMode) {
+    const analysisMap = { 3: 'router', 7: 'clusterSize', 8: 'nsx' };
+    const key = analysisMap[n];
+    const alreadySeen = state._optionsAnalysisSeen || {};
+    if (key && !alreadySeen[key]) {
+      state._optionsAnalysisSeen = alreadySeen;
+      alreadySeen[key] = true;
+      showOptionsAnalysis(key);
+    }
   }
 }
 
@@ -3250,7 +3294,11 @@ function wireGenerate() {
         body: JSON.stringify({
           ...state.answers,
           learningMode: state.learningMode,
-          designRationale: state.designRationale
+          designRationale: state.designRationale,
+          architectMode: state.architectMode,
+          discovery: state.discovery,
+          decisionLog: state.decisionLog,
+          riskRegister: state.riskRegister
         })
       });
       const data = await res.json();
@@ -3422,11 +3470,22 @@ function wireLearningOnboard() {
     });
   });
 
+  // Architect mode toggle
+  document.getElementById('learn-arch-toggle')?.addEventListener('change', e => {
+    state.architectMode = e.target.checked;
+  });
+
   // Start button
   startBtn?.addEventListener('click', () => {
+    applyOnboardingToWizard();
+    state.architectMode = document.getElementById('learn-arch-toggle')?.checked || false;
+    if (state.architectMode) {
+      if (onboard) onboard.hidden = true;
+      showArchDiscovery();
+      return;
+    }
     if (onboard) onboard.hidden = true;
     if (app)     app.hidden     = false;
-    applyOnboardingToWizard();
     showStep(0);
     renderTopology();
   });
@@ -3464,7 +3523,10 @@ function updateOnboardStart() {
   const btn = document.getElementById('learn-onboard-start');
   if (!btn) return;
   const dr = state.designRationale;
-  btn.disabled = !(dr.learningGoal && dr.experienceLevel && dr.timeAvailable);
+  const ready = !!(dr.learningGoal && dr.experienceLevel && dr.timeAvailable);
+  btn.disabled = !ready;
+  const archWrap = document.getElementById('learn-arch-toggle-wrap');
+  if (archWrap) archWrap.hidden = !ready;
 }
 
 function updateOnboardSummary() {
@@ -3541,6 +3603,7 @@ function wireModeSelect() {
     document.body.classList.add('learning-mode');
     if (screen)  screen.hidden  = true;
     if (onboard) onboard.hidden = false;
+    updateOnboardStart();
   });
 }
 
@@ -3752,6 +3815,515 @@ function renderScorecard() {
   }
 }
 
+// =============================================================================
+// Architect Mode
+// =============================================================================
+
+function genId() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+const DESIGN_PRINCIPLES = [
+  { key: 'security-default',    label: 'Security by default',          desc: 'If in doubt, restrict access' },
+  { key: 'automate',            label: 'Automate anything done twice',  desc: 'Manual processes introduce drift' },
+  { key: 'document-decisions',  label: 'Document decisions not outcomes', desc: 'Capture the why, not just the what' },
+  { key: 'design-for-failure',  label: 'Design for the failure you have not thought of yet', desc: 'Resilience by design' },
+  { key: 'keep-simple',         label: 'Keep it as simple as the requirement allows', desc: 'Complexity is a cost' },
+  { key: 'monitorable',         label: 'Every component must be monitorable', desc: 'You cannot fix what you cannot see' },
+  { key: 'change-process',      label: 'Changes go through a process', desc: 'Never ad-hoc in production or production-like labs' },
+  { key: 'design-day2',         label: 'Design for day 2, not just day 1', desc: 'Consider operations, not just deployment' },
+];
+
+const SUGGESTED_RISKS = [
+  { description: 'Physical host runs out of RAM during lab build', likelihood: 'medium', impact: 'high', mitigation: 'Allocate no more than 80% of physical RAM to nested VMs' },
+  { description: 'vSAN loses quorum if a nested host becomes unavailable', likelihood: 'medium', impact: 'high', mitigation: 'Ensure 3+ hosts with witness, avoid single-host vSAN' },
+  { description: 'Build takes longer than expected, lab becomes a blocker', likelihood: 'high', impact: 'medium', mitigation: 'Set a time budget per phase and stop if exceeded' },
+  { description: 'NSX complexity blocks progress on primary learning goal', likelihood: 'medium', impact: 'medium', mitigation: 'Deploy NSX after cluster is healthy; keep NSX config minimal initially' },
+  { description: 'Nested VM performance too slow for meaningful testing', likelihood: 'low', impact: 'high', mitigation: 'Use CPU reservation on nested ESXi hosts; minimise VM density during testing' },
+];
+
+function showArchDiscovery() {
+  const screen = document.getElementById('arch-discovery-screen');
+  if (screen) screen.hidden = false;
+  renderRiskInputs();
+  renderPrinciples();
+  renderSuggestedRisks();
+  wireDiscovery();
+}
+
+let _discoveryWired = false;
+function wireDiscovery() {
+  if (_discoveryWired) return;
+  _discoveryWired = true;
+  const disc = state.discovery;
+
+  // Stakeholder cards
+  document.querySelectorAll('.arch-stakeholder-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.arch-stakeholder-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      disc.stakeholders = card.dataset.stakeholder;
+    });
+  });
+
+  // Problem statement
+  document.getElementById('arch-problem-stmt')?.addEventListener('input', e => {
+    disc.problemStatement = e.target.value;
+  });
+
+  // MoSCoW radios
+  ['networking', 'compute', 'storage', 'security', 'management'].forEach(area => {
+    document.querySelectorAll(`input[name="moscow-${area}"]`).forEach(el => {
+      el.addEventListener('change', () => { if (el.checked) disc.moscow[area] = el.value; });
+    });
+  });
+
+  // Constraints
+  document.getElementById('arch-constraint-time')?.addEventListener('change', e => { disc.constraints.time = e.target.value; });
+  document.getElementById('arch-constraint-budget')?.addEventListener('change', e => { disc.constraints.budget = e.target.value; });
+  document.getElementById('arch-constraint-skills')?.addEventListener('input', e => { disc.constraints.skills = e.target.value; });
+  document.getElementById('arch-constraint-compliance')?.addEventListener('input', e => { disc.constraints.compliance = e.target.value; });
+
+  // Success
+  document.getElementById('arch-success-criteria')?.addEventListener('input', e => { disc.successCriteria = e.target.value; });
+  document.getElementById('arch-success-measure')?.addEventListener('input', e => { disc.successMeasure = e.target.value; });
+
+  // Custom principle add
+  document.getElementById('arch-principle-add-btn')?.addEventListener('click', () => {
+    const input = document.getElementById('arch-principle-custom-input');
+    if (!input) return;
+    const v = input.value.trim();
+    if (!v) return;
+    disc.designPrinciples.push(v);
+    input.value = '';
+    renderCustomPrinciples();
+  });
+
+  // Start
+  document.getElementById('arch-disc-start')?.addEventListener('click', finishDiscovery);
+}
+
+function finishDiscovery() {
+  const screen = document.getElementById('arch-discovery-screen');
+  if (screen) screen.hidden = true;
+
+  // Import discovery risks into riskRegister
+  state.discovery.risks.forEach(r => {
+    if (r && r.description) {
+      state.riskRegister.push({ ...r, source: 'discovery', id: genId() });
+    }
+  });
+
+  const dlPanel = document.getElementById('arch-decision-log-panel');
+  const rrPanel = document.getElementById('arch-risk-register-panel');
+  if (dlPanel) dlPanel.hidden = false;
+  if (rrPanel) rrPanel.hidden = false;
+
+  const app = document.querySelector('.app');
+  if (app) app.hidden = false;
+  showStep(0);
+  renderTopology();
+  renderDecisionLog();
+  renderRiskRegister();
+  wireArchitectWizardSteps();
+}
+
+function renderRiskInputs() {
+  const container = document.getElementById('arch-risk-inputs');
+  if (!container) return;
+  const disc = state.discovery;
+  container.innerHTML = '';
+  for (let n = 0; n < 3; n++) {
+    if (!disc.risks[n]) disc.risks[n] = { description: '', likelihood: '', impact: '', mitigation: '' };
+    const r = disc.risks[n];
+    const row = document.createElement('div');
+    row.className = 'arch-risk-row';
+    row.dataset.riskIdx = n;
+    row.innerHTML = `
+      <div class="arch-risk-num">Risk ${n + 1}</div>
+      <textarea class="arch-risk-desc arch-disc-textarea-sm" rows="2" placeholder="Describe the risk..."></textarea>
+      <div class="arch-risk-meta">
+        <select class="arch-risk-likelihood">
+          <option value="">Likelihood</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+        <select class="arch-risk-impact">
+          <option value="">Impact</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+      <textarea class="arch-risk-mitigation arch-disc-textarea-sm" rows="2" placeholder="How will you mitigate this?"></textarea>`;
+    const descEl = row.querySelector('.arch-risk-desc');
+    const likeEl = row.querySelector('.arch-risk-likelihood');
+    const impEl  = row.querySelector('.arch-risk-impact');
+    const mitEl  = row.querySelector('.arch-risk-mitigation');
+    descEl.value = r.description || '';
+    likeEl.value = r.likelihood || '';
+    impEl.value  = r.impact || '';
+    mitEl.value  = r.mitigation || '';
+    descEl.addEventListener('input', () => { disc.risks[n].description = descEl.value; });
+    likeEl.addEventListener('change', () => { disc.risks[n].likelihood = likeEl.value; });
+    impEl.addEventListener('change',  () => { disc.risks[n].impact = impEl.value; });
+    mitEl.addEventListener('input',   () => { disc.risks[n].mitigation = mitEl.value; });
+    container.appendChild(row);
+  }
+}
+
+function renderPrinciples() {
+  const grid = document.getElementById('arch-principles-grid');
+  if (!grid) return;
+  const disc = state.discovery;
+  grid.innerHTML = '';
+  DESIGN_PRINCIPLES.forEach(p => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'arch-principle-card' + (disc.designPrinciples.includes(p.key) ? ' selected' : '');
+    const title = document.createElement('div');
+    title.className = 'arch-principle-title';
+    title.textContent = p.label;
+    const desc = document.createElement('div');
+    desc.className = 'arch-principle-desc';
+    desc.textContent = p.desc;
+    card.append(title, desc);
+    card.addEventListener('click', () => {
+      const i = disc.designPrinciples.indexOf(p.key);
+      if (i >= 0) disc.designPrinciples.splice(i, 1);
+      else disc.designPrinciples.push(p.key);
+      card.classList.toggle('selected');
+    });
+    grid.appendChild(card);
+  });
+  renderCustomPrinciples();
+}
+
+function renderCustomPrinciples() {
+  const list = document.getElementById('arch-custom-principles-list');
+  if (!list) return;
+  const disc = state.discovery;
+  const known = new Set(DESIGN_PRINCIPLES.map(p => p.key));
+  const custom = disc.designPrinciples.filter(p => !known.has(p));
+  list.innerHTML = '';
+  custom.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'arch-custom-principle-item';
+    const text = document.createElement('span');
+    text.textContent = p;
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'btn-remove';
+    rm.textContent = '×';
+    rm.addEventListener('click', () => {
+      const i = disc.designPrinciples.indexOf(p);
+      if (i >= 0) disc.designPrinciples.splice(i, 1);
+      renderCustomPrinciples();
+    });
+    item.append(text, rm);
+    list.appendChild(item);
+  });
+}
+
+function renderSuggestedRisks() {
+  const container = document.getElementById('arch-risk-chips');
+  if (!container) return;
+  const disc = state.discovery;
+  container.innerHTML = '';
+  SUGGESTED_RISKS.forEach(sr => {
+    // Skip if already present
+    if (disc.risks.some(r => r && r.description === sr.description)) return;
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'arch-risk-chip';
+    chip.textContent = sr.description;
+    chip.addEventListener('click', () => {
+      // Find first empty slot
+      let slot = -1;
+      for (let i = 0; i < 3; i++) {
+        if (!disc.risks[i] || !disc.risks[i].description) { slot = i; break; }
+      }
+      if (slot === -1) return;
+      disc.risks[slot] = { ...sr };
+      renderRiskInputs();
+      renderSuggestedRisks();
+    });
+    container.appendChild(chip);
+  });
+}
+
+// --- Decision log ---
+
+function addDecision(decision, chosen, alternative, rationale) {
+  state.decisionLog.push({
+    id: genId(),
+    decision,
+    chosen,
+    alternative: alternative || '—',
+    rationale: rationale || '',
+    timestamp: new Date().toISOString().slice(0, 10)
+  });
+  renderDecisionLog();
+}
+
+function renderDecisionLog() {
+  const el = document.getElementById('arch-dl-body');
+  const cnt = document.getElementById('arch-dl-count');
+  if (!el) return;
+  if (cnt) cnt.textContent = state.decisionLog.length;
+  el.innerHTML = '';
+  if (!state.decisionLog.length) {
+    el.innerHTML = '<div class="arch-panel-empty">No decisions logged yet.</div>';
+    return;
+  }
+  state.decisionLog.slice().reverse().forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'arch-dl-row';
+    row.innerHTML = `
+      <div class="arch-dl-decision">${escHtml(d.decision)}</div>
+      <div class="arch-dl-chosen">${escHtml(d.chosen)}</div>
+      ${d.rationale ? `<div class="arch-dl-rationale">${escHtml(d.rationale)}</div>` : ''}
+      <div class="arch-dl-meta">${escHtml(d.timestamp)} &middot; vs. ${escHtml(d.alternative)}</div>`;
+    el.appendChild(row);
+  });
+}
+
+// --- Risk register ---
+
+function addAutoRisk(description, likelihood, impact, mitigation) {
+  if (state.riskRegister.some(r => r.description === description)) return;
+  state.riskRegister.push({ id: genId(), description, likelihood, impact, mitigation, source: 'auto' });
+  renderRiskRegister();
+}
+
+function renderRiskRegister() {
+  const el = document.getElementById('arch-rr-body');
+  const cnt = document.getElementById('arch-rr-count');
+  if (!el) return;
+  if (cnt) cnt.textContent = state.riskRegister.length;
+  el.innerHTML = '';
+  if (!state.riskRegister.length) {
+    el.innerHTML = '<div class="arch-panel-empty">No risks recorded yet.</div>';
+    return;
+  }
+  state.riskRegister.forEach(r => {
+    const row = document.createElement('div');
+    row.className = `arch-rr-row arch-rr-${r.likelihood || 'low'}`;
+    row.innerHTML = `
+      <div class="arch-rr-desc">${escHtml(r.description)}</div>
+      <div class="arch-rr-meta">
+        <span class="arch-rr-badge arch-rr-likelihood-${r.likelihood || 'low'}">${escHtml(r.likelihood || 'unknown')} likelihood</span>
+        <span class="arch-rr-badge arch-rr-impact-${r.impact || 'low'}">${escHtml(r.impact || 'unknown')} impact</span>
+        ${r.source === 'auto' ? '<span class="arch-rr-source">auto-detected</span>' : ''}
+      </div>
+      <div class="arch-rr-mitigation">${escHtml(r.mitigation || '—')}</div>`;
+    el.appendChild(row);
+  });
+}
+
+// Collapsible panel headers
+function wireArchPanelToggles() {
+  const dlHeader = document.getElementById('arch-dl-header');
+  const dlBody   = document.getElementById('arch-dl-body');
+  if (dlHeader && dlBody) {
+    dlHeader.addEventListener('click', () => {
+      dlBody.hidden = !dlBody.hidden;
+      dlHeader.classList.toggle('collapsed', dlBody.hidden);
+    });
+  }
+  const rrHeader = document.getElementById('arch-rr-header');
+  const rrBody   = document.getElementById('arch-rr-body');
+  if (rrHeader && rrBody) {
+    rrHeader.addEventListener('click', () => {
+      rrBody.hidden = !rrBody.hidden;
+      rrHeader.classList.toggle('collapsed', rrBody.hidden);
+    });
+  }
+}
+
+// --- Auto risk detection on wizard answers ---
+
+function wireArchitectWizardSteps() {
+  if (!state.architectMode) return;
+
+  document.getElementById('nestedHostCount')?.addEventListener('change', detectDesignRisks);
+  document.getElementById('vramPerHostGB')?.addEventListener('input', detectDesignRisks);
+  document.getElementById('nsxEnabled')?.addEventListener('change', detectDesignRisks);
+  document.getElementById('mgmtVlan')?.addEventListener('input', detectDesignRisks);
+  document.getElementById('vsanEnabled')?.addEventListener('change', detectDesignRisks);
+}
+
+function detectDesignRisks() {
+  if (!state.architectMode) return;
+  const g = state.answers.design;
+  const h = state.answers.hardware;
+
+  const hosts = Number(g.nestedHostCount) || 0;
+  const physRam = Number(h.ramGB) || 0;
+  const perHost = Number(g.vramPerHostGB) || 0;
+  const used = hosts * perHost + 21 + (g.nsxEnabled ? 48 : 0);
+
+  if (hosts === 1) {
+    addAutoRisk(
+      'Single nested host is a single point of failure — no HA possible',
+      'high', 'high',
+      'Accept as lab constraint or add a second host'
+    );
+  }
+
+  if (physRam > 0 && used > physRam * 0.85) {
+    addAutoRisk(
+      'Memory overcommitment — design uses more than 85% of physical RAM',
+      'high', 'high',
+      'Reduce host count or per-host RAM, or upgrade physical host'
+    );
+  }
+
+  if (g.vsanEnabled && hosts < 3) {
+    addAutoRisk(
+      'vSAN requires a minimum of 3 hosts — current cluster size will not form a cluster',
+      'high', 'high',
+      'Increase nested host count to at least 3 before enabling vSAN'
+    );
+  }
+
+  if (g.nsxEnabled && g.vyosEnabled && g.vyosNetworkMode !== 'bgp') {
+    addAutoRisk(
+      'NSX deployed without BGP peering — static routing limits topology flexibility',
+      'low', 'medium',
+      'Configure BGP on VyOS and NSX T0 to practise dynamic routing'
+    );
+  }
+
+  if (!g.mgmtVlan || g.mgmtVlan === '' || g.mgmtVlan === '0') {
+    addAutoRisk(
+      'Management traffic on untagged VLAN — no L2 segmentation for control plane',
+      'low', 'medium',
+      'Assign a dedicated VLAN ID for management traffic'
+    );
+  }
+}
+
+// --- Options analysis ---
+
+const OPTIONS_ANALYSIS = {
+  router: {
+    title: 'Virtual router decision',
+    context: 'Your router choice sets the foundation for all lab networking. This decision affects BGP capability, NSX peering, and how much networking complexity you take on.',
+    options: [
+      { label: 'VyOS with BGP', approach: 'VyOS VM with BGP peering to NSX T0', pros: ['Mirrors enterprise routing', 'Enables BGP peering practice', 'Required for advanced NSX study'], cons: ['More complex to configure', 'Requires understanding of BGP concepts'], risk: 'Misconfiguration can block all lab traffic', bestFor: 'Certification study (VCP-NV, VCAP-NV, VCF)' },
+      { label: 'VyOS basic NAT', approach: 'VyOS VM with NAT only, no dynamic routing', pros: ['Simpler to configure', 'Still provides NAT and DHCP', 'Good for vSphere-only labs'], cons: ['No BGP practice', 'Cannot peer with NSX T0 dynamically'], risk: 'Limits NSX routing capabilities', bestFor: 'vSphere basics study (VCP-DCV)' },
+      { label: 'No router', approach: 'No virtual router — direct physical network access', pros: ['Simplest setup', 'No router configuration'], cons: ['No network segmentation practice', 'No NAT for nested hosts'], risk: 'All nested VMs on flat network', bestFor: 'Minimal vSphere basics only' },
+    ],
+    decisionKey: 'Virtual router'
+  },
+  storage: {
+    title: 'Storage architecture decision',
+    context: 'Storage choice determines what you can practice and how resilient the lab is. vSAN requires 3+ hosts and significant RAM.',
+    options: [
+      { label: 'vSAN', approach: 'Software-defined storage across all nested hosts', pros: ['Practise vSAN configuration', 'Required for VCF/VCAP study', 'Mirrors enterprise deployments'], cons: ['Requires 3+ hosts', 'High RAM overhead', 'Complex to troubleshoot'], risk: 'vSAN health issues can take down the whole cluster', bestFor: 'VCP-DCV, VCF, enterprise simulation' },
+      { label: 'Local datastores', approach: 'Each nested host uses its own local disk', pros: ['Simple to configure', 'Lower resource overhead', 'Works on single host'], cons: ['No vMotion across hosts', 'No shared storage features'], risk: 'VMs pinned to one host', bestFor: 'Basic vSphere study, resource-constrained hardware' },
+    ],
+    decisionKey: 'Storage architecture'
+  },
+  nsx: {
+    title: 'NSX deployment decision',
+    context: 'NSX adds powerful networking capabilities but also significant resource overhead and complexity. Be clear on why you need it before committing.',
+    options: [
+      { label: 'Deploy NSX', approach: 'NSX Manager + T0/T1 gateway topology', pros: ['Micro-segmentation with DFW', 'T0/T1 routing practice', 'Required for VCP-NV/VCAP-NV/VCF'], cons: ['48GB+ RAM for NSX Manager', 'Significantly more complex', 'Deployment takes hours'], risk: 'NSX misconfiguration can break all VM networking', bestFor: 'VCP-NV, VCAP-NV, VCF, customer NSX environments' },
+      { label: 'No NSX', approach: 'Standard vSphere networking only (VDS port groups)', pros: ['Much simpler', 'Lower resource requirements', 'Faster to build'], cons: ['No micro-segmentation', 'No overlay networking practice', 'Cannot study NSX features'], risk: 'Lab does not reflect modern enterprise networking', bestFor: 'VCP-DCV, basic vSphere, resource-constrained hardware' },
+    ],
+    decisionKey: 'NSX deployment'
+  },
+  clusterSize: {
+    title: 'Cluster size decision',
+    context: 'Cluster size is the single biggest factor in lab capability and resource consumption. Balance what you need to learn against what your hardware can support.',
+    options: [
+      { label: '3 hosts', approach: '3 nested ESXi hosts with vSAN and full HA', pros: ['Full HA/DRS capability', 'vSAN minimum requirement met', 'Mirrors enterprise minimum'], cons: ['Highest resource consumption', 'Requires 192GB+ physical RAM with NSX'], risk: 'May hit physical RAM ceiling', bestFor: 'VCP-DCV with vSAN, VCF, production-like simulation' },
+      { label: '2 hosts', approach: '2 nested ESXi hosts, no vSAN', pros: ['Basic vMotion practice', 'Lower resource than 3 hosts', 'HA configured (limited)'], cons: ['No vSAN possible', 'HA cannot tolerate host failure safely'], risk: 'HA admission control issues with only 2 hosts', bestFor: 'Basic vMotion study, resource-constrained hardware' },
+      { label: '1 host', approach: 'Single nested ESXi host', pros: ['Lowest resource consumption', 'Fast to build', 'Good for vCenter-only study'], cons: ['No HA, no vMotion, no vSAN', 'No cluster features at all'], risk: 'Single point of failure — any issue takes down all nested VMs', bestFor: 'Minimal footprint, basic vSphere administration' },
+    ],
+    decisionKey: 'Cluster size'
+  }
+};
+
+function showOptionsAnalysis(key, onComplete) {
+  const config = OPTIONS_ANALYSIS[key];
+  if (!config || !state.architectMode) { if (onComplete) onComplete(); return; }
+
+  const panel = document.getElementById('arch-options-panel');
+  const title = document.getElementById('arch-options-title');
+  const context = document.getElementById('arch-options-context');
+  const table = document.getElementById('arch-options-table');
+  const rationale = document.getElementById('arch-options-rationale');
+  const confirm = document.getElementById('arch-options-confirm');
+  const skip = document.getElementById('arch-options-skip');
+  if (!panel) { if (onComplete) onComplete(); return; }
+
+  if (title) title.textContent = config.title;
+  if (context) context.textContent = config.context;
+  if (rationale) rationale.value = '';
+
+  if (table) {
+    table.innerHTML = '';
+    const opts = config.options;
+    const hdr = document.createElement('div');
+    hdr.className = 'arch-opt-row arch-opt-header';
+    hdr.innerHTML = `<span class="arch-opt-cell arch-opt-label-cell"></span>` +
+      opts.map((o, i) => `<button type="button" class="arch-opt-cell arch-opt-header-btn" data-opt-idx="${i}">${escHtml(o.label)}</button>`).join('');
+    table.appendChild(hdr);
+
+    const rows = [
+      { key: 'approach', label: 'Approach' },
+      { key: 'pros',     label: 'Pros',    isList: true },
+      { key: 'cons',     label: 'Cons',    isList: true },
+      { key: 'risk',     label: 'Main risk' },
+      { key: 'bestFor',  label: 'Best for' },
+    ];
+    rows.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'arch-opt-row';
+      row.innerHTML = `<span class="arch-opt-cell arch-opt-label-cell">${r.label}</span>` +
+        opts.map(o => {
+          const value = o[r.key];
+          const content = r.isList && Array.isArray(value)
+            ? value.map(v => `<div class="arch-opt-list-item">${escHtml(v)}</div>`).join('')
+            : escHtml(value || '—');
+          return `<div class="arch-opt-cell">${content}</div>`;
+        }).join('');
+      table.appendChild(row);
+    });
+
+    table.querySelectorAll('.arch-opt-header-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        table.querySelectorAll('.arch-opt-header-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        panel.dataset.selectedOpt = btn.dataset.optIdx;
+      });
+    });
+  }
+
+  panel.hidden = false;
+
+  const close = (logIt) => {
+    if (logIt && panel.dataset.selectedOpt !== undefined) {
+      const idx = Number(panel.dataset.selectedOpt);
+      const chosen = config.options[idx];
+      const others = config.options.filter((_, i) => i !== idx).map(o => o.label).join(' / ');
+      if (chosen) {
+        addDecision(config.decisionKey, chosen.label, others, rationale?.value || '');
+      }
+    }
+    panel.hidden = true;
+    delete panel.dataset.selectedOpt;
+    if (onComplete) onComplete();
+  };
+
+  if (confirm) confirm.onclick = () => close(true);
+  if (skip)    skip.onclick    = () => close(false);
+}
+
 // --- Init ---
 
 wireForm();
@@ -3761,4 +4333,5 @@ wireInlineValidation();
 wireModeSelect();
 wireLearningOnboard();
 wireLearningInputs();
+wireArchPanelToggles();
 renderTopology();

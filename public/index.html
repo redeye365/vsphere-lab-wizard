@@ -149,6 +149,16 @@
         <div id="learn-path-text" class="learn-path-text"></div>
       </div>
 
+      <div id="learn-arch-toggle-wrap" class="learn-arch-toggle-wrap" hidden>
+        <label class="learn-arch-toggle-label">
+          <input type="checkbox" id="learn-arch-toggle" class="learn-arch-checkbox">
+          <div class="learn-arch-toggle-content">
+            <div class="learn-arch-toggle-title">Enable Architect Thinking</div>
+            <div class="learn-arch-toggle-desc">Adds a consultant discovery session, requirements prioritisation (MoSCoW), options analysis at every major decision, a running decision log, and a risk register. Produces a design document you could hand to a customer. Recommended for VCAP Design or VCF architect certification study. Adds ~45 minutes.</div>
+          </div>
+        </label>
+      </div>
+
       <div class="learn-ob-actions">
         <button type="button" id="learn-onboard-start" class="btn btn-primary learn-ob-start" disabled>
           Start learning &rarr;
@@ -159,7 +169,205 @@
   </div>
 </div>
 
+<div id="arch-discovery-screen" class="arch-discovery-screen" hidden>
+  <div class="arch-disc-scroll">
+    <div class="arch-disc-inner">
+
+      <div class="arch-disc-hdr">
+        <div class="arch-disc-eyebrow">Architect Mode &middot; Discovery</div>
+        <h1 class="arch-disc-title">Before we touch any technology</h1>
+        <p class="arch-disc-sub">You are the consultant. A good architect understands the requirement before recommending a solution. Work through this discovery session first.</p>
+      </div>
+
+      <!-- Section 1: Stakeholders -->
+      <div class="arch-disc-section">
+        <div class="arch-disc-section-label">Who are the people affected by this design?</div>
+        <div class="arch-stakeholder-grid">
+          <button type="button" class="arch-stakeholder-card" data-stakeholder="solo">
+            <span class="arch-sh-title">Just me</span>
+            <span class="arch-sh-desc">Personal lab, no other users</span>
+          </button>
+          <button type="button" class="arch-stakeholder-card" data-stakeholder="colleagues">
+            <span class="arch-sh-title">Me and colleagues</span>
+            <span class="arch-sh-desc">Team lab or shared environment</span>
+          </button>
+          <button type="button" class="arch-stakeholder-card" data-stakeholder="trainer">
+            <span class="arch-sh-title">I am training others</span>
+            <span class="arch-sh-desc">Students or trainees will use this lab</span>
+          </button>
+          <button type="button" class="arch-stakeholder-card" data-stakeholder="customer">
+            <span class="arch-sh-title">Customer environment</span>
+            <span class="arch-sh-desc">Mirroring a real customer deployment</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Section 2: Problem statement -->
+      <div class="arch-disc-section">
+        <label for="arch-problem-stmt" class="arch-disc-section-label">In one sentence, what problem does this lab solve?</label>
+        <textarea id="arch-problem-stmt" class="arch-disc-textarea" rows="2"
+          placeholder="e.g. We need a reproducible environment to validate NSX DFW policies before applying them to production."></textarea>
+      </div>
+
+      <!-- Section 3: MoSCoW requirements -->
+      <div class="arch-disc-section">
+        <div class="arch-disc-section-label">MoSCoW requirements</div>
+        <p class="arch-disc-hint">For each technical area, assign a priority. Be honest &mdash; especially about Won't Have.</p>
+        <div class="arch-moscow-table">
+          <div class="arch-moscow-header">
+            <span></span>
+            <span class="arch-moscow-col must">Must Have</span>
+            <span class="arch-moscow-col should">Should Have</span>
+            <span class="arch-moscow-col could">Could Have</span>
+            <span class="arch-moscow-col wont">Won't Have</span>
+          </div>
+          <div class="arch-moscow-row" data-area="networking">
+            <span class="arch-moscow-area">Networking (VLANs, router, segmentation)</span>
+            <label class="arch-moscow-cell must"><input type="radio" name="moscow-networking" value="must"><span></span></label>
+            <label class="arch-moscow-cell should"><input type="radio" name="moscow-networking" value="should"><span></span></label>
+            <label class="arch-moscow-cell could"><input type="radio" name="moscow-networking" value="could"><span></span></label>
+            <label class="arch-moscow-cell wont"><input type="radio" name="moscow-networking" value="wont"><span></span></label>
+          </div>
+          <div class="arch-moscow-row" data-area="compute">
+            <span class="arch-moscow-area">Compute (nested ESXi, cluster sizing)</span>
+            <label class="arch-moscow-cell must"><input type="radio" name="moscow-compute" value="must" checked><span></span></label>
+            <label class="arch-moscow-cell should"><input type="radio" name="moscow-compute" value="should"><span></span></label>
+            <label class="arch-moscow-cell could"><input type="radio" name="moscow-compute" value="could"><span></span></label>
+            <label class="arch-moscow-cell wont"><input type="radio" name="moscow-compute" value="wont"><span></span></label>
+          </div>
+          <div class="arch-moscow-row" data-area="storage">
+            <span class="arch-moscow-area">Storage (vSAN, local datastores)</span>
+            <label class="arch-moscow-cell must"><input type="radio" name="moscow-storage" value="must"><span></span></label>
+            <label class="arch-moscow-cell should"><input type="radio" name="moscow-storage" value="should" checked><span></span></label>
+            <label class="arch-moscow-cell could"><input type="radio" name="moscow-storage" value="could"><span></span></label>
+            <label class="arch-moscow-cell wont"><input type="radio" name="moscow-storage" value="wont"><span></span></label>
+          </div>
+          <div class="arch-moscow-row" data-area="security">
+            <span class="arch-moscow-area">Security (NSX DFW, micro-segmentation)</span>
+            <label class="arch-moscow-cell must"><input type="radio" name="moscow-security" value="must"><span></span></label>
+            <label class="arch-moscow-cell should"><input type="radio" name="moscow-security" value="should" checked><span></span></label>
+            <label class="arch-moscow-cell could"><input type="radio" name="moscow-security" value="could"><span></span></label>
+            <label class="arch-moscow-cell wont"><input type="radio" name="moscow-security" value="wont"><span></span></label>
+          </div>
+          <div class="arch-moscow-row" data-area="management">
+            <span class="arch-moscow-area">Management (vCenter, SDDC Manager, monitoring)</span>
+            <label class="arch-moscow-cell must"><input type="radio" name="moscow-management" value="must" checked><span></span></label>
+            <label class="arch-moscow-cell should"><input type="radio" name="moscow-management" value="should"><span></span></label>
+            <label class="arch-moscow-cell could"><input type="radio" name="moscow-management" value="could"><span></span></label>
+            <label class="arch-moscow-cell wont"><input type="radio" name="moscow-management" value="wont"><span></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 4: Constraints -->
+      <div class="arch-disc-section">
+        <div class="arch-disc-section-label">What are you working within?</div>
+        <div class="arch-constraints-grid">
+          <div class="arch-constraint-field">
+            <label class="arch-disc-sublabel" for="arch-constraint-time">Time to build</label>
+            <select id="arch-constraint-time" class="arch-disc-select">
+              <option value="">Select&hellip;</option>
+              <option value="weekend">A weekend</option>
+              <option value="one-week">One week</option>
+              <option value="one-month">One month</option>
+              <option value="ongoing">Ongoing / no deadline</option>
+            </select>
+          </div>
+          <div class="arch-constraint-field">
+            <label class="arch-disc-sublabel" for="arch-constraint-budget">Budget</label>
+            <select id="arch-constraint-budget" class="arch-disc-select">
+              <option value="">Select&hellip;</option>
+              <option value="homelab">Home lab &mdash; no additional spend</option>
+              <option value="small">Small budget (up to &pound;500)</option>
+              <option value="project">Project budget &mdash; needs discussion</option>
+            </select>
+          </div>
+          <div class="arch-constraint-field">
+            <label class="arch-disc-sublabel" for="arch-constraint-skills">Skills &mdash; what do you already know well?</label>
+            <textarea id="arch-constraint-skills" class="arch-disc-textarea arch-disc-textarea-sm" rows="2"
+              placeholder="e.g. Strong on vSphere, learning NSX, no VCF experience yet"></textarea>
+          </div>
+          <div class="arch-constraint-field">
+            <label class="arch-disc-sublabel" for="arch-constraint-compliance">Compliance requirements (if any)</label>
+            <textarea id="arch-constraint-compliance" class="arch-disc-textarea arch-disc-textarea-sm" rows="2"
+              placeholder="e.g. Data must not leave the UK, audit logging required, encryption at rest needed"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 5: Success criteria -->
+      <div class="arch-disc-section">
+        <div class="arch-disc-section-label">Success criteria</div>
+        <div class="arch-success-fields">
+          <div>
+            <label for="arch-success-criteria" class="arch-disc-sublabel">What does success look like in 3 months?</label>
+            <textarea id="arch-success-criteria" class="arch-disc-textarea" rows="2"
+              placeholder="e.g. I can confidently configure NSX DFW policies, demonstrate HA failover, and explain every design decision."></textarea>
+          </div>
+          <div>
+            <label for="arch-success-measure" class="arch-disc-sublabel">How will you know this lab has achieved its purpose?</label>
+            <textarea id="arch-success-measure" class="arch-disc-textarea" rows="2"
+              placeholder="e.g. I pass the VCP-NV exam, or I can run through the customer scenario without referring to notes."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 6: Initial risks -->
+      <div class="arch-disc-section">
+        <div class="arch-disc-section-label">What are your top 3 risks before starting?</div>
+        <p class="arch-disc-hint">Identifying risks before you start is what separates an architect from a technician. We will add to this register automatically as you make design decisions.</p>
+        <div id="arch-risk-inputs" class="arch-risk-inputs"></div>
+        <div id="arch-suggested-risks" class="arch-suggested-risks">
+          <div class="arch-suggested-label">Suggested risks &mdash; click to add:</div>
+          <div id="arch-risk-chips" class="arch-risk-chips"></div>
+        </div>
+      </div>
+
+      <!-- Section 7: Design principles -->
+      <div class="arch-disc-section">
+        <div class="arch-disc-section-label">Design principles</div>
+        <p class="arch-disc-hint">Agree on the principles that will guide every decision before we start designing. These will be referenced throughout.</p>
+        <div class="arch-principles-grid" id="arch-principles-grid"></div>
+        <div class="arch-principle-custom">
+          <label for="arch-principle-custom-input" class="arch-disc-sublabel">Add your own principle</label>
+          <input type="text" id="arch-principle-custom-input" class="arch-disc-input"
+            placeholder="e.g. Every change must be reversible within 15 minutes">
+          <button type="button" id="arch-principle-add-btn" class="btn btn-secondary arch-principle-add">Add</button>
+        </div>
+        <div id="arch-custom-principles-list" class="arch-custom-principles-list"></div>
+      </div>
+
+      <div class="arch-disc-actions">
+        <button type="button" id="arch-disc-start" class="btn btn-primary arch-disc-start">
+          Begin design &rarr;
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <div class="app" hidden>
+
+  <div id="arch-options-panel" class="arch-options-overlay" hidden>
+    <div class="arch-options-inner">
+      <div class="arch-options-hdr">
+        <div class="arch-options-eyebrow">Architect Mode &middot; Options Analysis</div>
+        <h2 id="arch-options-title" class="arch-options-title"></h2>
+        <p id="arch-options-context" class="arch-options-context"></p>
+      </div>
+      <div id="arch-options-table" class="arch-options-table"></div>
+      <div class="arch-options-rationale-wrap">
+        <label for="arch-options-rationale" class="arch-options-rationale-label">Why are you choosing this option?</label>
+        <textarea id="arch-options-rationale" class="arch-options-rationale-ta" rows="2"
+          placeholder="Explain your reasoning — this goes into your decision log."></textarea>
+      </div>
+      <div class="arch-options-actions">
+        <button type="button" id="arch-options-confirm" class="btn btn-primary">Confirm decision &rarr;</button>
+        <button type="button" id="arch-options-skip" class="btn btn-ghost">Skip for now</button>
+      </div>
+    </div>
+  </div>
 
   <aside class="rail">
     <div class="rail-brand">
@@ -186,6 +394,25 @@
     </ol>
     <div class="rail-footer">
       <a href="/diagram" target="_blank" rel="noopener" class="rail-diagram-btn" id="rail-diagram-btn">&#x1F5A7; View Diagram</a>
+    </div>
+
+    <!-- Architect mode panels — hidden in non-architect mode -->
+    <div id="arch-decision-log-panel" class="arch-sidebar-panel" hidden>
+      <div class="arch-panel-header" id="arch-dl-header">
+        <span class="arch-panel-title">Decision Log</span>
+        <span class="arch-panel-count" id="arch-dl-count">0</span>
+        <span class="arch-panel-toggle">&#9660;</span>
+      </div>
+      <div id="arch-dl-body" class="arch-panel-body"></div>
+    </div>
+
+    <div id="arch-risk-register-panel" class="arch-sidebar-panel" hidden>
+      <div class="arch-panel-header" id="arch-rr-header">
+        <span class="arch-panel-title">Risk Register</span>
+        <span class="arch-panel-count" id="arch-rr-count">0</span>
+        <span class="arch-panel-toggle">&#9660;</span>
+      </div>
+      <div id="arch-rr-body" class="arch-panel-body arch-rr-body"></div>
     </div>
   </aside>
 
