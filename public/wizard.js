@@ -123,7 +123,14 @@ const state = {
   modeSelected: false,
   learningMode: false,
   designRationale: {
-    useCase: '',
+    // Onboarding fields (captured before wizard starts)
+    learningGoal: '',        // certification | technology | customer | homelab | role
+    certTarget: '',          // VCP-DCV | VCP-NV | VCAP-DCV | VCAP-NV | VCF
+    techFocus: '',           // vsphere | vsan | nsx | vcf
+    experienceLevel: '',     // new | some | experienced
+    successStatement: '',    // free text — opening statement of design rationale
+    timeAvailable: '',       // wizard-only | wizard-build | full-day
+    // Per-step rationale fields (captured as the wizard progresses)
     routerChoice: '',
     networkSecurity: '',
     availabilityRequirement: '',
@@ -3340,32 +3347,210 @@ document.addEventListener('keydown', (e) => {
 // Learning mode
 // =============================================================================
 
-// Wires the opening mode selector. Until a mode is chosen the .app is hidden
-// and only #mode-select-screen is shown.
+// =============================================================================
+// Learning mode onboarding
+// =============================================================================
+
+const CERT_AREAS = {
+  'VCP-DCV':  ['ESXi deployment', 'vCenter and cluster management', 'vSAN configuration', 'HA and DRS'],
+  'VCP-NV':   ['NSX Manager deployment', 'T0/T1 gateway topology', 'DFW micro-segmentation', 'BGP peering'],
+  'VCAP-DCV': ['advanced vSphere configuration', 'storage policy design', 'performance tuning', 'cluster architecture'],
+  'VCAP-NV':  ['advanced NSX routing', 'BGP prefix filtering', 'advanced DFW design', 'NSX troubleshooting'],
+  'VCF':      ['VCF bring-up and SDDC Manager', 'management domain design', 'NSX in VCF context', 'workload domain provisioning'],
+};
+
+const TECH_FOCUS_AREAS = {
+  vsphere: 'vSphere cluster design, vCenter architecture, vSAN fundamentals, and HA/DRS configuration',
+  vsan:    'vSAN cluster sizing, ESA vs OSA architecture, disk group design, and storage policies',
+  nsx:     'NSX Manager deployment, T0/T1 gateway design, DFW rule creation, and BGP peering with VyOS',
+  vcf:     'VCF bring-up requirements, SDDC Manager, management domain design, and the NSX integration',
+};
+
+function wireLearningOnboard() {
+  const onboard  = document.getElementById('learn-onboard-screen');
+  const app      = document.querySelector('.app');
+  const startBtn = document.getElementById('learn-onboard-start');
+  const dr       = state.designRationale;
+
+  // Goal cards
+  document.querySelectorAll('.learn-goal-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.learn-goal-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      dr.learningGoal = card.dataset.goal;
+      document.getElementById('learn-cert-wrap').hidden = (dr.learningGoal !== 'certification');
+      document.getElementById('learn-tech-wrap').hidden = (dr.learningGoal !== 'technology');
+      updateOnboardSummary();
+      updateOnboardStart();
+    });
+  });
+
+  // Cert / tech dropdowns
+  document.getElementById('learn-cert-target')?.addEventListener('change', e => {
+    dr.certTarget = e.target.value;
+    updateOnboardSummary();
+  });
+  document.getElementById('learn-tech-focus')?.addEventListener('change', e => {
+    dr.techFocus = e.target.value;
+    updateOnboardSummary();
+  });
+
+  // Experience cards
+  document.querySelectorAll('.learn-exp-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.learn-exp-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      dr.experienceLevel = card.dataset.exp;
+      updateOnboardSummary();
+      updateOnboardStart();
+    });
+  });
+
+  // Success statement
+  document.getElementById('learn-success-stmt')?.addEventListener('input', e => {
+    dr.successStatement = e.target.value;
+  });
+
+  // Time cards
+  document.querySelectorAll('.learn-time-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.learn-time-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      dr.timeAvailable = card.dataset.time;
+      updateOnboardSummary();
+      updateOnboardStart();
+    });
+  });
+
+  // Start button
+  startBtn?.addEventListener('click', () => {
+    if (onboard) onboard.hidden = true;
+    if (app)     app.hidden     = false;
+    applyOnboardingToWizard();
+    showStep(0);
+    renderTopology();
+  });
+}
+
+// Pre-fills wizard state from onboarding answers so the user doesn't repeat themselves.
+function applyOnboardingToWizard() {
+  const dr = state.designRationale;
+  const goalToUseCase = {
+    certification: 'certification',
+    technology:    'feature_testing',
+    customer:      'customer_demo',
+    homelab:       'homelab',
+    role:          'feature_testing',
+  };
+  const uc = goalToUseCase[dr.learningGoal];
+  if (uc) {
+    const radio = document.querySelector(`[name="useCase"][value="${uc}"]`);
+    if (radio) {
+      radio.checked = true;
+      state.answers.discovery = state.answers.discovery || {};
+      state.answers.discovery.useCase = uc;
+    }
+  }
+  // NSX is strongly implied by cert/tech focus — pre-tick it as a hint (user can untick)
+  if (dr.certTarget === 'VCP-NV' || dr.certTarget === 'VCAP-NV' ||
+      dr.techFocus === 'nsx' || dr.techFocus === 'vcf' ||
+      dr.certTarget === 'VCF') {
+    const nsxCheck = document.getElementById('nsxEnabled');
+    if (nsxCheck && !nsxCheck.checked) nsxCheck.checked = true;
+  }
+}
+
+function updateOnboardStart() {
+  const btn = document.getElementById('learn-onboard-start');
+  if (!btn) return;
+  const dr = state.designRationale;
+  btn.disabled = !(dr.learningGoal && dr.experienceLevel && dr.timeAvailable);
+}
+
+function updateOnboardSummary() {
+  const summaryEl = document.getElementById('learn-path-summary');
+  const textEl    = document.getElementById('learn-path-text');
+  if (!summaryEl || !textEl) return;
+  const dr = state.designRationale;
+
+  if (!dr.learningGoal && !dr.experienceLevel) { summaryEl.hidden = true; return; }
+
+  const parts = [];
+
+  // Focus sentence
+  if (dr.learningGoal === 'certification') {
+    const cert  = dr.certTarget;
+    const areas = cert && CERT_AREAS[cert]
+      ? CERT_AREAS[cert]
+      : ['vSphere cluster design', 'vCenter deployment', 'storage and networking fundamentals'];
+    const label = cert || 'your certification';
+    parts.push(`Based on your goal, we will focus on <strong>${areas.join(', ')}</strong> — the core areas ${label} tests.`);
+  } else if (dr.learningGoal === 'technology') {
+    const tech = dr.techFocus;
+    const desc = tech ? TECH_FOCUS_AREAS[tech] : 'the key design decisions for your chosen technology';
+    parts.push(`We will deep-dive on <strong>${desc}</strong>.`);
+  } else if (dr.learningGoal === 'customer') {
+    parts.push('We will emphasise <strong>design rationale documentation</strong> — translating business requirements into architecture decisions, the same way you would in a customer engagement.');
+  } else if (dr.learningGoal === 'homelab') {
+    parts.push('We will keep the design <strong>practical and focused</strong> on what gives you the most learning value for your hardware.');
+  } else if (dr.learningGoal === 'role') {
+    parts.push('We will build a <strong>rounded lab</strong> covering the breadth of VMware infrastructure skills used in infrastructure and cloud roles.');
+  }
+
+  // Experience calibration
+  if (dr.experienceLevel === 'new') {
+    parts.push('Guidance will explain <em>why</em> each decision matters — not just what to select.');
+  } else if (dr.experienceLevel === 'some') {
+    parts.push('Guidance will connect decisions to real-world implications and common mistakes.');
+  } else if (dr.experienceLevel === 'experienced') {
+    parts.push('Guidance will focus on the nuances and trade-offs, assuming you already know the basics.');
+  }
+
+  // Time
+  const timeText = {
+    'wizard-only':  'Estimated time: <strong>~30 minutes</strong> for the design wizard and script generation.',
+    'wizard-build': 'Estimated time: <strong>~4 hours</strong> — design wizard, then guided build of your lab.',
+    'full-day':     'Estimated time: <strong>a full day+</strong> — design, build, and troubleshooting practice with pre-built fault scenarios.',
+  };
+  if (dr.timeAvailable) parts.push(timeText[dr.timeAvailable] || '');
+
+  if (!parts.length) { summaryEl.hidden = true; return; }
+  textEl.innerHTML = parts.map(p => `<p>${p}</p>`).join('');
+  summaryEl.hidden = false;
+}
+
+// Wires the opening mode selector. Standard mode goes straight to the wizard.
+// Learning mode goes to the onboarding screen first.
 function wireModeSelect() {
-  const screen = document.getElementById('mode-select-screen');
-  const app    = document.querySelector('.app');
-  const enter  = (learning) => {
+  const screen  = document.getElementById('mode-select-screen');
+  const onboard = document.getElementById('learn-onboard-screen');
+  const app     = document.querySelector('.app');
+
+  document.getElementById('mode-build')?.addEventListener('click', () => {
     state.modeSelected = true;
-    state.learningMode = learning;
-    if (learning) document.body.classList.add('learning-mode');
+    state.learningMode = false;
     if (screen) screen.hidden = true;
     if (app)    app.hidden    = false;
     showStep(0);
     renderTopology();
-  };
-  document.getElementById('mode-build')?.addEventListener('click', () => enter(false));
-  document.getElementById('mode-learn')?.addEventListener('click', () => enter(true));
+  });
+
+  document.getElementById('mode-learn')?.addEventListener('click', () => {
+    state.modeSelected = true;
+    state.learningMode = true;
+    document.body.classList.add('learning-mode');
+    if (screen)  screen.hidden  = true;
+    if (onboard) onboard.hidden = false;
+  });
 }
 
-// Captures the free-text / select rationale fields into state.designRationale.
+// Captures the per-step rationale fields into state.designRationale.
 function wireLearningInputs() {
   const dr = state.designRationale;
   const bind = (id, key) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', () => { dr[key] = el.value; });
   };
-  bind('learn-use-case-text', 'useCase');
   bind('learn-router-choice', 'routerChoice');
   bind('learn-network-security', 'networkSecurity');
   bind('learn-nsx-rationale', 'nsxRationale');
@@ -3574,5 +3759,6 @@ wireNav();
 wireGenerate();
 wireInlineValidation();
 wireModeSelect();
+wireLearningOnboard();
 wireLearningInputs();
 renderTopology();

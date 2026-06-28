@@ -51,21 +51,76 @@ const { chromium } = require('playwright');
   await check('body has .learning-mode class', async () => {
     return await page.evaluate(() => document.body.classList.contains('learning-mode'));
   });
-  await check('Learn block visible on step 0', async () => {
-    const el = await page.$('.learn-block[data-learn-step="0"]');
-    return el && await el.evaluate(e => e.style.display !== 'none');
+  await check('Onboarding screen visible after choosing Learn', async () => {
+    return await page.evaluate(() => !document.getElementById('learn-onboard-screen').hidden);
   });
-  await check('Use-case textarea present on step 0', async () => page.isVisible('#learn-use-case-text'));
+  await check('.app still hidden during onboarding', async () => {
+    return await page.evaluate(() => document.querySelector('.app').hidden);
+  });
 
-  // Fill in rationale field
-  await page.fill('#learn-use-case-text', 'Studying for VCP-DCV — need hands-on vSAN and HA practice');
-  await check('Rationale text captured in state', async () => {
-    return await page.evaluate(() => window.state?.designRationale?.useCase?.includes('VCP-DCV'));
+  console.log('\n── Onboarding screen ──');
+  await check('5 goal cards present', async () => {
+    const cards = await page.$$('.learn-goal-card'); return cards.length === 5;
+  });
+  await check('3 experience cards present', async () => {
+    const cards = await page.$$('.learn-exp-card'); return cards.length === 3;
+  });
+  await check('3 time cards present', async () => {
+    const cards = await page.$$('.learn-time-card'); return cards.length === 3;
+  });
+  await check('Start button disabled before selections', async () => {
+    return await page.$eval('#learn-onboard-start', e => e.disabled);
+  });
+  await check('Learning path summary hidden before selections', async () => {
+    return await page.evaluate(() => document.getElementById('learn-path-summary').hidden);
+  });
+
+  // Select certification goal — cert dropdown should appear
+  await page.evaluate(() => document.querySelector('.learn-goal-card[data-goal="certification"]').click());
+  await check('Cert dropdown shown after certification goal', async () => {
+    return await page.evaluate(() => !document.getElementById('learn-cert-wrap').hidden);
+  });
+  await check('Tech dropdown hidden for certification goal', async () => {
+    return await page.evaluate(() => document.getElementById('learn-tech-wrap').hidden);
+  });
+  await page.selectOption('#learn-cert-target', 'VCP-NV');
+
+  // Select experience
+  await page.evaluate(() => document.querySelector('.learn-exp-card[data-exp="some"]').click());
+
+  // Fill success statement
+  await page.fill('#learn-success-stmt', 'Practise NSX DFW and T0/T1 routing for VCP-NV exam.');
+  await check('Success statement captured in state', async () => {
+    return await page.evaluate(() => {
+      const ta = document.getElementById('learn-success-stmt');
+      return ta && ta.value.includes('VCP-NV');
+    });
+  });
+
+  // Select time
+  await page.evaluate(() => document.querySelector('.learn-time-card[data-time="full-day"]').click());
+
+  await check('Learning path summary visible after selections', async () => {
+    return await page.evaluate(() => !document.getElementById('learn-path-summary').hidden);
+  });
+  await check('Learning path text mentions VCP-NV areas', async () => {
+    const text = await page.$eval('#learn-path-text', e => e.textContent);
+    return text.includes('NSX') || text.includes('DFW') || text.includes('gateway');
+  });
+  await check('Start button enabled after required fields', async () => {
+    return await page.$eval('#learn-onboard-start', e => !e.disabled);
+  });
+
+  // Proceed into the wizard
+  await page.evaluate(() => document.getElementById('learn-onboard-start').click());
+  await check('Onboarding screen hidden after start', async () => {
+    return await page.evaluate(() => document.getElementById('learn-onboard-screen').hidden);
+  });
+  await check('.app visible after start', async () => {
+    return await page.evaluate(() => !document.querySelector('.app').hidden);
   });
 
   console.log('\n── Navigate to step 1 (hardware) ──');
-  // Select a use case first
-  await page.click('[name="useCase"][value="certification"]');
   await page.click('#btn-next');
   await check('Step 1 learn-block visible', async () => {
     const el = await page.$('.learn-block[data-learn-step="1"]');

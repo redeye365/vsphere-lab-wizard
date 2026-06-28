@@ -31,6 +31,134 @@
   </div>
 </div>
 
+<div id="learn-onboard-screen" class="learn-onboard-screen" hidden>
+  <div class="learn-onboard-scroll">
+    <div class="learn-onboard-inner">
+
+      <div class="learn-onboard-hdr">
+        <div class="learn-onboard-eyebrow">Learning Mode</div>
+        <h1 class="learn-onboard-title">Set up your learning experience</h1>
+        <p class="learn-onboard-sub">Four quick questions &mdash; your lab guidance will be personalised to your goals.</p>
+      </div>
+
+      <!-- Q1: Learning goal -->
+      <div class="learn-ob-field">
+        <div class="learn-ob-label">What do you want to get out of this lab?</div>
+        <div class="learn-goal-grid">
+          <button type="button" class="learn-goal-card" data-goal="certification">
+            <span class="learn-goal-icon">&#127891;</span>
+            <span class="learn-goal-title">Certification prep</span>
+            <span class="learn-goal-desc">Studying for VCP, VCAP, or VCF</span>
+          </button>
+          <button type="button" class="learn-goal-card" data-goal="technology">
+            <span class="learn-goal-icon">&#128300;</span>
+            <span class="learn-goal-title">Technology deep-dive</span>
+            <span class="learn-goal-desc">NSX, vSAN, VCF, or vSphere basics</span>
+          </button>
+          <button type="button" class="learn-goal-card" data-goal="customer">
+            <span class="learn-goal-icon">&#128100;</span>
+            <span class="learn-goal-title">Customer scenario</span>
+            <span class="learn-goal-desc">Replicate a real environment to practice</span>
+          </button>
+          <button type="button" class="learn-goal-card" data-goal="homelab">
+            <span class="learn-goal-icon">&#127968;</span>
+            <span class="learn-goal-title">Home lab</span>
+            <span class="learn-goal-desc">General experimenting and learning</span>
+          </button>
+          <button type="button" class="learn-goal-card" data-goal="role">
+            <span class="learn-goal-icon">&#128188;</span>
+            <span class="learn-goal-title">New role prep</span>
+            <span class="learn-goal-desc">Building skills for an infrastructure position</span>
+          </button>
+        </div>
+        <div id="learn-cert-wrap" class="learn-ob-conditional" hidden>
+          <label for="learn-cert-target" class="learn-ob-sublabel">Which certification?</label>
+          <select id="learn-cert-target" class="learn-ob-select">
+            <option value="">Select&hellip;</option>
+            <option value="VCP-DCV">VCP-DCV &mdash; vSphere / Datacenter Virtualisation</option>
+            <option value="VCP-NV">VCP-NV &mdash; Network Virtualisation (NSX)</option>
+            <option value="VCAP-DCV">VCAP-DCV &mdash; Advanced vSphere</option>
+            <option value="VCAP-NV">VCAP-NV &mdash; Advanced NSX</option>
+            <option value="VCF">VCF &mdash; VMware Cloud Foundation</option>
+          </select>
+        </div>
+        <div id="learn-tech-wrap" class="learn-ob-conditional" hidden>
+          <label for="learn-tech-focus" class="learn-ob-sublabel">Which technology?</label>
+          <select id="learn-tech-focus" class="learn-ob-select">
+            <option value="">Select&hellip;</option>
+            <option value="vsphere">vSphere &mdash; ESXi, vCenter, clusters</option>
+            <option value="vsan">vSAN &mdash; software-defined storage</option>
+            <option value="nsx">NSX &mdash; software-defined networking</option>
+            <option value="vcf">VCF &mdash; VMware Cloud Foundation</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Q2: Experience level -->
+      <div class="learn-ob-field">
+        <div class="learn-ob-label">What is your current VMware experience level?</div>
+        <div class="learn-exp-row">
+          <button type="button" class="learn-exp-card" data-exp="new">
+            <span class="learn-exp-title">New to VMware</span>
+            <span class="learn-exp-sub">Less than 1 year</span>
+          </button>
+          <button type="button" class="learn-exp-card" data-exp="some">
+            <span class="learn-exp-title">Some experience</span>
+            <span class="learn-exp-sub">1&ndash;3 years</span>
+          </button>
+          <button type="button" class="learn-exp-card" data-exp="experienced">
+            <span class="learn-exp-title">Experienced</span>
+            <span class="learn-exp-sub">3+ years, deepening specific skills</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Q3: Success statement -->
+      <div class="learn-ob-field">
+        <label for="learn-success-stmt" class="learn-ob-label">What does success look like for you?</label>
+        <p class="learn-ob-hint">Your words &mdash; this becomes the opening statement of your design rationale.</p>
+        <textarea id="learn-success-stmt" class="learn-ob-textarea" rows="3"
+          placeholder="e.g. I want to build a 3-host vSAN cluster I can use to practise HA configuration for the VCP-DCV exam, and understand what each setting actually does rather than just memorising it&hellip;"></textarea>
+      </div>
+
+      <!-- Q4: Time available -->
+      <div class="learn-ob-field">
+        <div class="learn-ob-label">How much time do you have?</div>
+        <div class="learn-time-row">
+          <button type="button" class="learn-time-card" data-time="wizard-only">
+            <span class="learn-time-title">Just the wizard</span>
+            <span class="learn-time-sub">~30 minutes</span>
+            <span class="learn-time-desc">Design and generate scripts</span>
+          </button>
+          <button type="button" class="learn-time-card" data-time="wizard-build">
+            <span class="learn-time-title">Wizard + build</span>
+            <span class="learn-time-sub">~half day</span>
+            <span class="learn-time-desc">Design, generate, and build the lab</span>
+          </button>
+          <button type="button" class="learn-time-card" data-time="full-day">
+            <span class="learn-time-title">Full lab</span>
+            <span class="learn-time-sub">Full day+</span>
+            <span class="learn-time-desc">Design, build, and troubleshooting practice</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Personalised learning path summary -->
+      <div id="learn-path-summary" class="learn-path-summary" hidden>
+        <div class="learn-path-eyebrow">Your learning path</div>
+        <div id="learn-path-text" class="learn-path-text"></div>
+      </div>
+
+      <div class="learn-ob-actions">
+        <button type="button" id="learn-onboard-start" class="btn btn-primary learn-ob-start" disabled>
+          Start learning &rarr;
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <div class="app" hidden>
 
   <aside class="rail">
@@ -69,16 +197,6 @@
       <section class="step" data-step="0">
         <h1>What's this lab for?</h1>
         <p class="step-intro">This shapes the defaults for cluster size and sizing checks later. You can override anything.</p>
-
-        <div class="learn-block" data-learn-step="0">
-          <div class="learn-context">
-            <p>Good design starts with understanding the requirement. Before we talk about hardware and software, let's be clear on what you are trying to achieve and why. The answers here will shape every decision we make.</p>
-          </div>
-          <div class="field">
-            <label for="learn-use-case-text">In your own words, what problem is this lab solving?</label>
-            <textarea id="learn-use-case-text" class="learn-textarea" rows="3" placeholder="e.g. I'm studying for VCP-DCV and need hands-on practice with vSAN and HA configuration..."></textarea>
-          </div>
-        </div>
 
         <div class="field">
           <label>Lab session</label>

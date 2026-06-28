@@ -2243,3 +2243,208 @@ select:focus {
 .ts-methodology-scorecard { margin: 6px 0; padding-left: 18px; }
 .ts-methodology-scorecard li { font-size: 13.5px; line-height: 1.7; }
 .ts-methodology-pattern { font-size: 14px; margin-top: 10px; }
+
+/* =============================================================================
+   Learning Mode — Onboarding screen
+   ============================================================================= */
+
+.learn-onboard-screen[hidden] { display: none !important; }
+.learn-onboard-screen {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 20%, #161d24 0%, var(--bg) 65%);
+  z-index: 50;
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.learn-onboard-scroll {
+  width: 100%;
+  padding: 60px 24px 80px;
+  display: flex;
+  justify-content: center;
+}
+.learn-onboard-inner {
+  width: 100%;
+  max-width: 740px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+/* Header */
+.learn-onboard-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--warn);
+  margin-bottom: 10px;
+}
+.learn-onboard-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+.learn-onboard-sub {
+  font-size: 15px;
+  color: var(--text-dim);
+  margin: 0;
+}
+.learn-onboard-hdr { display: flex; flex-direction: column; }
+
+/* Field wrapper */
+.learn-ob-field { display: flex; flex-direction: column; gap: 14px; }
+.learn-ob-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.learn-ob-hint { font-size: 13px; color: var(--text-dim); margin: -8px 0 0; }
+.learn-ob-sublabel { font-size: 13.5px; font-weight: 600; color: var(--text-dim); }
+
+/* Goal cards — 2-3 per row */
+.learn-goal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.learn-goal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text);
+  font-family: var(--sans);
+  text-align: left;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.learn-goal-card:hover { border-color: var(--accent); background: rgba(79,179,164,.07); }
+.learn-goal-card.selected {
+  border-color: var(--warn);
+  background: rgba(217,154,78,.1);
+  box-shadow: 0 0 0 1px var(--warn);
+}
+.learn-goal-icon { font-size: 22px; line-height: 1; }
+.learn-goal-title { font-size: 14px; font-weight: 700; }
+.learn-goal-desc { font-size: 12.5px; color: var(--text-dim); line-height: 1.4; }
+
+/* Conditional dropdowns */
+.learn-ob-conditional { display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border-soft); }
+.learn-ob-select {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  padding: 9px 12px;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Experience level cards */
+.learn-exp-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.learn-exp-card {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text);
+  font-family: var(--sans);
+  text-align: left;
+  transition: border-color .15s, background .15s;
+}
+.learn-exp-card:hover { border-color: var(--accent); background: rgba(79,179,164,.07); }
+.learn-exp-card.selected {
+  border-color: var(--warn);
+  background: rgba(217,154,78,.1);
+  box-shadow: 0 0 0 1px var(--warn);
+}
+.learn-exp-title { font-size: 14px; font-weight: 700; }
+.learn-exp-sub { font-size: 12.5px; color: var(--text-dim); }
+
+/* Success statement textarea */
+.learn-ob-textarea {
+  width: 100%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px 14px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.learn-ob-textarea:focus { outline: none; border-color: var(--accent); }
+.learn-ob-textarea::placeholder { color: var(--text-faint); }
+
+/* Time cards */
+.learn-time-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.learn-time-card {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 18px 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text);
+  font-family: var(--sans);
+  text-align: left;
+  transition: border-color .15s, background .15s;
+}
+.learn-time-card:hover { border-color: var(--accent); background: rgba(79,179,164,.07); }
+.learn-time-card.selected {
+  border-color: var(--warn);
+  background: rgba(217,154,78,.1);
+  box-shadow: 0 0 0 1px var(--warn);
+}
+.learn-time-title { font-size: 14px; font-weight: 700; }
+.learn-time-sub { font-size: 13px; color: var(--warn); font-weight: 600; }
+.learn-time-desc { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+
+/* Personalised learning path summary */
+.learn-path-summary {
+  background: linear-gradient(135deg, rgba(217,154,78,.12), rgba(79,179,164,.08));
+  border: 1px solid rgba(217,154,78,.35);
+  border-radius: 12px;
+  padding: 22px 24px;
+}
+.learn-path-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--warn);
+  margin-bottom: 10px;
+}
+.learn-path-text { display: flex; flex-direction: column; gap: 6px; }
+.learn-path-text p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.learn-path-text strong { color: var(--accent-text); }
+.learn-path-text em { color: var(--text-dim); font-style: normal; }
+
+/* Start button row */
+.learn-ob-actions { display: flex; justify-content: flex-end; }
+.learn-ob-start { min-width: 180px; font-size: 16px; padding: 14px 28px; }
