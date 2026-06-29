@@ -345,6 +345,51 @@ const { chromium } = require('playwright');
     });
   });
 
+  // ── Learning objectives on scenario cards ───────────────────────────────────
+  console.log('\n── Learning objectives ──');
+
+  // Reset to All filter, inject a scenario with objectives
+  await page.evaluate(() => {
+    state.tsAllScenarios = [
+      {
+        id: 'mock-obj', name: 'NSX DFW Lab', description: 'Test DFW',
+        difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-NV'],
+        learningObjectives: ['Deploy NSX-T Manager appliance', 'Configure T0 gateway with BGP', 'Apply DFW micro-segmentation rules']
+      },
+      {
+        id: 'mock-no-obj', name: 'vSphere HA Lab', description: 'Test HA',
+        difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF']
+      }
+    ];
+    document.querySelector('.ts-cert-chip[data-cert=""]').click();
+  });
+  await page.waitForTimeout(100);
+
+  await check('Objectives section rendered on card with learningObjectives', async () =>
+    page.evaluate(() => !!document.querySelector('.ts-lib-card-objectives')));
+
+  await check('Objectives label present', async () =>
+    page.evaluate(() => {
+      const label = document.querySelector('.ts-obj-label');
+      return label && label.textContent.trim() === 'Objectives';
+    }));
+
+  await check('3 objective list items rendered', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-obj-list li').length === 3));
+
+  await check('First objective text matches', async () =>
+    page.evaluate(() => {
+      const li = document.querySelector('.ts-obj-list li');
+      return li && li.textContent.includes('Deploy NSX-T Manager');
+    }));
+
+  await check('Card without learningObjectives has no objectives section', async () =>
+    page.evaluate(() => {
+      const cards = document.querySelectorAll('.ts-lib-card');
+      const noObjCard = Array.from(cards).find(c => c.querySelector('.ts-lib-card-name').textContent.includes('vSphere HA'));
+      return noObjCard && !noObjCard.querySelector('.ts-lib-card-objectives');
+    }));
+
   console.log(`\n── Results: ${pass} passed, ${fail} failed ──\n`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);

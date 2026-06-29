@@ -2265,6 +2265,11 @@ async function tsLibLoad() {
   }
 }
 
+function tsObjectivesHtml(objectives) {
+  if (!objectives || objectives.length === 0) return '';
+  return `<div class="ts-lib-card-objectives"><span class="ts-obj-label">Objectives</span><ul class="ts-obj-list">${objectives.map(o => `<li>${escHtml(o)}</li>`).join('')}</ul></div>`;
+}
+
 function tsLibRender() {
   const listEl  = document.getElementById('ts-scenario-list');
   const search  = (document.getElementById('ts-lib-search')?.value || '').toLowerCase();
@@ -2298,6 +2303,7 @@ function tsLibRender() {
           ${certBadges}
           ${s.snapshotName ? '<span class="ts-snapshot-badge">snapshot captured</span>' : '<span class="ts-no-snapshot-badge">no snapshot</span>'}
         </div>
+        ${tsObjectivesHtml(s.learningObjectives)}
       </div>
       <div class="ts-lib-card-actions">
         <button type="button" class="btn btn-primary btn-sm ts-load-btn" data-id="${escHtml(s.id)}">Load</button>
@@ -2816,7 +2822,9 @@ function tsRenderPickList() {
         <div class="ts-lib-card-meta">
           <span class="ts-diff-badge ts-diff-${s.difficulty}">${escHtml(s.difficulty || '')}</span>
           ${(s.topics || []).map(t => `<span class="ts-topic-chip-inline">${escHtml(t)}</span>`).join('')}
+          ${(s.certRelevance || []).map(c => `<span class="ts-cert-badge ts-cert-badge-${c.toLowerCase().replace(/[^a-z0-9]/g, '-')}">${escHtml(c)}</span>`).join('')}
         </div>
+        ${tsObjectivesHtml(s.learningObjectives)}
       </div>
       <div class="ts-lib-card-actions">
         <button type="button" class="btn btn-primary btn-sm" data-id="${escHtml(s.id)}">Select</button>

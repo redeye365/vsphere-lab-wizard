@@ -1890,6 +1890,33 @@ select:focus {
 .ts-snapshot-badge    { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:var(--accent-soft); color:var(--accent-text); }
 .ts-no-snapshot-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:var(--surface); color:var(--text-faint); border:1px solid var(--border); }
 
+/* Learning objectives on scenario cards */
+.ts-lib-card-objectives {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.ts-obj-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.ts-obj-list {
+  margin: 0;
+  padding: 0 0 0 14px;
+  list-style: disc;
+}
+.ts-obj-list li {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
 /* Small button variant */
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 .btn-danger { background: rgba(217,105,106,0.15); color: var(--danger); border: 1px solid var(--danger); }
