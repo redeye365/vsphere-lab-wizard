@@ -1441,6 +1441,25 @@
               <div class="field ts-build-full"><label>Topics (comma-separated)</label><input type="text" id="ts-build-topics" placeholder="bgp, nsx-routing"></div>
               <div class="field ts-build-full"><label>Exam objectives (comma-separated)</label><input type="text" id="ts-build-exams" placeholder="VCP-VCF-Admin, VCAP-VCF-Networking"></div>
               <div class="field ts-build-full"><label>Lab requirements (comma-separated)</label><input type="text" id="ts-build-reqs" placeholder="nsx, vyos, nested-cluster-min-3"></div>
+              <div class="field ts-build-full">
+                <label>Cert relevance</label>
+                <div class="ts-build-cert-checks" id="ts-build-cert-checks">
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCP-VCF-Architect"> VCP-VCF Architect</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCP-VCF-Admin"> VCP-VCF Admin</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCP-VCF-Support"> VCP-VCF Support</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCP-VVF-Admin"> VCP-VVF Admin</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCP-VVF-Support"> VCP-VVF Support</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCAP-VCF-Automation"> VCAP-VCF Automation</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCAP-VCF-Operations"> VCAP-VCF Operations</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCAP-VCF-Storage"> VCAP-VCF Storage</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCAP-VCF-VKS"> VCAP-VCF VKS</label>
+                  <label class="ts-cert-check-item"><input type="checkbox" class="ts-cert-check" value="VCAP-VCF-Networking"> VCAP-VCF Networking</label>
+                </div>
+              </div>
+              <div class="field ts-build-full">
+                <label>Learning objectives (one per line, 2&ndash;4)</label>
+                <textarea id="ts-build-objectives" class="ts-notes" rows="4" placeholder="Diagnose BGP session state via NSX Manager&#10;Identify AS number mismatch between T0 and upstream router"></textarea>
+              </div>
             </div>
 
             <div class="ts-build-section-sub">

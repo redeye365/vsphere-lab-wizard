@@ -530,6 +530,91 @@ const { chromium } = require('playwright');
   // Clean up
   await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
 
+  // ── Build form: cert relevance + learning objectives ─────────────────────────
+  console.log('\n── Build form: cert relevance + learning objectives ──');
+
+  // Navigate to troubleshoot step and open new scenario form
+  await page.goto(BASE);
+  await page.click('#mode-build');
+  await page.waitForTimeout(100);
+  // Fast-forward to troubleshoot step via JS
+  await page.evaluate(() => { if (typeof showStep === 'function') showStep(9); });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { if (typeof initTroubleshootStep === 'function') initTroubleshootStep(); });
+  await page.waitForTimeout(200);
+  // Open new scenario form
+  await page.evaluate(() => { if (typeof tsLibOpenBuild === 'function') tsLibOpenBuild(null); });
+  await page.waitForTimeout(150);
+
+  await check('Build form has 10 cert checkboxes', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-cert-check').length === 10));
+
+  await check('All cert checkboxes unchecked for new scenario', async () =>
+    page.evaluate(() => [...document.querySelectorAll('.ts-cert-check')].every(cb => !cb.checked)));
+
+  await check('Learning objectives textarea exists', async () =>
+    page.evaluate(() => !!document.getElementById('ts-build-objectives')));
+
+  await check('VCP-VCF-Admin checkbox present with correct value', async () =>
+    page.evaluate(() => !!document.querySelector('.ts-cert-check[value="VCP-VCF-Admin"]')));
+
+  await check('VCAP-VCF-Networking checkbox present with correct value', async () =>
+    page.evaluate(() => !!document.querySelector('.ts-cert-check[value="VCAP-VCF-Networking"]')));
+
+  // Pre-populate form and open via tsLibOpenBuild with a scenario that has certRelevance
+  await check('Edit scenario pre-checks correct cert boxes', async () => {
+    await page.evaluate(() => {
+      const mockScenario = {
+        id: 'test-build-cert', name: 'Test', description: '', difficulty: 'easy',
+        topics: [], certRelevance: ['VCP-VCF-Admin', 'VCAP-VCF-Networking'],
+        learningObjectives: ['Objective one', 'Objective two'],
+        hints: ['','','','',''], fixSteps: [], customerScenario: '', customerFollowUp: '',
+        snapshotName: '', labRequirements: [], examObjectives: [],
+      };
+      tsLibOpenBuild(mockScenario);
+    });
+    await new Promise(r => setTimeout(r, 150));
+    return page.evaluate(() => {
+      const adminChecked = document.querySelector('.ts-cert-check[value="VCP-VCF-Admin"]')?.checked;
+      const netChecked   = document.querySelector('.ts-cert-check[value="VCAP-VCF-Networking"]')?.checked;
+      const archChecked  = document.querySelector('.ts-cert-check[value="VCP-VCF-Architect"]')?.checked;
+      return adminChecked && netChecked && !archChecked;
+    });
+  });
+
+  await check('Edit scenario populates learning objectives textarea', async () =>
+    page.evaluate(() => {
+      const val = document.getElementById('ts-build-objectives')?.value || '';
+      return val.includes('Objective one') && val.includes('Objective two');
+    }));
+
+  await check('Clearing and re-opening with no certRelevance unchecks all boxes', async () => {
+    await page.evaluate(() => {
+      tsLibOpenBuild({ id: 'x', name: 'X', description: '', difficulty: 'easy',
+        topics: [], certRelevance: [], learningObjectives: [],
+        hints: ['','','','',''], fixSteps: [], customerScenario: '', customerFollowUp: '',
+        snapshotName: '', labRequirements: [], examObjectives: [] });
+    });
+    await new Promise(r => setTimeout(r, 100));
+    return page.evaluate(() => [...document.querySelectorAll('.ts-cert-check')].every(cb => !cb.checked));
+  });
+
+  await check('Checking boxes produces correct certRelevance on read', async () =>
+    page.evaluate(() => {
+      document.querySelector('.ts-cert-check[value="VCP-VVF-Admin"]').checked   = true;
+      document.querySelector('.ts-cert-check[value="VCAP-VCF-Storage"]').checked = true;
+      const selected = [...document.querySelectorAll('.ts-cert-check:checked')].map(cb => cb.value);
+      return selected.length === 2 && selected.includes('VCP-VVF-Admin') && selected.includes('VCAP-VCF-Storage');
+    }));
+
+  await check('Learning objectives textarea value splits correctly into array', async () =>
+    page.evaluate(() => {
+      const el = document.getElementById('ts-build-objectives');
+      el.value = 'First objective\nSecond objective\nThird objective';
+      const lines = el.value.split('\n').map(l => l.trim()).filter(Boolean);
+      return lines.length === 3 && lines[0] === 'First objective';
+    }));
+
   // ── Study Plan tab ───────────────────────────────────────────────────────────
   console.log('\n── Study Plan tab ──');
 

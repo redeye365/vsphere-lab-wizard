@@ -2606,6 +2606,14 @@ function tsLibOpenBuild(scenario) {
   document.getElementById('ts-build-followup').value     = scenario ? scenario.customerFollowUp || '' : '';
   document.getElementById('ts-build-fixsteps').value     = scenario ? (scenario.fixSteps || []).join('\n') : '';
   document.getElementById('ts-snapshot-name').value      = scenario ? scenario.snapshotName || '' : '';
+
+  // certRelevance checkboxes
+  document.querySelectorAll('.ts-cert-check').forEach(cb => {
+    cb.checked = !!(scenario && (scenario.certRelevance || []).includes(cb.value));
+  });
+  // learningObjectives
+  const objEl = document.getElementById('ts-build-objectives');
+  if (objEl) objEl.value = scenario ? (scenario.learningObjectives || []).join('\n') : '';
   document.getElementById('ts-capture-status').textContent = '';
 
   // Hints
@@ -2662,6 +2670,8 @@ async function tsLibSave() {
     topics:           (document.getElementById('ts-build-topics')?.value || '').split(',').map(t=>t.trim()).filter(Boolean),
     examObjectives:   (document.getElementById('ts-build-exams')?.value || '').split(',').map(t=>t.trim()).filter(Boolean),
     labRequirements:  (document.getElementById('ts-build-reqs')?.value || '').split(',').map(t=>t.trim()).filter(Boolean),
+    certRelevance:    [...document.querySelectorAll('.ts-cert-check:checked')].map(cb => cb.value),
+    learningObjectives: (document.getElementById('ts-build-objectives')?.value || '').split('\n').map(l=>l.trim()).filter(Boolean),
     customerScenario: document.getElementById('ts-build-scenario')?.value.trim() || '',
     customerFollowUp: document.getElementById('ts-build-followup')?.value.trim() || '',
     snapshotName:     document.getElementById('ts-snapshot-name')?.value.trim() || '',

@@ -2119,6 +2119,22 @@ select:focus {
 .ts-build-section-sub h4 { font-size: 13px; font-weight: 600; color: var(--text-dim); margin: 0 0 8px; }
 .ts-build-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ts-build-full { grid-column: 1 / -1; }
+.ts-build-cert-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 24px;
+  margin-top: 5px;
+}
+.ts-cert-check-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.ts-cert-check-item input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); }
 
 .ts-snapshot-row { display: flex; gap: 8px; align-items: center; }
 .ts-snapshot-input { flex: 1; padding: 7px 10px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 13px; }
