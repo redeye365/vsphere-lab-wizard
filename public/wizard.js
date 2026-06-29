@@ -1979,10 +1979,20 @@ function renderReviewDiagram() {
   empty.style.display = 'flex';
 
   if (!reviewMermaidInit) {
-    if (typeof mermaid === 'undefined') return;
-    mermaid.initialize({ startOnLoad: false, theme: 'dark', darkMode: true, securityLevel: 'strict' });
+    if (typeof mermaid === 'undefined') {
+      empty.textContent = 'Diagram preview unavailable — your network-diagram.svg will still be included in the generated zip';
+      return;
+    }
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', darkMode: true, securityLevel: 'antiscript', flowchart: { curve: 'basis' } });
     reviewMermaidInit = true;
   }
+
+  // 5-second timeout: if mermaid render hangs, show fallback
+  const renderTimeout = setTimeout(() => {
+    if (empty.textContent === 'Rendering…') {
+      empty.textContent = 'Diagram preview unavailable — your network-diagram.svg will still be included in the generated zip';
+    }
+  }, 5000);
 
   // Build spec from current state and request mermaid source from server
   fetch('/api/diagram/from-spec', {
@@ -1995,6 +2005,7 @@ function renderReviewDiagram() {
       if (!data.mermaid) throw new Error('No mermaid source returned');
       const id = 'review-diag-' + Date.now();
       const { svg } = await mermaid.render(id, data.mermaid);
+      clearTimeout(renderTimeout);
       // Parse as SVG rather than injecting raw HTML string
       const svgDoc = new DOMParser().parseFromString(svg, 'image/svg+xml');
       inner.innerHTML = '';
@@ -2003,8 +2014,9 @@ function renderReviewDiagram() {
       if (svgEl) { svgEl.style.maxWidth = '100%'; svgEl.style.height = 'auto'; }
       empty.style.display = 'none';
     })
-    .catch((err) => {
-      empty.textContent = 'Diagram preview unavailable';
+    .catch(() => {
+      clearTimeout(renderTimeout);
+      empty.textContent = 'Diagram preview unavailable — your network-diagram.svg will still be included in the generated zip';
     });
 }
 
@@ -3618,7 +3630,19 @@ function wireGenerate() {
         railDiagramBtn.href = `/diagram?id=${data.id}`;
       }
     } catch (err) {
-      if (err.message) document.getElementById('step-error').textContent = err.message;
+      if (err.message) {
+        const isNetworkErr = err instanceof TypeError || /NetworkError|Failed to fetch|Network request failed/i.test(err.message);
+        if (isNetworkErr) {
+          errBlock.textContent = 'Cannot connect to server — is the wizard running? Check your terminal.';
+          errBlock.hidden = false;
+          errBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        // non-network errors with a message go to step-error (e.g. internal validation throws)
+        // empty-message throw from validation error display path is intentionally ignored
+        else if (err.message) {
+          document.getElementById('step-error').textContent = err.message;
+        }
+      }
     } finally {
       btn.disabled = false;
       btn.textContent = originalText;
