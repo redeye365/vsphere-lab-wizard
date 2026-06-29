@@ -280,6 +280,42 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
+### v1.10.0 (current — DC deployment profiles)
+- **DC deployment profile radio card layout** replaces single DC checkbox (step 4):
+  - Four options: **No DC** / **DC only** / **DC + Jumpbox** / **DC + Jumpbox + File Server**
+  - Profile-aware sizing: No DC → 0; DC only → 2 vCPU / 4 GB; Jumpbox → 4 vCPU / 8 GB; File Server → 4 vCPU / 8 GB OS + configurable second disk
+  - `dc-jumpbox-fileserver` profile: `dcStorageDiskGB` input (default 200 GB); build guide includes PowerShell to init disk + create `\\dc\LabISOs` share
+  - Jumpbox profiles: `buildRdpFile(dc)` in `generatePowerShell.js` generates `lab-dc.rdp` in output zip (pre-configured with DC IP, 1920×1080, clipboard redirect)
+  - State: `g.dcProfile` (`'none'` | `'dc-only'` | `'dc-jumpbox'` | `'dc-jumpbox-fileserver'`), `g.dcStorageDiskGB`
+  - `lib/sizing.js`: `DC_VCPU_BY_PROFILE` / `DC_VRAM_GB_BY_PROFILE` lookup objects replace scalar constants
+  - `lib/generateSpec.js`: `domainController` spec now includes `profile`, `hasJumpbox`, `hasFileServer`, `storageDiskGB`; backward-compat fallback from `enabled` bool
+  - `server.js`: writes `lab-dc.rdp` to output dir when `buildRdpFile` returns non-null
+  - `module.exports` for `generatePowerShell.js`: `{ buildPowerShellScripts, buildRdpFile }`
+
+### v1.9.2 (cert relevance field in build form)
+- **Cert relevance checkbox grid** replaces free-text field in scenario build form:
+  - 10-cert grid (`VCP-VCF-Architect`, `VCP-VCF-Admin`, `VCP-VCF-Support`, `VCP-VVF-Admin`, `VCP-VVF-Support`, `VCAP-VCF-Automation`, `VCAP-VCF-Operations`, `VCAP-VCF-Storage`, `VCAP-VCF-VKS`, `VCAP-VCF-Networking`)
+  - `.ts-build-cert-checks` / `.ts-cert-check-item` styles; `tsLibOpenBuild()` pre-checks saved values; `tsLibSave()` reads checked values into `certRelevance[]`
+- **Learning objectives textarea**: `#ts-build-objectives` (2–4 lines); stored as `learningObjectives[]` (one item per non-blank line)
+
+### v1.9.1 (scenario library expansion — cert coverage)
+- **5 new scenarios** added to fill zero-coverage certs; wizard now ships 27 scenarios (was 22):
+  - `vcsa-disk-space-log` — easy, VCP-VVF-Support + VCP-VVF-Admin
+  - `esxi-coredump-unconfigured` — easy, VCP-VVF-Support
+  - `aria-automation-project-zone-missing` — medium, VCAP-VCF-Automation
+  - `aria-ops-adapter-credentials` — medium, VCAP-VCF-Operations
+  - `tkg-namespace-storage-policy` — medium, VCAP-VCF-VKS
+- All 10 cert codes now have at least one scenario
+
+### v1.9.0 (Study Plan tab)
+- **Study Plan** — third tab in the troubleshooter panel (`#ts-studyplan-panel`):
+  - Scenarios grouped by cert, sorted Easy → Medium → Hard within each cert
+  - Per-cert progress bar + overall progress bar at top
+  - Per-row: Load button + Mark Done / Undo toggle (persisted to `'vsphere-completed-scenarios'` localStorage key)
+  - `tsRenderStudyPlan()` — main render function; `SP_CERT_LABELS` — cert display name map; `SP_DIFF_ORDER` — sort constants
+  - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
+  - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
+
 ### v0.6.8-beta (current — Architect Thinking mode)
 - **Three-tier mode system**: Standard (fast wizard) / Learning (onboarding + learn-blocks + scorecard) /
   Architect (Learning PLUS Phase 0 discovery, options analysis, decision log, risk register, architect design doc).
@@ -345,3 +381,11 @@ network diagram, prerequisites.
   (`assessArchitecture`, `collectAntiPatterns`) reproduces the same logic for the design doc.
 - Troubleshoot learning mode: `state.troubleshootLearningMode` set in phase 0; methodology
   prompts wired in `tsWirePhase3()`; enhanced debrief built by `tsBuildLearnDebrief(data)`.
+- DC profile state: `g.dcProfile` (`'none'`|`'dc-only'`|`'dc-jumpbox'`|`'dc-jumpbox-fileserver'`).
+  All old `g.dcEnabled` references replaced. Sizing uses `DC_RAM_GB_BY_PROFILE[g.dcProfile]`
+  in `wizard.js` and `DC_VCPU_BY_PROFILE` / `DC_VRAM_GB_BY_PROFILE` in `lib/sizing.js`.
+- Study plan helpers: `tsGetCompleted()` / `tsSetCompleted(id, done)` read/write `'vsphere-completed-scenarios'`
+  localStorage key (JSON array of IDs). `tsRenderStudyPlan()` is the full render function.
+- Cert codes (10, canonical): `VCP-VCF-Architect`, `VCP-VCF-Admin`, `VCP-VCF-Support`,
+  `VCP-VVF-Admin`, `VCP-VVF-Support`, `VCAP-VCF-Automation`, `VCAP-VCF-Operations`,
+  `VCAP-VCF-Storage`, `VCAP-VCF-VKS`, `VCAP-VCF-Networking`.
