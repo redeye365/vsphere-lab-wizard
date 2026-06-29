@@ -633,6 +633,8 @@ function depotStepVisible() {
   return !!g.vsanEnabled && hasLocalDs;
 }
 
+let _onFormChange = () => {};
+
 function wireForm() {
   const d = state.answers.discovery;
   const h = state.answers.hardware;
@@ -645,7 +647,9 @@ function wireForm() {
     renderSizingRecommendations();
     renderResourceTips();
     updateVramWarning();
+    autoSave();
   };
+  _onFormChange = onChange;
 
   bindRadio('useCase', d, 'useCase', onChange);
 
@@ -1496,6 +1500,7 @@ function validateStep(n) {
 
 function showStep(n) {
   state.step = n;
+  autoSave();
   document.querySelectorAll('.step').forEach((el) => {
     el.classList.toggle('active', Number(el.dataset.step) === n);
   });
@@ -3575,6 +3580,7 @@ function wireGenerate() {
 
       errBlock.hidden = true;
       state.generated = data;
+      clearAutoSave();
 
       renderWarnings(data.warnings);
       renderDownloads(data.id, data.generatedScripts || [], !!data.svgGenerated);
@@ -3850,6 +3856,14 @@ function wireModeSelect() {
     if (screen)  screen.hidden  = true;
     if (onboard) onboard.hidden = false;
     updateOnboardStart();
+  });
+
+  document.getElementById('mode-continue')?.addEventListener('click', () => {
+    document.getElementById('load-config-input')?.click();
+  });
+
+  document.getElementById('mode-template')?.addEventListener('click', () => {
+    document.getElementById('load-template-input')?.click();
   });
 }
 
@@ -4570,6 +4584,390 @@ function showOptionsAnalysis(key, onComplete) {
   if (skip)    skip.onclick    = () => close(false);
 }
 
+// ── Save / Resume ──────────────────────────────────────────────────────────
+
+const AUTOSAVE_KEY = 'vsphere-wizard-autosave';
+const STEP_LABELS  = ['Use case', 'Hardware', 'ESXi version', 'Virtual router', 'Domain controller', 'Existing network', 'Lab networks', 'Nested cluster', 'NSX-T', 'VCF Bring-up', 'Nested disks', 'Bundle depot', 'Workload VMs', 'Security & access', 'Review & generate'];
+
+function buildWizardSave(asTemplate = false) {
+  const answers = JSON.parse(JSON.stringify(state.answers));
+  if (asTemplate) {
+    answers.hardware.ipAddress = null;
+    (answers.hardware.additionalHosts || []).forEach(h => { h.ipAddress = null; });
+    answers.design.dcIpAddress   = null;
+    answers.design.nsxIpAddress  = null;
+    answers.design.depotIpAddress = null;
+    answers.design.nestedEsxiPassword = '';
+    answers.design.vcfEsxiPassword    = '';
+    answers.design.vcfEsxiLicense     = '';
+    answers.design.vcfVcenterLicense  = '';
+    answers.design.vcfSddcMgrIp   = null;
+    answers.design.vcfVcenterIp   = null;
+  }
+  return {
+    _type:    asTemplate ? 'lab-template' : 'wizard-config',
+    _version: 1,
+    _savedAt: new Date().toISOString(),
+    _step:    state.step,
+    learningMode:  state.learningMode,
+    architectMode: state.architectMode,
+    answers,
+    designRationale: JSON.parse(JSON.stringify(state.designRationale)),
+    discovery:       JSON.parse(JSON.stringify(state.discovery)),
+    decisionLog:     JSON.parse(JSON.stringify(state.decisionLog)),
+    riskRegister:    JSON.parse(JSON.stringify(state.riskRegister))
+  };
+}
+
+function isValidWizardConfig(obj) {
+  return obj && typeof obj === 'object' &&
+    (obj._type === 'wizard-config' || obj._type === 'lab-template') &&
+    obj._version === 1 &&
+    obj.answers && typeof obj.answers === 'object';
+}
+
+function configSummary(config) {
+  const g = (config.answers || {}).design || {};
+  const h = (config.answers || {}).hardware || {};
+  const parts = [];
+  if (g.esxiVersion)    parts.push(`ESXi ${g.esxiVersion}`);
+  if (g.nestedHostCount) parts.push(`${g.nestedHostCount}-host cluster`);
+  if (g.nsxEnabled)     parts.push('NSX-T');
+  if (g.vcfEnabled)     parts.push('VCF');
+  if (h.ramGB)          parts.push(`${h.ramGB} GB host`);
+  return parts.join(' · ') || 'Saved configuration';
+}
+
+function formatTimeAgo(date) {
+  const mins  = Math.floor((Date.now() - date.getTime()) / 60000);
+  const hours = Math.floor(mins / 60);
+  const days  = Math.floor(hours / 24);
+  if (mins  <  2) return 'just now';
+  if (mins  < 60) return `${mins} min ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
+}
+
+function autoSave() {
+  if (!state.modeSelected) return;
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(buildWizardSave())); } catch (e) {}
+}
+
+function clearAutoSave() {
+  try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {}
+}
+
+function downloadWizardConfig(asTemplate = false) {
+  const save = buildWizardSave(asTemplate);
+  const ts   = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  const fname = asTemplate ? `lab-template-${ts}.labtemplate` : `wizard-config-${ts}.json`;
+  const blob  = new Blob([JSON.stringify(save, null, 2)], { type: 'application/json' });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  a.href = url; a.download = fname; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function populateFormFromState() {
+  const d = state.answers.discovery;
+  const h = state.answers.hardware;
+  const g = state.answers.design;
+
+  function setVal(id, v) {
+    const el = document.getElementById(id);
+    if (el) el.value = (v == null) ? '' : String(v);
+  }
+  function setCheck(id, v) {
+    const el = document.getElementById(id);
+    if (el) el.checked = !!v;
+  }
+  function setRadio(name, v) {
+    if (v == null) return;
+    const el = document.querySelector(`input[name="${name}"][value="${v}"]`);
+    if (el) el.checked = true;
+  }
+
+  // Step 0
+  setRadio('useCase', d.useCase);
+
+  // Step 1
+  setVal('hostCount', h.hostCount || 1);
+  setVal('host1Ip', h.ipAddress);
+  setVal('cpuCores', h.cpuCores);
+  setVal('ramGB', h.ramGB);
+  setVal('nicCount', h.nicCount);
+  setVal('nicSpeed', h.nicSpeed);
+  setVal('nicModel', h.nicModel);
+  const addHostsSec = document.getElementById('additional-hosts-section');
+  if (addHostsSec) addHostsSec.hidden = (h.hostCount || 1) <= 1;
+  renderStorageDevices(_onFormChange);
+  renderAdditionalHosts(_onFormChange);
+
+  // Step 2
+  setVal('esxiVersion', g.esxiVersion);
+  setRadio('esxiDeployMethod', g.esxiDeployMethod);
+
+  // Step 3
+  setCheck('vyosEnabled', g.vyosEnabled);
+  const vyosModeField = document.getElementById('vyos-mode-field');
+  if (vyosModeField) vyosModeField.hidden = !g.vyosEnabled;
+  if (g.vyosEnabled) setRadio('vyosNetworkMode', g.vyosNetworkMode);
+
+  // Step 4
+  setRadio('dcProfile', g.dcProfile || 'none');
+  const dcFields = document.getElementById('dc-fields');
+  if (dcFields) dcFields.hidden = (g.dcProfile || 'none') === 'none';
+  const storageDiskField = document.getElementById('dc-storage-disk-field');
+  if (storageDiskField) storageDiskField.hidden = g.dcProfile !== 'dc-jumpbox-fileserver';
+  setVal('dcDomainName', g.dcDomainName);
+  setVal('dcIpAddress', g.dcIpAddress);
+  setVal('dcStorageDiskGB', g.dcStorageDiskGB || 200);
+
+  // Step 5
+  setRadio('networkType', d.networkType);
+  setRadio('vlanCapable', d.vlanCapable);
+  setRadio('dhcpAvailable', d.dhcpAvailable);
+
+  // Step 6
+  setVal('mgmtCidr', g.mgmtCidr);
+  setRadio('mgmtVlanMode', g.mgmtVlanMode || 'untagged');
+  const mgmtVlanIdField = document.getElementById('mgmt-vlan-id-field');
+  if (mgmtVlanIdField) mgmtVlanIdField.hidden = g.mgmtVlanMode !== 'tagged';
+  setVal('mgmtVlan', g.mgmtVlan);
+  setVal('vmotionCidr', g.vmotionCidr);
+  setVal('vmotionVlan', g.vmotionVlan);
+  setVal('vmCidr', g.vmCidr);
+  setVal('vmVlan', g.vmVlan);
+  setCheck('vsanEnabled', g.vsanEnabled);
+  const vsanNetRow = document.getElementById('vsan-network-row');
+  if (vsanNetRow) vsanNetRow.hidden = !g.vsanEnabled;
+  setVal('vsanCidr', g.vsanCidr);
+  setVal('vsanVlan', g.vsanVlan);
+
+  // Step 7
+  setVal('nestedHostCount', g.nestedHostCount);
+  setVal('vcpuPerHost', g.vcpuPerHost);
+  setVal('vramPerHostGB', g.vramPerHostGB);
+  setVal('nestedDiskGB', g.nestedDiskGB);
+  setVal('clusterName', g.clusterName);
+  setVal('ssoDomain', g.ssoDomain);
+  setRadio('vsanArch', g.vsanArch || 'esa');
+  setCheck('legacyCpuCompat', g.legacyCpuCompat);
+  setCheck('memTieringEnabled', g.memTieringEnabled);
+  const tieringFields = document.getElementById('mem-tiering-fields');
+  if (tieringFields) tieringFields.hidden = !g.memTieringEnabled;
+  setVal('nvmeSizeGB', g.nvmeSizeGB);
+  setVal('tierNvmePct', g.tierNvmePct);
+  setRadio('nestedHostPlacement', g.nestedHostPlacement || 'auto');
+  setVal('nestedEsxiPassword', g.nestedEsxiPassword);
+  renderNestedDisks(_onFormChange);
+  renderPlacementRows(_onFormChange);
+
+  // Step 8 — NSX
+  setCheck('nsxEnabled', g.nsxEnabled);
+  const nsxFields = document.getElementById('nsx-fields');
+  if (nsxFields) nsxFields.hidden = !g.nsxEnabled;
+  setRadio('nsxSize', g.nsxSize || 'small');
+  setRadio('nsxTopology', g.nsxTopology || 'T0T1');
+  setRadio('nsxEdgeCount', String(g.nsxEdgeCount || 1));
+  setVal('nsxEdgeSize', g.nsxEdgeSize || 'medium');
+  setVal('nsxIpAddress', g.nsxIpAddress);
+  setVal('nsxBgpLocalAs', g.nsxBgpLocalAs || 65001);
+  setVal('nsxBgpPeerAs',  g.nsxBgpPeerAs  || 65002);
+  setRadio('nsxBgpRouteAdvert', g.nsxBgpRouteAdvert || 'all');
+  const bgpPrefixFields = document.getElementById('nsx-bgp-prefix-fields');
+  if (bgpPrefixFields) bgpPrefixFields.hidden = g.nsxBgpRouteAdvert !== 'specific';
+  setVal('nsxBgpPrefixes', g.nsxBgpPrefixes);
+  setCheck('nsxRedistConnected', g.nsxRedistConnected !== false);
+  setCheck('nsxRedistStatic',    g.nsxRedistStatic);
+  setCheck('nsxRedistT1Lb',      g.nsxRedistT1Lb);
+
+  // Step 9 — VCF
+  setCheck('vcfEnabled', g.vcfEnabled);
+  const vcfFields = document.getElementById('vcf-fields');
+  if (vcfFields) vcfFields.hidden = !g.vcfEnabled;
+  setVal('vcfSddcMgrIp',       g.vcfSddcMgrIp);
+  setVal('vcfSddcMgrHostname', g.vcfSddcMgrHostname || 'sddcmgr');
+  setVal('vcfVcenterIp',       g.vcfVcenterIp);
+  setVal('vcfVtepCidr',        g.vcfVtepCidr);
+  setVal('vcfVtepVlan',        g.vcfVtepVlan);
+  setVal('vcfEdgeUplink1Cidr', g.vcfEdgeUplink1Cidr);
+  setVal('vcfEdgeUplink1Vlan', g.vcfEdgeUplink1Vlan);
+  setVal('vcfEdgeUplink2Cidr', g.vcfEdgeUplink2Cidr);
+  setVal('vcfEdgeUplink2Vlan', g.vcfEdgeUplink2Vlan);
+  setVal('vcfEsxiPassword',    g.vcfEsxiPassword);
+  setVal('vcfEsxiLicense',     g.vcfEsxiLicense);
+  setVal('vcfVcenterLicense',  g.vcfVcenterLicense);
+
+  // Step 11 — Depot
+  setCheck('depotEnabled', g.depotEnabled);
+  const depotFields = document.getElementById('depot-fields');
+  if (depotFields) depotFields.hidden = !g.depotEnabled;
+  setRadio('depotMode', g.depotMode || 'linux');
+  setVal('depotIpAddress', g.depotIpAddress);
+
+  // Step 12 — Workloads
+  setCheck('workloadVmsEnabled', g.workloadVmsEnabled);
+  const workloadFields = document.getElementById('workload-fields');
+  if (workloadFields) workloadFields.hidden = !g.workloadVmsEnabled;
+  setVal('workloadVmCount', g.workloadVmCount);
+  setRadio('workloadVmSize', g.workloadVmSize || 'small');
+
+  // Step 13 — Security
+  setCheck('isolateLab',    g.isolateLab);
+  setCheck('internetAccess', g.internetAccess);
+  if (g.firewallPolicy) setRadio('firewallPolicy', g.firewallPolicy);
+  setVal('remoteAccessMethod', g.remoteAccessMethod);
+  const vpnTypeField = document.getElementById('vpn-type-field');
+  if (vpnTypeField) vpnTypeField.hidden = g.remoteAccessMethod !== 'vpn';
+  if (g.vpnType) setRadio('vpnType', g.vpnType);
+  setVal('vcenterSize', g.vcenterSize);
+}
+
+function loadWizardConfig(config) {
+  const src = config.answers || {};
+  if (src.discovery) Object.assign(state.answers.discovery, src.discovery);
+  if (src.hardware)  Object.assign(state.answers.hardware,  src.hardware);
+  if (src.design)    Object.assign(state.answers.design,    src.design);
+  state.learningMode  = !!config.learningMode;
+  state.architectMode = !!config.architectMode;
+  if (config.designRationale) Object.assign(state.designRationale, config.designRationale);
+  if (config.discovery)       Object.assign(state.discovery, config.discovery);
+  if (Array.isArray(config.decisionLog))  state.decisionLog  = config.decisionLog;
+  if (Array.isArray(config.riskRegister)) state.riskRegister = config.riskRegister;
+  if (state.learningMode) document.body.classList.add('learning-mode');
+  populateFormFromState();
+  return Math.min(Number(config._step) || 0, TOTAL_STEPS - 2);
+}
+
+function enterAppWithConfig(config, showBanner) {
+  const targetStep = loadWizardConfig(config);
+  state.modeSelected = true;
+  const screen = document.getElementById('mode-select-screen');
+  const app    = document.querySelector('.app');
+  if (screen) screen.hidden = true;
+  if (app)    app.hidden    = false;
+
+  if (state.architectMode) {
+    const dlPanel = document.getElementById('arch-decision-log-panel');
+    const rrPanel = document.getElementById('arch-risk-register-panel');
+    if (dlPanel) dlPanel.hidden = false;
+    if (rrPanel) rrPanel.hidden = false;
+    wireArchitectWizardSteps();
+    renderDecisionLog();
+    renderRiskRegister();
+  }
+
+  showStep(targetStep);
+  renderTopology();
+
+  if (showBanner) {
+    const banner = document.getElementById('config-loaded-banner');
+    if (banner) {
+      const d       = new Date(config._savedAt);
+      const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      const kind    = config._type === 'lab-template' ? 'template' : 'config';
+      banner.textContent = `Loaded ${kind} from ${dateStr} — ${configSummary(config)}`;
+      banner.hidden = false;
+      setTimeout(() => { banner.hidden = true; }, 5000);
+    }
+  }
+}
+
+function checkAutoSave() {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (!raw) return;
+    const config = JSON.parse(raw);
+    if (!isValidWizardConfig(config) || config._type !== 'wizard-config') return;
+    const step   = Math.min(Number(config._step) || 0, STEP_LABELS.length - 1);
+    const banner = document.getElementById('autosave-banner');
+    const msg    = document.getElementById('autosave-banner-msg');
+    if (banner && msg) {
+      msg.textContent = `Saved session from ${formatTimeAgo(new Date(config._savedAt))} — step ${step + 1}: ${STEP_LABELS[step]}`;
+      banner.hidden = false;
+    }
+  } catch (e) {}
+}
+
+function wireAutoSave() {
+  // Autosave resume banner
+  document.getElementById('autosave-resume-btn')?.addEventListener('click', () => {
+    try {
+      const config = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null');
+      if (!isValidWizardConfig(config)) return;
+      enterAppWithConfig(config, false);
+    } catch (e) {}
+  });
+
+  document.getElementById('autosave-discard-btn')?.addEventListener('click', () => {
+    clearAutoSave();
+    const banner = document.getElementById('autosave-banner');
+    if (banner) banner.hidden = true;
+  });
+
+  // Save progress button in sidebar
+  document.getElementById('rail-save-btn')?.addEventListener('click', () => {
+    downloadWizardConfig(false);
+  });
+
+  // Export as template button on review screen
+  document.getElementById('btn-export-template')?.addEventListener('click', () => {
+    downloadWizardConfig(true);
+  });
+
+  // Continue saved design file input
+  document.getElementById('load-config-input')?.addEventListener('change', (e) => {
+    const file     = e.target.files[0];
+    const statusEl = document.getElementById('load-config-status');
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const config = JSON.parse(ev.target.result);
+        if (!isValidWizardConfig(config)) {
+          if (statusEl) statusEl.textContent = 'Not a valid wizard config file.';
+          return;
+        }
+        if (config._type !== 'wizard-config') {
+          if (statusEl) statusEl.textContent = 'This is a template — use “Start from template” instead.';
+          return;
+        }
+        if (statusEl) statusEl.textContent = '';
+        enterAppWithConfig(config, true);
+      } catch { if (statusEl) statusEl.textContent = 'Invalid file — could not load.'; }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // Start from template file input
+  document.getElementById('load-template-input')?.addEventListener('change', (e) => {
+    const file     = e.target.files[0];
+    const statusEl = document.getElementById('load-template-status');
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const config = JSON.parse(ev.target.result);
+        if (!isValidWizardConfig(config)) {
+          if (statusEl) statusEl.textContent = 'Not a valid lab template file.';
+          return;
+        }
+        if (config._type !== 'lab-template') {
+          if (statusEl) statusEl.textContent = 'This is a full save — use “Continue saved design” instead.';
+          return;
+        }
+        if (statusEl) statusEl.textContent = '';
+        config._step = 0;
+        enterAppWithConfig(config, true);
+      } catch { if (statusEl) statusEl.textContent = 'Invalid file — could not load.'; }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+}
+
 // --- Init ---
 
 wireForm();
@@ -4580,4 +4978,6 @@ wireModeSelect();
 wireLearningOnboard();
 wireLearningInputs();
 wireArchPanelToggles();
+wireAutoSave();
+checkAutoSave();
 renderTopology();

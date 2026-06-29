@@ -798,6 +798,143 @@ const { chromium } = require('playwright');
   // Clean up
   await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
 
+  // ── Save / Resume ──────────────────────────────────────────────────────────
+  console.log('\n── Save / Resume — mode-select screen ──');
+
+  // Clear any autosave left by earlier tests, then reload so checkAutoSave runs clean
+  await page.evaluate(() => localStorage.removeItem('vsphere-wizard-autosave'));
+  await page.reload();
+
+  await page.goto(BASE);
+  await check('"Continue saved design" card present', async () =>
+    page.evaluate(() => !!document.getElementById('mode-continue')));
+  await check('"Start from template" card present', async () =>
+    page.evaluate(() => !!document.getElementById('mode-template')));
+  await check('load-config-input file input present', async () =>
+    page.evaluate(() => !!document.getElementById('load-config-input')));
+  await check('load-template-input file input present', async () =>
+    page.evaluate(() => !!document.getElementById('load-template-input')));
+  await check('Autosave banner initially hidden (no autosave)', async () =>
+    page.evaluate(() => document.getElementById('autosave-banner').hidden));
+
+  console.log('\n── Save / Resume — auto-save and banner ──');
+
+  await page.click('#mode-build');
+  await check('rail-save-btn present in sidebar', async () =>
+    page.evaluate(() => !!document.getElementById('rail-save-btn')));
+  await check('autoSave creates localStorage entry on form change', async () =>
+    page.evaluate(() => {
+      state.answers.design.esxiVersion = '9.1';
+      autoSave();
+      const raw = localStorage.getItem('vsphere-wizard-autosave');
+      return !!raw && JSON.parse(raw)._type === 'wizard-config';
+    }));
+  await check('buildWizardSave includes step and answers', async () =>
+    page.evaluate(() => {
+      const s = buildWizardSave();
+      return s._version === 1 && s._step === state.step && !!s.answers;
+    }));
+  await check('buildWizardSave(true) strips IP addresses', async () =>
+    page.evaluate(() => {
+      state.answers.hardware.ipAddress = '192.168.1.10';
+      state.answers.design.dcIpAddress = '192.168.10.5';
+      const t = buildWizardSave(true);
+      return t._type === 'lab-template' && t.answers.hardware.ipAddress === null && t.answers.design.dcIpAddress === null;
+    }));
+  await check('buildWizardSave(true) strips passwords', async () =>
+    page.evaluate(() => {
+      state.answers.design.nestedEsxiPassword = 'secret';
+      state.answers.design.vcfEsxiPassword    = 'secret2';
+      const t = buildWizardSave(true);
+      return t.answers.design.nestedEsxiPassword === '' && t.answers.design.vcfEsxiPassword === '';
+    }));
+  await check('isValidWizardConfig rejects random object', async () =>
+    page.evaluate(() => !isValidWizardConfig({ foo: 'bar' })));
+  await check('isValidWizardConfig accepts wizard-config', async () =>
+    page.evaluate(() => isValidWizardConfig({ _type: 'wizard-config', _version: 1, answers: {} })));
+  await check('isValidWizardConfig accepts lab-template', async () =>
+    page.evaluate(() => isValidWizardConfig({ _type: 'lab-template', _version: 1, answers: {} })));
+  await check('clearAutoSave removes localStorage entry', async () =>
+    page.evaluate(() => {
+      localStorage.setItem('vsphere-wizard-autosave', '{"_type":"wizard-config","_version":1,"answers":{}}');
+      clearAutoSave();
+      return localStorage.getItem('vsphere-wizard-autosave') === null;
+    }));
+
+  console.log('\n── Save / Resume — autosave banner shows on reload ──');
+
+  await page.goto(BASE);
+  await page.evaluate(() => {
+    localStorage.setItem('vsphere-wizard-autosave', JSON.stringify({
+      _type: 'wizard-config', _version: 1,
+      _savedAt: new Date().toISOString(), _step: 3,
+      learningMode: false, architectMode: false,
+      answers: { discovery: {}, hardware: { hostCount: 1, storageDevices: [], additionalHosts: [] }, design: { nestedHostCount: 3, nestedDisks: [], nestedHostAssignments: [] } },
+      designRationale: {}, discovery: {}, decisionLog: [], riskRegister: []
+    }));
+  });
+  await page.reload();
+  await check('Autosave banner visible after reload with saved state', async () =>
+    page.evaluate(() => !document.getElementById('autosave-banner').hidden));
+  await check('Autosave banner msg contains step number', async () =>
+    page.evaluate(() => (document.getElementById('autosave-banner-msg')?.textContent || '').includes('step 4')));
+  await check('Discard button hides the banner and clears storage', async () => {
+    await page.evaluate(() => document.getElementById('autosave-discard-btn').click());
+    await new Promise(r => setTimeout(r, 100));
+    return page.evaluate(() =>
+      document.getElementById('autosave-banner').hidden &&
+      localStorage.getItem('vsphere-wizard-autosave') === null);
+  });
+
+  console.log('\n── Save / Resume — populateFormFromState ──');
+
+  await page.goto(BASE);
+  await page.click('#mode-build');
+  await check('populateFormFromState sets esxiVersion select', async () =>
+    page.evaluate(() => {
+      state.answers.design.esxiVersion = '8.0u3';
+      populateFormFromState();
+      return document.getElementById('esxiVersion').value === '8.0u3';
+    }));
+  await check('populateFormFromState sets mgmtCidr input', async () =>
+    page.evaluate(() => {
+      state.answers.design.mgmtCidr = '10.0.10.0/24';
+      populateFormFromState();
+      return document.getElementById('mgmtCidr').value === '10.0.10.0/24';
+    }));
+  await check('populateFormFromState checks nsxEnabled checkbox', async () =>
+    page.evaluate(() => {
+      state.answers.design.nsxEnabled = true;
+      populateFormFromState();
+      return document.getElementById('nsxEnabled').checked === true;
+    }));
+  await check('populateFormFromState shows nsx-fields when nsxEnabled', async () =>
+    page.evaluate(() => !document.getElementById('nsx-fields').hidden));
+  await check('populateFormFromState sets dcProfile radio', async () =>
+    page.evaluate(() => {
+      state.answers.design.dcProfile = 'dc-jumpbox';
+      populateFormFromState();
+      const r = document.querySelector('input[name="dcProfile"][value="dc-jumpbox"]');
+      return r && r.checked;
+    }));
+  await check('populateFormFromState shows dc-fields for non-none profile', async () =>
+    page.evaluate(() => !document.getElementById('dc-fields').hidden));
+
+  console.log('\n── Save / Resume — export template button ──');
+
+  await page.goto(BASE);
+  await page.click('#mode-build');
+  // Navigate to review step
+  await page.evaluate(() => showStep(14));
+  await page.waitForTimeout(100);
+  await check('Export as template button present on review step', async () =>
+    page.evaluate(() => !!document.getElementById('btn-export-template')));
+  await check('Export template button is visible on review step', async () =>
+    page.isVisible('#btn-export-template'));
+
+  // Clean up
+  await page.evaluate(() => localStorage.removeItem('vsphere-wizard-autosave'));
+
   console.log(`\n── Results: ${pass} passed, ${fail} failed ──\n`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);

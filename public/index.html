@@ -15,6 +15,15 @@
     <h1 class="mode-select-title">vSphere Lab Wizard</h1>
     <p class="mode-select-tagline">Design your nested vSphere lab</p>
   </div>
+
+  <div id="autosave-banner" class="autosave-banner" hidden>
+    <span id="autosave-banner-msg"></span>
+    <div class="autosave-banner-actions">
+      <button type="button" id="autosave-resume-btn" class="btn btn-primary">Resume</button>
+      <button type="button" id="autosave-discard-btn" class="btn btn-ghost">Start Fresh</button>
+    </div>
+  </div>
+
   <div class="mode-card-row">
     <button type="button" id="mode-build" class="mode-card mode-card-standard">
       <span class="mode-card-badge">Standard</span>
@@ -28,7 +37,23 @@
       <span class="mode-card-desc">Guided design thinking &mdash; understand the why behind every decision. Adds 15&ndash;20 minutes. Recommended for anyone studying for VMware certifications or new to infrastructure design.</span>
       <span class="mode-card-cta">Start learning &rarr;</span>
     </button>
+    <button type="button" id="mode-continue" class="mode-card mode-card-continue">
+      <span class="mode-card-badge">Saved</span>
+      <span class="mode-card-heading">Continue saved design</span>
+      <span class="mode-card-desc">Resume a previous wizard session from where you left off. All fields and mode settings restored.</span>
+      <span class="mode-card-cta">Load wizard-config.json &rarr;</span>
+      <span id="load-config-status" class="mode-card-file-status"></span>
+    </button>
+    <button type="button" id="mode-template" class="mode-card mode-card-template">
+      <span class="mode-card-badge">Template</span>
+      <span class="mode-card-heading">Start from template</span>
+      <span class="mode-card-desc">Use a shared lab design as your starting point &mdash; topology pre-filled, IPs and passwords blank for you to personalise.</span>
+      <span class="mode-card-cta">Load .labtemplate &rarr;</span>
+      <span id="load-template-status" class="mode-card-file-status"></span>
+    </button>
   </div>
+  <input type="file" id="load-config-input"   accept=".json"              style="display:none;">
+  <input type="file" id="load-template-input" accept=".json,.labtemplate" style="display:none;">
 </div>
 
 <div id="learn-onboard-screen" class="learn-onboard-screen" hidden>
@@ -403,6 +428,7 @@
     </ol>
     <div class="rail-footer">
       <a href="/diagram" target="_blank" rel="noopener" class="rail-diagram-btn" id="rail-diagram-btn">&#x1F5A7; View Diagram</a>
+      <button type="button" id="rail-save-btn" class="rail-save-btn">&#8595; Save progress</button>
     </div>
 
     <!-- Architect mode panels — hidden in non-architect mode -->
@@ -426,6 +452,8 @@
   </aside>
 
   <main class="main">
+
+    <div id="config-loaded-banner" class="config-loaded-banner" hidden></div>
 
     <div id="wizard-steps">
 
@@ -1337,7 +1365,10 @@
 
         <div id="generate-error-block" class="generate-error-block" hidden></div>
 
-        <button type="button" id="btn-generate" class="btn btn-primary">Generate lab design</button>
+        <div class="generate-actions">
+          <button type="button" id="btn-generate" class="btn btn-primary">Generate lab design</button>
+          <button type="button" id="btn-export-template" class="btn btn-secondary">Export as template</button>
+        </div>
 
         <div id="results" class="results" hidden>
           <div id="warnings-block" class="warnings-block" hidden></div>

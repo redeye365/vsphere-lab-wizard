@@ -280,7 +280,18 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.10.0 (current — DC deployment profiles)
+### v1.11.0 (current — Save and resume)
+- **Auto-save to localStorage** (`vsphere-wizard-autosave`): state serialised after every `onChange` and every `showStep`. Cleared on successful generate. Key format: `{ _type, _version:1, _savedAt, _step, learningMode, architectMode, answers, designRationale, discovery, decisionLog, riskRegister }`.
+- **Resume banner** on mode-select screen: `checkAutoSave()` runs at init; if a valid autosave exists, `#autosave-banner` is shown above the mode cards with the saved step and time-ago. Resume loads the config and enters the app; Start Fresh discards it.
+- **4-option mode-select screen**: Build / Learning / Continue saved design / Start from template. Continue and template cards trigger hidden file inputs (`#load-config-input`, `#load-template-input`).
+- **Save progress button** (`#rail-save-btn`) in the wizard sidebar: downloads `wizard-config-[ts].json` containing full state (including passwords). Present on every step.
+- **Export as template** (`#btn-export-template`) on the review screen (step 14): same format but strips IPs and passwords → `.labtemplate` extension. Sits next to the Generate button in a `.generate-actions` flex row.
+- **Load flow**: file → `isValidWizardConfig()` → `loadWizardConfig()` → `populateFormFromState()` → `enterAppWithConfig()` → `showStep(savedStep)`. A `#config-loaded-banner` confirms the load for 5 s.
+- **`populateFormFromState()`**: syncs all wizard DOM fields from `state.answers` — inputs, selects, radios, checkboxes, conditional show/hide, dynamic lists (storage devices, additional hosts, nested disks, placement rows). Uses `_onFormChange` so re-rendered dynamic rows are fully wired.
+- **`_onFormChange`**: module-level reference to the `onChange` closure in `wireForm()`, set at wireForm init. Used by `populateFormFromState` to pass the real onChange to render functions.
+- **Template strips**: `hardware.ipAddress`, `additionalHosts[].ipAddress`, `dcIpAddress`, `nsxIpAddress`, `depotIpAddress`, `nestedEsxiPassword`, `vcfEsxiPassword`, `vcfEsxiLicense`, `vcfVcenterLicense`, `vcfSddcMgrIp`, `vcfVcenterIp`.
+
+### v1.10.0 (DC deployment profiles)
 - **DC deployment profile radio card layout** replaces single DC checkbox (step 4):
   - Four options: **No DC** / **DC only** / **DC + Jumpbox** / **DC + Jumpbox + File Server**
   - Profile-aware sizing: No DC → 0; DC only → 2 vCPU / 4 GB; Jumpbox → 4 vCPU / 8 GB; File Server → 4 vCPU / 8 GB OS + configurable second disk
@@ -389,3 +400,5 @@ network diagram, prerequisites.
 - Cert codes (10, canonical): `VCP-VCF-Architect`, `VCP-VCF-Admin`, `VCP-VCF-Support`,
   `VCP-VVF-Admin`, `VCP-VVF-Support`, `VCAP-VCF-Automation`, `VCAP-VCF-Operations`,
   `VCAP-VCF-Storage`, `VCAP-VCF-VKS`, `VCAP-VCF-Networking`.
+- Save/resume key: `vsphere-wizard-autosave` (localStorage). Save format: `_type` `wizard-config` | `lab-template`, `_version:1`, `_savedAt` ISO, `_step`, mode flags, `answers`, `designRationale`, `discovery`, `decisionLog`, `riskRegister`.
+- `_onFormChange` — module-level reference to the real `onChange` inside `wireForm()`. Must be used (not `() => {}`) when calling render functions from outside wireForm so dynamic list elements stay wired.
