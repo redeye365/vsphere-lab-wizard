@@ -34,11 +34,12 @@ function isValidSpecStructure(obj) {
   return required.every((k) => k in obj);
 }
 
-const TOTAL_STEPS = 16;
-const DEPOT_STEP = 11;      // skipped when vSAN + local datastore not both configured
-const NSX_STEP = 8;         // always shown
-const VCF_STEP = 9;         // always shown; gated by vcfEnabled inside
-const TROUBLESHOOT_STEP = 15; // only reachable when troubleshooting mode is active
+const TOTAL_STEPS = 17;
+const PLACEMENT_STEP = 8;     // skipped when single physical host
+const DEPOT_STEP = 12;        // skipped when vSAN + local datastore not both configured
+const NSX_STEP = 9;           // always shown
+const VCF_STEP = 10;          // always shown; gated by vcfEnabled inside
+const TROUBLESHOOT_STEP = 16; // only reachable when troubleshooting mode is active
 
 const USE_CASE_LABELS = {
   certification: 'Certification study',
@@ -223,6 +224,7 @@ const state = {
       workloadVmsEnabled: false, workloadVmCount: 3, workloadVmSize: 'small',
       nestedDisks: [],
       nestedHostPlacement: 'auto', nestedHostAssignments: [],
+      deployVyosHostIdx: 0, deployDcHostIdx: 0,
       isolateLab: false, firewallPolicy: null, internetAccess: false,
       remoteAccessMethod: null, vpnType: null, vcenterSize: null
     }
@@ -633,6 +635,10 @@ function depotStepVisible() {
   return !!g.vsanEnabled && hasLocalDs;
 }
 
+function placementStepVisible() {
+  return (Number(state.answers.hardware.hostCount) || 1) > 1;
+}
+
 let _onFormChange = () => {};
 
 function wireForm() {
@@ -647,6 +653,8 @@ function wireForm() {
     renderSizingRecommendations();
     renderResourceTips();
     updateVramWarning();
+    renderInfraPlacement(onChange);
+    renderPlacementRamSummary();
     autoSave();
   };
   _onFormChange = onChange;
@@ -848,7 +856,7 @@ function wireForm() {
   bindNumber('nvmeSizeGB',  g, 'nvmeSizeGB',  onChange);
   bindNumber('tierNvmePct', g, 'tierNvmePct', onChange);
 
-  // NSX step (step 8)
+  // NSX step (step 9)
   const nsxCheckbox = document.getElementById('nsxEnabled');
   if (nsxCheckbox) {
     nsxCheckbox.addEventListener('change', () => {
@@ -897,7 +905,7 @@ function wireForm() {
   });
   document.getElementById('vyosEnabled').addEventListener('change', origVyosHandler);
 
-  // VCF step (step 9)
+  // VCF step (step 10)
   const vcfCheckbox = document.getElementById('vcfEnabled');
   if (vcfCheckbox) {
     vcfCheckbox.addEventListener('change', () => {
@@ -978,7 +986,7 @@ function wireForm() {
     onChange();
   });
 
-  // Workload VMs (step 9)
+  // Workload VMs (step 13)
   const wlCheckbox = document.getElementById('workloadVmsEnabled');
   wlCheckbox.addEventListener('change', () => {
     g.workloadVmsEnabled = wlCheckbox.checked;
@@ -1006,7 +1014,7 @@ function wireForm() {
   bindRadio('vpnType', g, 'vpnType', onChange);
   bindSelect('vcenterSize', g, 'vcenterSize', onChange);
 
-  // Bundle depot (step 9)
+  // Bundle depot (step 12)
   const depotCheckbox = document.getElementById('depotEnabled');
   depotCheckbox.addEventListener('change', () => {
     g.depotEnabled = depotCheckbox.checked;
@@ -1235,6 +1243,7 @@ function renderPlacementRows(onChange) {
     row.append(lbl, sel);
     manualRows.appendChild(row);
   }
+  renderPlacementRamSummary();
 }
 
 function renderNvmeDiskPicker(onChange) {
@@ -1450,9 +1459,12 @@ function validateStep(n) {
       }
       return null;
     case 8:
-      // NSX step — no required fields (nsxEnabled is optional)
+      // Deployment placement step — no required fields
       return null;
     case 9:
+      // NSX step — no required fields (nsxEnabled is optional)
+      return null;
+    case 10:
       // VCF step — no required fields (vcfEnabled is optional)
       if (g.vcfEnabled) {
         if (!g.vcfSddcMgrIp) return 'Enter the SDDC Manager IP address.';
@@ -1461,7 +1473,7 @@ function validateStep(n) {
         if (!g.vcfEdgeUplink1Cidr) return 'Enter the NSX Edge Uplink 1 CIDR.';
       }
       return null;
-    case 10: {
+    case 11: {
       const ndisks = g.nestedDisks || [];
       if (g.vsanEnabled) {
         const isEsa = g.vsanArch !== 'osa';
@@ -1479,16 +1491,16 @@ function validateStep(n) {
       }
       return null;
     }
-    case 11:
+    case 12:
       // Depot step — only reached when depotStepVisible(); no required fields
       return null;
-    case 12:
+    case 13:
       if (g.workloadVmsEnabled) {
         if (!g.workloadVmCount || g.workloadVmCount < 1) return 'Enter the number of workload VMs.';
         if (!g.workloadVmSize) return 'Select a workload VM size.';
       }
       return null;
-    case 13:
+    case 14:
       if (g.remoteAccessMethod === 'vpn' && !g.vpnType) {
         return 'Select a VPN type (WireGuard or VyOS site-to-site) to continue.';
       }
@@ -1514,14 +1526,16 @@ function showStep(n) {
 
   // The review step (TOTAL_STEPS-2) is the effective last step in normal mode.
   // When troubleshootingMode is on, the user can navigate one step further to TROUBLESHOOT_STEP.
-  const reviewStep = TOTAL_STEPS - 2;  // step 13
+  const reviewStep = TOTAL_STEPS - 2;  // step 15
   const isLastVisible = state.troubleshootingMode ? n === TROUBLESHOOT_STEP : n === reviewStep;
   document.getElementById('btn-next').style.display = isLastVisible ? 'none' : 'inline-flex';
   document.getElementById('step-error').textContent = '';
 
   if (n === reviewStep) renderReview();
+  if (n === reviewStep) renderReviewPlacement();
   if (n === TROUBLESHOOT_STEP) initTroubleshootStep();
   if (n === 7) { renderSizingRecommendations(); renderResourceTips(); updateVramWarning(); }
+  if (n === PLACEMENT_STEP) renderDeploymentPlacement(_onFormChange);
   updateDcNotice();
   updateEsxi9Notices();
 
@@ -1534,12 +1548,12 @@ function showStep(n) {
   if (state.learningMode) {
     if (n === 1) updateLearnRamContext();
     if (n === 7) updateLearnRamHeadroom();
-    if (n === 14) renderScorecard();
+    if (n === 15) renderScorecard();
   }
 
   // In architect mode, show options analysis before certain steps (once per session)
   if (state.architectMode) {
-    const analysisMap = { 3: 'router', 7: 'clusterSize', 8: 'nsx' };
+    const analysisMap = { 3: 'router', 7: 'clusterSize', 9: 'nsx' };
     const key = analysisMap[n];
     const alreadySeen = state._optionsAnalysisSeen || {};
     if (key && !alreadySeen[key]) {
@@ -1551,14 +1565,16 @@ function showStep(n) {
 }
 
 function getNextStep(n) {
-  const next = n + 1;
-  if (next === DEPOT_STEP && !depotStepVisible()) return next + 1;
+  let next = n + 1;
+  if (next === PLACEMENT_STEP && !placementStepVisible()) next++;
+  if (next === DEPOT_STEP && !depotStepVisible()) next++;
   return next;
 }
 
 function getPrevStep(n) {
-  const prev = n - 1;
-  if (prev === DEPOT_STEP && !depotStepVisible()) return prev - 1;
+  let prev = n - 1;
+  if (prev === PLACEMENT_STEP && !placementStepVisible()) prev--;
+  if (prev === DEPOT_STEP && !depotStepVisible()) prev--;
   return prev;
 }
 
@@ -3546,12 +3562,12 @@ function wireGenerate() {
               [/^(dcIpAddress|dcDomainName)/,                                  {label: 'Domain controller', step: 4,  railNum: 5}],
               [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 3,  railNum: 4}],
               [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering|nestedEsxiPassword)/, {label: 'Nested cluster',    step: 7,  railNum: 8}],
-              [/^(nsxSize|nsxTopology|nsxEdge|nsxIpAddress|nsxBgp|nsxRedist)/,   {label: 'NSX-T',             step: 8,  railNum: 9}],
-              [/^vcf/,                                                          {label: 'VCF Bring-up',      step: 9,  railNum: 10}],
-              [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 10, railNum: 11}],
-              [/^depot/,                                                        {label: 'Bundle depot',      step: 11, railNum: 12}],
-              [/^workloadVm/,                                                   {label: 'Workload VMs',      step: 12, railNum: 13}],
-              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            {label: 'Security & access', step: 13, railNum: 14}],
+              [/^(nsxSize|nsxTopology|nsxEdge|nsxIpAddress|nsxBgp|nsxRedist)/,   {label: 'NSX-T',             step: 9,  railNum: 10}],
+              [/^vcf/,                                                          {label: 'VCF Bring-up',      step: 10, railNum: 11}],
+              [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 11, railNum: 12}],
+              [/^depot/,                                                        {label: 'Bundle depot',      step: 12, railNum: 13}],
+              [/^workloadVm/,                                                   {label: 'Workload VMs',      step: 13, railNum: 14}],
+              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            {label: 'Security & access', step: 14, railNum: 15}],
             ];
             for (const [re, hint] of map) {
               if (re.test(msg)) return hint;
@@ -4611,7 +4627,7 @@ function showOptionsAnalysis(key, onComplete) {
 // ── Save / Resume ──────────────────────────────────────────────────────────
 
 const AUTOSAVE_KEY = 'vsphere-wizard-autosave';
-const STEP_LABELS  = ['Use case', 'Hardware', 'ESXi version', 'Virtual router', 'Domain controller', 'Existing network', 'Lab networks', 'Nested cluster', 'NSX-T', 'VCF Bring-up', 'Nested disks', 'Bundle depot', 'Workload VMs', 'Security & access', 'Review & generate'];
+const STEP_LABELS  = ['Use case', 'Hardware', 'ESXi version', 'Virtual router', 'Domain controller', 'Existing network', 'Lab networks', 'Nested cluster', 'Deployment placement', 'NSX-T', 'VCF Bring-up', 'Nested disks', 'Bundle depot', 'Workload VMs', 'Security & access', 'Review & generate'];
 
 function buildWizardSave(asTemplate = false) {
   const answers = JSON.parse(JSON.stringify(state.answers));
@@ -4785,9 +4801,11 @@ function populateFormFromState() {
   setRadio('nestedHostPlacement', g.nestedHostPlacement || 'auto');
   setVal('nestedEsxiPassword', g.nestedEsxiPassword);
   renderNestedDisks(_onFormChange);
-  renderPlacementRows(_onFormChange);
 
-  // Step 8 — NSX
+  // Step 8 — Deployment placement
+  renderDeploymentPlacement(_onFormChange);
+
+  // Step 9 — NSX
   setCheck('nsxEnabled', g.nsxEnabled);
   const nsxFields = document.getElementById('nsx-fields');
   if (nsxFields) nsxFields.hidden = !g.nsxEnabled;
@@ -4806,7 +4824,7 @@ function populateFormFromState() {
   setCheck('nsxRedistStatic',    g.nsxRedistStatic);
   setCheck('nsxRedistT1Lb',      g.nsxRedistT1Lb);
 
-  // Step 9 — VCF
+  // Step 10 — VCF
   setCheck('vcfEnabled', g.vcfEnabled);
   const vcfFields = document.getElementById('vcf-fields');
   if (vcfFields) vcfFields.hidden = !g.vcfEnabled;
@@ -4823,21 +4841,21 @@ function populateFormFromState() {
   setVal('vcfEsxiLicense',     g.vcfEsxiLicense);
   setVal('vcfVcenterLicense',  g.vcfVcenterLicense);
 
-  // Step 11 — Depot
+  // Step 12 — Depot
   setCheck('depotEnabled', g.depotEnabled);
   const depotFields = document.getElementById('depot-fields');
   if (depotFields) depotFields.hidden = !g.depotEnabled;
   setRadio('depotMode', g.depotMode || 'linux');
   setVal('depotIpAddress', g.depotIpAddress);
 
-  // Step 12 — Workloads
+  // Step 13 — Workloads
   setCheck('workloadVmsEnabled', g.workloadVmsEnabled);
   const workloadFields = document.getElementById('workload-fields');
   if (workloadFields) workloadFields.hidden = !g.workloadVmsEnabled;
   setVal('workloadVmCount', g.workloadVmCount);
   setRadio('workloadVmSize', g.workloadVmSize || 'small');
 
-  // Step 13 — Security
+  // Step 14 — Security
   setCheck('isolateLab',    g.isolateLab);
   setCheck('internetAccess', g.internetAccess);
   if (g.firewallPolicy) setRadio('firewallPolicy', g.firewallPolicy);
@@ -4990,6 +5008,202 @@ function wireAutoSave() {
     reader.readAsText(file);
     e.target.value = '';
   });
+}
+
+function placementBuildHostOptions() {
+  const h = state.answers.hardware;
+  const physCount = Number(h.hostCount) || 1;
+  const hosts = [{ idx: 0, label: `Physical host 1${h.ipAddress ? ' — ' + h.ipAddress : ''}` }];
+  const addHosts = h.additionalHosts || [];
+  for (let i = 0; i < Math.min(physCount - 1, addHosts.length); i++) {
+    const ah = addHosts[i];
+    const ip = ah.ipAddress || null;
+    hosts.push({ idx: i + 1, label: `Physical host ${i + 2}${ip ? ' — ' + ip : ''}` });
+  }
+  return hosts;
+}
+
+function renderInfraPlacement(onChange) {
+  const g = state.answers.design;
+  const section = document.getElementById('infra-placement-section');
+  const rows = document.getElementById('infra-placement-rows');
+  if (!section || !rows) return;
+
+  const comps = [];
+  if (g.vyosEnabled) comps.push({ key: 'deployVyosHostIdx', label: 'VyOS router', ram: VYOS_RAM_GB_SIZING });
+  if (g.dcProfile && g.dcProfile !== 'none') {
+    comps.push({ key: 'deployDcHostIdx', label: 'Domain controller', ram: DC_RAM_GB_BY_PROFILE[g.dcProfile] || 4 });
+  }
+
+  section.hidden = comps.length === 0;
+  if (comps.length === 0) return;
+
+  const physHosts = placementBuildHostOptions();
+
+  rows.innerHTML = '';
+  for (const comp of comps) {
+    const row = document.createElement('div');
+    row.className = 'placement-infra-row';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'placement-vm-name';
+    lbl.textContent = comp.label;
+
+    const ramBadge = document.createElement('span');
+    ramBadge.className = 'placement-vm-ram';
+    ramBadge.textContent = comp.ram + ' GB';
+
+    const sel = document.createElement('select');
+    sel.className = 'placement-select';
+    for (const ph of physHosts) {
+      const opt = document.createElement('option');
+      opt.value = ph.idx;
+      opt.textContent = ph.label;
+      opt.selected = (Number(g[comp.key]) === ph.idx);
+      sel.appendChild(opt);
+    }
+    sel.addEventListener('change', () => {
+      g[comp.key] = Number(sel.value);
+      onChange();
+      renderPlacementRamSummary();
+    });
+
+    row.append(lbl, ramBadge, sel);
+    rows.appendChild(row);
+  }
+}
+
+function renderPlacementRamSummary() {
+  const summaryEl = document.getElementById('placement-ram-summary');
+  if (!summaryEl) return;
+
+  const h = state.answers.hardware;
+  const g = state.answers.design;
+  const physCount = Number(h.hostCount) || 1;
+
+  const physHosts = [];
+  physHosts.push({ ip: h.ipAddress || null, ramGB: Number(h.ramGB) || 0, vms: [], totalRam: 0 });
+  const addHosts = h.additionalHosts || [];
+  for (let i = 0; i < Math.min(physCount - 1, addHosts.length); i++) {
+    const ah = addHosts[i];
+    physHosts.push({
+      ip: ah.ipAddress || null,
+      ramGB: ah.sameAsFirst !== false ? (Number(h.ramGB) || 0) : (Number(ah.ramGB) || 0),
+      vms: [], totalRam: 0
+    });
+  }
+
+  const nestedCount = Number(g.nestedHostCount) || 0;
+  const vramPerHost = Number(g.vramPerHostGB) || 16;
+  const assignments = g.nestedHostPlacement === 'manual' && g.nestedHostAssignments.length >= nestedCount
+    ? g.nestedHostAssignments.map((v) => Math.min(Number(v) || 0, physCount - 1))
+    : Array.from({ length: nestedCount }, (_, i) => i % physCount);
+
+  for (let i = 0; i < nestedCount; i++) {
+    const phIdx = Math.min(assignments[i] ?? (i % physCount), physHosts.length - 1);
+    physHosts[phIdx].vms.push({ label: 'nested-esxi-' + String(i + 1).padStart(2, '0'), ram: vramPerHost });
+    physHosts[phIdx].totalRam += vramPerHost;
+  }
+
+  if (g.vyosEnabled) {
+    const phIdx = Math.min(Number(g.deployVyosHostIdx) || 0, physHosts.length - 1);
+    physHosts[phIdx].vms.push({ label: 'VyOS router', ram: VYOS_RAM_GB_SIZING });
+    physHosts[phIdx].totalRam += VYOS_RAM_GB_SIZING;
+  }
+
+  if (g.dcProfile && g.dcProfile !== 'none') {
+    const dcRam = DC_RAM_GB_BY_PROFILE[g.dcProfile] || 4;
+    const phIdx = Math.min(Number(g.deployDcHostIdx) || 0, physHosts.length - 1);
+    physHosts[phIdx].vms.push({ label: 'Domain controller', ram: dcRam });
+    physHosts[phIdx].totalRam += dcRam;
+  }
+
+  let html = '';
+  for (let i = 0; i < physHosts.length; i++) {
+    const ph = physHosts[i];
+    const pct = ph.ramGB > 0 ? Math.min(100, Math.round(ph.totalRam / ph.ramGB * 100)) : 0;
+    const over = ph.ramGB > 0 && ph.totalRam > ph.ramGB;
+    const label = 'Physical host ' + (i + 1) + (ph.ip ? ' (' + ph.ip + ')' : '');
+    html += '<div class="placement-host-card' + (over ? ' placement-host-over' : '') + '">';
+    html += '<div class="placement-host-header"><span class="placement-host-name">' + escHtml(label) + '</span>';
+    html += '<span class="placement-host-ram' + (over ? ' over' : '') + '">' + ph.totalRam + ' / ' + (ph.ramGB || '?') + ' GB</span></div>';
+    html += '<div class="placement-ram-track"><div class="placement-ram-fill' + (over ? ' over' : '') + '" style="width:' + pct + '%"></div></div>';
+    if (ph.vms.length) {
+      html += '<ul class="placement-vm-list">';
+      for (const vm of ph.vms) html += '<li>' + escHtml(vm.label) + ': ' + vm.ram + ' GB</li>';
+      html += '</ul>';
+    } else {
+      html += '<p class="placement-no-vms">No VMs assigned to this host</p>';
+    }
+    if (over) {
+      html += '<p class="placement-over-warning">⚠ Over capacity by ' + (ph.totalRam - ph.ramGB) + ' GB &mdash; reduce assignments or add RAM</p>';
+    }
+    html += '</div>';
+  }
+  summaryEl.innerHTML = html;
+}
+
+function renderDeploymentPlacement(onChange) {
+  const h = state.answers.hardware;
+  const physCount = Number(h.hostCount) || 1;
+
+  const singleNotice = document.getElementById('placement-singlehost-notice');
+  const multiContent = document.getElementById('placement-multihost-content');
+  if (singleNotice) singleNotice.hidden = physCount > 1;
+  if (multiContent) multiContent.hidden = physCount < 2;
+  if (physCount < 2) return;
+
+  renderInfraPlacement(onChange);
+  renderPlacementRows(onChange);
+  renderPlacementRamSummary();
+}
+
+function renderReviewPlacement() {
+  const el = document.getElementById('review-placement-section');
+  if (!el) return;
+
+  const h = state.answers.hardware;
+  const g = state.answers.design;
+  const physCount = Number(h.hostCount) || 1;
+
+  if (physCount < 2) { el.hidden = true; return; }
+  el.hidden = false;
+
+  const physHosts = [];
+  physHosts.push({ ip: h.ipAddress || null, vms: [] });
+  const addHosts = h.additionalHosts || [];
+  for (let i = 0; i < Math.min(physCount - 1, addHosts.length); i++) {
+    physHosts.push({ ip: addHosts[i].ipAddress || null, vms: [] });
+  }
+
+  const nestedCount = Number(g.nestedHostCount) || 0;
+  const assignments = g.nestedHostPlacement === 'manual' && g.nestedHostAssignments.length >= nestedCount
+    ? g.nestedHostAssignments.map((v) => Math.min(Number(v) || 0, physCount - 1))
+    : Array.from({ length: nestedCount }, (_, i) => i % physCount);
+
+  for (let i = 0; i < nestedCount; i++) {
+    const phIdx = Math.min(assignments[i] ?? (i % physCount), physHosts.length - 1);
+    physHosts[phIdx].vms.push('nested-esxi-' + String(i + 1).padStart(2, '0'));
+  }
+  if (g.vyosEnabled) {
+    const phIdx = Math.min(Number(g.deployVyosHostIdx) || 0, physHosts.length - 1);
+    physHosts[phIdx].vms.unshift('VyOS router');
+  }
+  if (g.dcProfile && g.dcProfile !== 'none') {
+    const phIdx = Math.min(Number(g.deployDcHostIdx) || 0, physHosts.length - 1);
+    physHosts[phIdx].vms.unshift('Domain controller');
+  }
+
+  let html = '<table class="review-placement-table"><thead><tr><th>Physical host</th><th>VMs assigned</th></tr></thead><tbody>';
+  for (let i = 0; i < physHosts.length; i++) {
+    const ph = physHosts[i];
+    const hostLabel = 'Physical host ' + (i + 1) + (ph.ip ? ' &mdash; ' + escHtml(ph.ip) : '');
+    const vmList = ph.vms.length ? ph.vms.map(escHtml).join(', ') : '<em>none</em>';
+    html += '<tr><td>' + hostLabel + '</td><td>' + vmList + '</td></tr>';
+  }
+  html += '<tr><td colspan="2" class="review-placement-vcenter-note">vCenter deploys onto nested-esxi-01 after that host is running</td></tr>';
+  html += '</tbody></table>';
+  el.querySelector('.review-placement-body').innerHTML = html;
 }
 
 // --- Init ---

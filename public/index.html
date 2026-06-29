@@ -417,14 +417,15 @@
       <li data-step="5"><span class="rail-num">06</span><span>Existing network</span></li>
       <li data-step="6"><span class="rail-num">07</span><span>Lab networks</span></li>
       <li data-step="7"><span class="rail-num">08</span><span>Nested cluster</span></li>
-      <li data-step="8"><span class="rail-num">09</span><span>NSX-T</span></li>
-      <li data-step="9"><span class="rail-num">10</span><span>VCF Bring-up</span></li>
-      <li data-step="10"><span class="rail-num">11</span><span>Nested disks</span></li>
-      <li data-step="11"><span class="rail-num">12</span><span>Bundle depot</span></li>
-      <li data-step="12"><span class="rail-num">13</span><span>Workload VMs</span></li>
-      <li data-step="13"><span class="rail-num">14</span><span>Security &amp; access</span></li>
-      <li data-step="14"><span class="rail-num">15</span><span>Review &amp; generate</span></li>
-      <li data-step="15" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
+      <li data-step="8"><span class="rail-num">09</span><span>Deployment placement</span></li>
+      <li data-step="9"><span class="rail-num">10</span><span>NSX-T</span></li>
+      <li data-step="10"><span class="rail-num">11</span><span>VCF Bring-up</span></li>
+      <li data-step="11"><span class="rail-num">12</span><span>Nested disks</span></li>
+      <li data-step="12"><span class="rail-num">13</span><span>Bundle depot</span></li>
+      <li data-step="13"><span class="rail-num">14</span><span>Workload VMs</span></li>
+      <li data-step="14"><span class="rail-num">15</span><span>Security &amp; access</span></li>
+      <li data-step="15"><span class="rail-num">16</span><span>Review &amp; generate</span></li>
+      <li data-step="16" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
     </ol>
     <div class="rail-footer">
       <a href="/diagram" target="_blank" rel="noopener" class="rail-diagram-btn" id="rail-diagram-btn">&#x1F5A7; View Diagram</a>
@@ -903,18 +904,6 @@
           </div>
         </div>
 
-        <!-- Nested host placement (shown when hostCount > 1) -->
-        <div id="placement-section" hidden>
-          <div class="field">
-            <label>Distribute nested hosts across physical hosts</label>
-            <div class="radio-group">
-              <label class="radio-row"><input type="radio" name="nestedHostPlacement" value="auto" checked><span>Automatic &mdash; distribute evenly (round-robin)</span></label>
-              <label class="radio-row"><input type="radio" name="nestedHostPlacement" value="manual"><span>Manual &mdash; assign each nested host myself</span></label>
-            </div>
-          </div>
-          <div id="manual-placement-rows" hidden></div>
-        </div>
-
         <div class="field">
           <label>Deploy nested ESXi from</label>
           <div class="radio-grid" id="esxi-deploy-method-options">
@@ -1003,12 +992,52 @@
         </div>
       </section>
 
-      <!-- Step 8: NSX-T -->
+      <!-- Step 8: Deployment placement -->
       <section class="step" data-step="8">
+        <h1>Deployment placement</h1>
+        <p class="step-intro">Assign each VM to a physical host. Only relevant when you have two or more physical ESXi hosts &mdash; with a single host everything deploys to it automatically.</p>
+
+        <div id="placement-singlehost-notice" hidden>
+          <p class="hint">You have a single physical host &mdash; all VMs will deploy to it automatically. Continue to the next step.</p>
+        </div>
+
+        <div id="placement-multihost-content" hidden>
+
+          <div id="infra-placement-section" hidden>
+            <div class="field">
+              <label>Infrastructure VMs</label>
+              <div id="infra-placement-rows"></div>
+            </div>
+          </div>
+
+          <!-- Nested host placement (moved from step 7) -->
+          <div id="placement-section" hidden>
+            <div class="field">
+              <label>Nested ESXi hosts</label>
+              <div class="radio-group">
+                <label class="radio-row"><input type="radio" name="nestedHostPlacement" value="auto" checked><span>Automatic &mdash; distribute evenly (round-robin)</span></label>
+                <label class="radio-row"><input type="radio" name="nestedHostPlacement" value="manual"><span>Manual &mdash; assign each nested host myself</span></label>
+              </div>
+            </div>
+            <div id="manual-placement-rows" hidden></div>
+          </div>
+
+          <div class="field">
+            <label>Physical host RAM allocation</label>
+            <div id="placement-ram-summary"></div>
+          </div>
+
+          <p class="hint">vCenter deploys onto nested-esxi-01 after that host is running &mdash; no physical host selection needed for it.</p>
+
+        </div>
+      </section>
+
+      <!-- Step 9: NSX-T -->
+      <section class="step" data-step="9">
         <h1>Add NSX-T to this lab?</h1>
         <p class="step-intro">NSX-T adds software-defined networking, micro-segmentation, and optional BGP routing on top of the vSphere cluster. Deployment is after the cluster is healthy.</p>
 
-        <div class="learn-block" data-learn-step="8">
+        <div class="learn-block" data-learn-step="9">
           <div class="learn-context">
             <p>NSX adds significant capability &mdash; micro-segmentation, overlay networking, distributed routing &mdash; but also significant complexity and resource overhead. Before choosing NSX, be clear on why you need it.</p>
             <div class="learn-reasons">
@@ -1114,8 +1143,8 @@
         </div>
       </section>
 
-      <!-- Step 9: VCF Bring-up -->
-      <section class="step" data-step="9">
+      <!-- Step 10: VCF Bring-up -->
+      <section class="step" data-step="10">
         <h1>VCF bring-up spec</h1>
         <p class="step-intro">VMware Cloud Foundation uses a Cloud Builder appliance to orchestrate the full management domain deployment &mdash; vCenter, NSX-T, and SDDC Manager all installed and configured from a single JSON file. Enable this to generate that file alongside the standard lab scripts.</p>
 
@@ -1210,8 +1239,8 @@
         </div>
       </section>
 
-      <!-- Step 10: Nested host disk layout -->
-      <section class="step" data-step="10">
+      <!-- Step 11: Nested host disk layout -->
+      <section class="step" data-step="11">
         <h1>Nested host disk layout</h1>
         <p class="step-intro">Virtual disks added to each nested ESXi host VM on top of the boot disk. Purpose options adapt to the vSAN architecture chosen in the previous step.</p>
 
@@ -1226,8 +1255,8 @@
         </div>
       </section>
 
-      <!-- Step 11: Bundle depot (conditional — shown only when vSAN + local datastore both configured) -->
-      <section class="step" data-step="11">
+      <!-- Step 12: Bundle depot (conditional — shown only when vSAN + local datastore both configured) -->
+      <section class="step" data-step="12">
         <h1>VCF bundle depot?</h1>
         <p class="step-intro">A local HTTPS file server hosting VCF bundles on your LAN. During VCF bring-up, SDDC Manager downloads bundles from Broadcom's CDN — a local depot gives LAN-speed downloads instead and enables air-gapped deployments.</p>
 
@@ -1256,8 +1285,8 @@
         </div>
       </section>
 
-      <!-- Step 12: Workload VMs -->
-      <section class="step" data-step="12">
+      <!-- Step 13: Workload VMs -->
+      <section class="step" data-step="13">
         <h1>Deploy test workload VMs?</h1>
         <p class="step-intro">Blank VM shells on the cluster for practising vMotion, DRS, and HA — no OS required, but you can install one later.</p>
 
@@ -1284,8 +1313,8 @@
         </div>
       </section>
 
-      <!-- Step 13: Security & access -->
-      <section class="step" data-step="13">
+      <!-- Step 14: Security & access -->
+      <section class="step" data-step="14">
         <h1>Security and remote access</h1>
 
         <div class="field checkbox-field">
@@ -1335,8 +1364,8 @@
         </div>
       </section>
 
-      <!-- Step 14: Review & generate -->
-      <section class="step" data-step="14">
+      <!-- Step 15: Review & generate -->
+      <section class="step" data-step="15">
         <h1>Review and generate</h1>
         <p class="step-intro">Checks out? Generate the spec, deployment scripts, and the design doc.</p>
 
@@ -1354,7 +1383,12 @@
           </div>
         </div>
 
-        <div class="learn-block" data-learn-step="14">
+        <div id="review-placement-section" hidden>
+          <h3 class="review-section-heading">Deployment targets</h3>
+          <div class="review-placement-body"></div>
+        </div>
+
+        <div class="learn-block" data-learn-step="15">
           <div class="learn-scorecard-wrap">
             <h2 class="learn-scorecard-title">Architecture Review</h2>
             <p class="learn-scorecard-intro">Your design rationale will be included in your design document &mdash; this is what separates a spec from a proper design.</p>
@@ -1386,8 +1420,8 @@
         </div>
       </section>
 
-      <!-- Step 15: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
-      <section class="step" data-step="15">
+      <!-- Step 16: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
+      <section class="step" data-step="16">
         <h1>Troubleshooting Lab</h1>
 
         <!-- Mode tabs -->

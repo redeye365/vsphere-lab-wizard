@@ -165,9 +165,9 @@ const { chromium } = require('playwright');
     return await page.$eval('#learn-availability-req', e => e.value) === 'productionlike';
   });
 
-  console.log('\n── Architecture scorecard (step 14) ──');
-  // Jump to step 14 via JS
-  await page.evaluate(() => { window.showStep(14); });
+  console.log('\n── Architecture scorecard (step 15) ──');
+  // Jump to step 15 via JS
+  await page.evaluate(() => { window.showStep(15); });
   await check('Scorecard container visible', async () => page.isVisible('#learn-scorecard'));
   await check('Scorecard has rendered rows', async () => {
     const rows = await page.$$('.learn-score-row');
@@ -189,7 +189,7 @@ const { chromium } = require('playwright');
 
   await check('Troubleshooter step visible', async () => {
     return await page.evaluate(() => {
-      const el = document.querySelector('[data-step="15"]');
+      const el = document.querySelector('[data-step="16"]');
       return el && !el.hidden;
     });
   });
@@ -258,7 +258,7 @@ const { chromium } = require('playwright');
   await page.click('#mode-build');
   await page.waitForTimeout(200);
   // Navigate to step 15 via showStep
-  await page.evaluate(() => { if (typeof showStep === 'function') showStep(15); });
+  await page.evaluate(() => { if (typeof showStep === 'function') showStep(16); });
   await page.waitForTimeout(400);
 
   await check('Cert filter row present in DOM', async () =>
@@ -538,7 +538,7 @@ const { chromium } = require('playwright');
   await page.click('#mode-build');
   await page.waitForTimeout(100);
   // Fast-forward to troubleshoot step via JS
-  await page.evaluate(() => { if (typeof showStep === 'function') showStep(9); });
+  await page.evaluate(() => { if (typeof showStep === 'function') showStep(10); });
   await page.waitForTimeout(200);
   await page.evaluate(() => { if (typeof initTroubleshootStep === 'function') initTroubleshootStep(); });
   await page.waitForTimeout(200);
@@ -632,7 +632,7 @@ const { chromium } = require('playwright');
   const tsSection = await page.$('#troubleshoot-step');
   if (!tsSection) {
     // Navigate directly via step selector if needed
-    await page.evaluate(() => { showStep(9); initTroubleshootStep(); });
+    await page.evaluate(() => { showStep(10); initTroubleshootStep(); });
     await page.waitForTimeout(200);
   }
 
@@ -925,7 +925,7 @@ const { chromium } = require('playwright');
   await page.goto(BASE);
   await page.click('#mode-build');
   // Navigate to review step
-  await page.evaluate(() => showStep(14));
+  await page.evaluate(() => showStep(15));
   await page.waitForTimeout(100);
   await check('Export as template button present on review step', async () =>
     page.evaluate(() => !!document.getElementById('btn-export-template')));

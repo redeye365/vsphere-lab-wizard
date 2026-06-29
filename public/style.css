@@ -3260,3 +3260,40 @@ select:focus {
 .arch-readiness-amber  { background: rgba(251,191,36,.15);  color: var(--warn); }
 .arch-readiness-red    { background: rgba(239,68,68,.15);   color: #f87171; }
 .arch-readiness-hint   { font-size: 12.5px; color: var(--text-dim); flex-basis: 100%; margin-top: 2px; }
+
+/* ── Deployment placement step ────────────────────────────────────────────── */
+.placement-infra-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.placement-vm-name { min-width: 160px; color: var(--text); }
+.placement-vm-ram  { min-width: 50px; color: var(--text-muted); font-size: 12px; }
+.placement-select  { min-width: 200px; }
+.placement-host-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.placement-host-card.placement-host-over { border-color: var(--warning); }
+.placement-host-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.placement-host-ram { color: var(--text-muted); font-weight: 400; }
+.placement-host-ram.over { color: var(--warning); font-weight: 600; }
+.placement-ram-track { height: 6px; background: var(--border); border-radius: 3px; margin-bottom: 8px; overflow: hidden; }
+.placement-ram-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.2s; }
+.placement-ram-fill.over { background: var(--warning); }
+.placement-vm-list { margin: 4px 0; padding-left: 16px; font-size: 12px; color: var(--text-muted); list-style: disc; }
+.placement-vm-list li { margin-bottom: 2px; }
+.placement-no-vms { font-size: 12px; color: var(--text-muted); margin: 4px 0; font-style: italic; }
+.placement-over-warning { font-size: 12px; color: var(--warning); margin: 6px 0 0; }
+
+/* ── Review screen deployment targets table ──────────────────────────────── */
+.review-placement-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+.review-placement-table th, .review-placement-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.review-placement-table th { font-weight: 600; color: var(--text-muted); font-size: 12px; }
+.review-placement-vcenter-note { color: var(--text-muted); font-style: italic; font-size: 12px; }
+.review-section-heading { font-size: 14px; font-weight: 600; margin: 20px 0 8px; color: var(--text); }
