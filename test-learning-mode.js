@@ -83,17 +83,17 @@ const { chromium } = require('playwright');
   await check('Tech dropdown hidden for certification goal', async () => {
     return await page.evaluate(() => document.getElementById('learn-tech-wrap').hidden);
   });
-  await page.selectOption('#learn-cert-target', 'VCP-NV');
+  await page.selectOption('#learn-cert-target', 'VCP-VCF-Admin');
 
   // Select experience
   await page.evaluate(() => document.querySelector('.learn-exp-card[data-exp="some"]').click());
 
   // Fill success statement
-  await page.fill('#learn-success-stmt', 'Practise NSX DFW and T0/T1 routing for VCP-NV exam.');
+  await page.fill('#learn-success-stmt', 'Practise VCF bring-up and SDDC Manager for VCP-VCF Admin exam.');
   await check('Success statement captured in state', async () => {
     return await page.evaluate(() => {
       const ta = document.getElementById('learn-success-stmt');
-      return ta && ta.value.includes('VCP-NV');
+      return ta && ta.value.includes('VCP-VCF Admin');
     });
   });
 
@@ -103,9 +103,9 @@ const { chromium } = require('playwright');
   await check('Learning path summary visible after selections', async () => {
     return await page.evaluate(() => !document.getElementById('learn-path-summary').hidden);
   });
-  await check('Learning path text mentions VCP-NV areas', async () => {
+  await check('Learning path text mentions VCP-VCF-Admin areas', async () => {
     const text = await page.$eval('#learn-path-text', e => e.textContent);
-    return text.includes('NSX') || text.includes('DFW') || text.includes('gateway');
+    return text.includes('VCF') || text.includes('SDDC') || text.includes('NSX') || text.includes('workload');
   });
   await check('Start button enabled after required fields', async () => {
     return await page.$eval('#learn-onboard-start', e => !e.disabled);
@@ -264,8 +264,8 @@ const { chromium } = require('playwright');
   await check('Cert filter row present in DOM', async () =>
     page.evaluate(() => !!document.getElementById('ts-cert-filter-row')));
 
-  await check('7 cert chips (All + 6 certs)', async () =>
-    page.evaluate(() => document.querySelectorAll('.ts-cert-chip').length === 7));
+  await check('11 cert chips (All + 10 certs)', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-cert-chip').length === 11));
 
   await check('"All" chip active by default', async () =>
     page.evaluate(() => {
@@ -273,21 +273,27 @@ const { chromium } = require('playwright');
       return allChip && allChip.classList.contains('active');
     }));
 
-  await check('All 6 cert-specific chips present', async () =>
+  await check('All 10 cert-specific chips present', async () =>
     page.evaluate(() => {
-      const certs = ['VCP-VVF', 'VCP-NV', 'VCAP-DCV', 'VCAP-NV', 'VCP-VCF-Admin', 'VCP-VCF-Architect'];
+      const certs = ['VCP-VCF-Architect','VCP-VCF-Admin','VCP-VCF-Support','VCP-VVF-Admin','VCP-VVF-Support','VCAP-VCF-Automation','VCAP-VCF-Operations','VCAP-VCF-Storage','VCAP-VCF-VKS','VCAP-VCF-Networking'];
       return certs.every(c => !!document.querySelector(`.ts-cert-chip[data-cert="${c}"]`));
     }));
 
-  await check('Clicking VCP-NV chip sets state.tsCertFilter', async () => {
-    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCP-NV"]').click());
-    return page.evaluate(() => state.tsCertFilter === 'VCP-NV');
+  await check('Old cert chips absent (VCP-NV, VCAP-DCV, VCAP-NV, VCP-VVF)', async () =>
+    page.evaluate(() => {
+      const old = ['VCP-NV', 'VCAP-DCV', 'VCAP-NV', 'VCP-VVF'];
+      return old.every(c => !document.querySelector(`.ts-cert-chip[data-cert="${c}"]`));
+    }));
+
+  await check('Clicking VCAP-VCF-Networking chip sets state.tsCertFilter', async () => {
+    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCAP-VCF-Networking"]').click());
+    return page.evaluate(() => state.tsCertFilter === 'VCAP-VCF-Networking');
   });
 
-  await check('VCP-NV chip is active after click', async () =>
-    page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCP-NV"]').classList.contains('active')));
+  await check('VCAP-VCF-Networking chip is active after click', async () =>
+    page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCAP-VCF-Networking"]').classList.contains('active')));
 
-  await check('"All" chip deactivated after VCP-NV selected', async () =>
+  await check('"All" chip deactivated after VCAP-VCF-Networking selected', async () =>
     page.evaluate(() => !document.querySelector('.ts-cert-chip[data-cert=""]').classList.contains('active')));
 
   await check('Clicking All chip resets state.tsCertFilter', async () => {
@@ -299,13 +305,13 @@ const { chromium } = require('playwright');
     page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert=""]').classList.contains('active')));
 
   // Inject mock scenarios and verify filtering
-  await check('VCP-NV filter shows only matching scenarios', async () => {
+  await check('VCAP-VCF-Networking filter shows only matching scenarios', async () => {
     await page.evaluate(() => {
       state.tsAllScenarios = [
-        { id: 'mock-a', name: 'NSX DFW Lab', description: 'Test DFW', difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-NV', 'VCAP-NV'] },
-        { id: 'mock-b', name: 'vSphere HA Lab', description: 'Test HA', difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF'] },
+        { id: 'mock-a', name: 'NSX DFW Lab', description: 'Test DFW', difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-VCF-Admin', 'VCAP-VCF-Networking'] },
+        { id: 'mock-b', name: 'vSphere HA Lab', description: 'Test HA', difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF-Admin'] },
       ];
-      document.querySelector('.ts-cert-chip[data-cert="VCP-NV"]').click();
+      document.querySelector('.ts-cert-chip[data-cert="VCAP-VCF-Networking"]').click();
     });
     await page.waitForTimeout(100);
     const cards = await page.$$('.ts-lib-card');
@@ -330,14 +336,14 @@ const { chromium } = require('playwright');
   await check('Both cert badges visible across all cards', async () =>
     page.evaluate(() => document.querySelectorAll('.ts-lib-card .ts-cert-badge').length >= 2));
 
-  await check('VCAP-NV filter also matches NSX scenario (multi-cert scenario)', async () => {
-    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCAP-NV"]').click());
+  await check('VCP-VCF-Admin filter also matches NSX scenario (multi-cert scenario)', async () => {
+    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCP-VCF-Admin"]').click());
     await page.waitForTimeout(100);
     return page.evaluate(() => document.querySelectorAll('.ts-lib-card').length === 1);
   });
 
   await check('No-match cert shows empty state message', async () => {
-    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCP-VCF-Architect"]').click());
+    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCAP-VCF-VKS"]').click());
     await page.waitForTimeout(100);
     return page.evaluate(() => {
       const hint = document.querySelector('#ts-scenario-list .hint');
@@ -353,12 +359,12 @@ const { chromium } = require('playwright');
     state.tsAllScenarios = [
       {
         id: 'mock-obj', name: 'NSX DFW Lab', description: 'Test DFW',
-        difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-NV'],
+        difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-VCF-Admin', 'VCAP-VCF-Networking'],
         learningObjectives: ['Deploy NSX-T Manager appliance', 'Configure T0 gateway with BGP', 'Apply DFW micro-segmentation rules']
       },
       {
         id: 'mock-no-obj', name: 'vSphere HA Lab', description: 'Test HA',
-        difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF']
+        difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF-Admin']
       }
     ];
     document.querySelector('.ts-cert-chip[data-cert=""]').click();
@@ -399,8 +405,8 @@ const { chromium } = require('playwright');
   // Inject two mock scenarios, re-render
   await page.evaluate(() => {
     state.tsAllScenarios = [
-      { id: 'sc-a', name: 'NSX DFW Lab', description: 'desc', difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-NV'], learningObjectives: ['Configure DFW'] },
-      { id: 'sc-b', name: 'vSphere HA Lab', description: 'desc', difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF'] }
+      { id: 'sc-a', name: 'NSX DFW Lab', description: 'desc', difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-VCF-Admin', 'VCAP-VCF-Networking'], learningObjectives: ['Configure DFW'] },
+      { id: 'sc-b', name: 'vSphere HA Lab', description: 'desc', difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF-Admin'] }
     ];
     document.querySelector('.ts-cert-chip[data-cert=""]').click();
   });

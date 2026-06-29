@@ -74,7 +74,7 @@ scenarios/
   "name": "BGP AS Number Mismatch",
   "description": "T0 BGP peer is down due to AS number mismatch between NSX-T and VyOS",
   "difficulty": "easy | medium | hard",
-  "examObjectives": ["VCP-NV", "VCAP-NV"],
+  "examObjectives": ["VCP-VCF-Admin", "VCAP-VCF-Networking"],
   "topics": ["bgp", "nsx-routing"],
   "author": "your-github-handle",
   "created": "2026-06-01",
@@ -129,19 +129,27 @@ scenarios/
 
 Use only these exact strings (current Broadcom certs as of June 2026):
 
-| Value | Certification |
-|-------|--------------|
-| `VCP-VVF` | VMware vSphere Foundation Administrator (replaces retired VCP-DCV) |
-| `VCP-NV` | Network Virtualization / NSX |
-| `VCAP-DCV` | Advanced Data Center Virtualization Design |
-| `VCAP-NV` | Advanced Network Virtualization Design |
-| `VCP-VCF-Admin` | VCF Administrator |
-| `VCP-VCF-Architect` | VCF Architect |
+| Value | Certification | Exam |
+|-------|--------------|------|
+| `VCP-VCF-Architect` | VCP — VMware Cloud Foundation Architect | 2V0-13.25 |
+| `VCP-VCF-Admin` | VCP — VMware Cloud Foundation Administrator | 2V0-17.25 |
+| `VCP-VCF-Support` | VCP — VMware Cloud Foundation Support | 2V0-15.25 |
+| `VCP-VVF-Admin` | VCP — VMware vSphere Foundation Administrator | 2V0-16.25 |
+| `VCP-VVF-Support` | VCP — VMware vSphere Foundation Support | 2V0-18.25 |
+| `VCAP-VCF-Automation` | VCAP — VMware Cloud Foundation Automation | 3V0-21.25 |
+| `VCAP-VCF-Operations` | VCAP — VMware Cloud Foundation Operations | 3V0-22.25 |
+| `VCAP-VCF-Storage` | VCAP — VMware Cloud Foundation Storage | 3V0-23.25 |
+| `VCAP-VCF-VKS` | VCAP — VMware Cloud Foundation VKS | 3V0-24.25 |
+| `VCAP-VCF-Networking` | VCAP — VMware Cloud Foundation Networking | 3V0-25.25 |
 
 Assignment guidance:
-- Basic vSphere / HA / DRS / vMotion / vSAN → `VCP-VVF`; advanced storage/cluster design → add `VCAP-DCV`
-- NSX / DFW / T0/T1 / BGP / overlay → `VCP-NV`; design-focused → add `VCAP-NV`
+- Basic vSphere / HA / DRS / vMotion / vSAN → `VCP-VVF-Admin`; advanced storage design → add `VCAP-VCF-Storage`
+- NSX / DFW / T0/T1 / BGP / overlay → `VCP-VCF-Admin`; advanced networking design → add `VCAP-VCF-Networking`
 - VCF / SDDC Manager / Cloud Builder → `VCP-VCF-Admin`; architecture-focused → add `VCP-VCF-Architect`
+- VCF troubleshooting / log analysis / support → add `VCP-VCF-Support`
+- Automation / IaC / day-2 workflows → `VCAP-VCF-Automation`
+- Monitoring / capacity / performance → `VCAP-VCF-Operations`
+- Kubernetes / containers / TKG → `VCAP-VCF-VKS`
 - Multi-component scenarios → all relevant certs
 
 ---

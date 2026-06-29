@@ -75,12 +75,20 @@
           <label for="learn-cert-target" class="learn-ob-sublabel">Which certification?</label>
           <select id="learn-cert-target" class="learn-ob-select">
             <option value="">Select&hellip;</option>
-            <option value="VCP-VVF">VCP-VVF &mdash; VMware vSphere Foundation Administrator (2V0-16.25)</option>
-            <option value="VCP-NV">VCP-NV &mdash; Network Virtualisation / NSX (2V0-41.23)</option>
-            <option value="VCAP-DCV">VCAP-DCV Design &mdash; Advanced Data Centre Virtualisation</option>
-            <option value="VCAP-NV">VCAP-NV Design &mdash; Advanced Network Virtualisation</option>
-            <option value="VCP-VCF-Admin">VCP-VCF Administrator &mdash; Cloud Foundation Administrator (2V0-17.25)</option>
-            <option value="VCP-VCF-Architect">VCP-VCF Architect &mdash; Cloud Foundation Architect (2V0-13.25)</option>
+            <optgroup label="VCP &mdash; VMware Certified Professional">
+            <option value="VCP-VCF-Architect">VCP &mdash; VMware Cloud Foundation Architect (2V0-13.25)</option>
+            <option value="VCP-VCF-Admin">VCP &mdash; VMware Cloud Foundation Administrator (2V0-17.25)</option>
+            <option value="VCP-VCF-Support">VCP &mdash; VMware Cloud Foundation Support (2V0-15.25)</option>
+            <option value="VCP-VVF-Admin">VCP &mdash; VMware vSphere Foundation Administrator (2V0-16.25)</option>
+            <option value="VCP-VVF-Support">VCP &mdash; VMware vSphere Foundation Support (2V0-18.25)</option>
+            </optgroup>
+            <optgroup label="VCAP &mdash; VMware Certified Advanced Professional">
+            <option value="VCAP-VCF-Automation">VCAP &mdash; VMware Cloud Foundation Automation (3V0-21.25)</option>
+            <option value="VCAP-VCF-Operations">VCAP &mdash; VMware Cloud Foundation Operations (3V0-22.25)</option>
+            <option value="VCAP-VCF-Storage">VCAP &mdash; VMware Cloud Foundation Storage (3V0-23.25)</option>
+            <option value="VCAP-VCF-VKS">VCAP &mdash; VMware Cloud Foundation VKS (3V0-24.25)</option>
+            <option value="VCAP-VCF-Networking">VCAP &mdash; VMware Cloud Foundation Networking (3V0-25.25)</option>
+            </optgroup>
           </select>
         </div>
         <div id="learn-tech-wrap" class="learn-ob-conditional" hidden>
@@ -119,7 +127,7 @@
         <label for="learn-success-stmt" class="learn-ob-label">What does success look like for you?</label>
         <p class="learn-ob-hint">Your words &mdash; this becomes the opening statement of your design rationale.</p>
         <textarea id="learn-success-stmt" class="learn-ob-textarea" rows="3"
-          placeholder="e.g. I want to build a 3-host vSAN cluster I can use to practise HA configuration for the VCP-VVF exam, and understand what each setting actually does rather than just memorising it&hellip;"></textarea>
+          placeholder="e.g. I want to build a 3-host vSAN cluster I can use to practise HA configuration for the VCP-VVF Admin exam, and understand what each setting actually does rather than just memorising it&hellip;"></textarea>
       </div>
 
       <!-- Q4: Time available -->
@@ -155,7 +163,7 @@
           <input type="checkbox" id="learn-arch-toggle" class="learn-arch-checkbox">
           <div class="learn-arch-toggle-content">
             <div class="learn-arch-toggle-title">Enable Architect Thinking</div>
-            <div class="learn-arch-toggle-desc">Adds a consultant discovery session, requirements prioritisation (MoSCoW), options analysis at every major decision, a running decision log, and a risk register. Produces a design document you could hand to a customer. Recommended for VCAP-DCV Design, VCAP-NV Design, or VCP-VCF Architect certification study. Adds ~45 minutes.</div>
+            <div class="learn-arch-toggle-desc">Adds a consultant discovery session, requirements prioritisation (MoSCoW), options analysis at every major decision, a running decision log, and a risk register. Produces a design document you could hand to a customer. Recommended for VCAP-level certifications (Automation, Operations, Storage, VKS, Networking) or VCP-VCF Architect certification study. Adds ~45 minutes.</div>
           </div>
         </label>
       </div>
@@ -308,7 +316,7 @@
           <div>
             <label for="arch-success-measure" class="arch-disc-sublabel">How will you know this lab has achieved its purpose?</label>
             <textarea id="arch-success-measure" class="arch-disc-textarea" rows="2"
-              placeholder="e.g. I pass the VCP-NV exam, or I can run through the customer scenario without referring to notes."></textarea>
+              placeholder="e.g. I pass the VCP-VCF Admin exam, or I can run through the customer scenario without referring to notes."></textarea>
           </div>
         </div>
       </div>
@@ -593,7 +601,7 @@
           </div>
           <div class="field">
             <label for="learn-router-choice">Which fits your learning goal and why?</label>
-            <textarea id="learn-router-choice" class="learn-textarea" rows="2" placeholder="e.g. VyOS because I'm targeting VCP-NV and want to understand BGP peering with NSX..."></textarea>
+            <textarea id="learn-router-choice" class="learn-textarea" rows="2" placeholder="e.g. VyOS because I'm targeting VCAP-VCF Networking and want to understand BGP peering with NSX..."></textarea>
           </div>
         </div>
 
@@ -934,14 +942,14 @@
           <div class="learn-context">
             <p>NSX adds significant capability &mdash; micro-segmentation, overlay networking, distributed routing &mdash; but also significant complexity and resource overhead. Before choosing NSX, be clear on why you need it.</p>
             <div class="learn-reasons">
-              <div class="learn-reason-item">&#10003; Learning NSX for certification (VCP-NV, VCAP-NV, VCP-VCF Administrator)</div>
+              <div class="learn-reason-item">&#10003; Learning NSX for certification (VCP-VCF Admin, VCP-VCF Architect, VCAP Networking)</div>
               <div class="learn-reason-item">&#10003; Practising micro-segmentation for a customer project</div>
               <div class="learn-reason-item">&#10003; Building a full VCF environment</div>
             </div>
           </div>
           <div class="field">
             <label for="learn-nsx-rationale">What is driving your decision to include NSX?</label>
-            <textarea id="learn-nsx-rationale" class="learn-textarea" rows="2" placeholder="e.g. Studying for VCP-NV exam, need to practice DFW rule creation and T0/T1 gateway config..."></textarea>
+            <textarea id="learn-nsx-rationale" class="learn-textarea" rows="2" placeholder="e.g. Studying for VCP-VCF Admin exam, need to practice DFW rule creation and T0/T1 gateway config..."></textarea>
           </div>
         </div>
 
@@ -1374,12 +1382,16 @@
           <div class="ts-cert-filter-row" id="ts-cert-filter-row">
             <span class="ts-cert-filter-label">Cert:</span>
             <button type="button" class="ts-cert-chip active" data-cert="">All</button>
-            <button type="button" class="ts-cert-chip" data-cert="VCP-VVF">VCP-VVF</button>
-            <button type="button" class="ts-cert-chip" data-cert="VCP-NV">VCP-NV</button>
-            <button type="button" class="ts-cert-chip" data-cert="VCAP-DCV">VCAP-DCV</button>
-            <button type="button" class="ts-cert-chip" data-cert="VCAP-NV">VCAP-NV</button>
-            <button type="button" class="ts-cert-chip" data-cert="VCP-VCF-Admin">VCP-VCF Admin</button>
             <button type="button" class="ts-cert-chip" data-cert="VCP-VCF-Architect">VCP-VCF Architect</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCP-VCF-Admin">VCP-VCF Admin</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCP-VCF-Support">VCP-VCF Support</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCP-VVF-Admin">VCP-VVF Admin</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCP-VVF-Support">VCP-VVF Support</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCAP-VCF-Automation">VCAP Automation</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCAP-VCF-Operations">VCAP Operations</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCAP-VCF-Storage">VCAP Storage</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCAP-VCF-VKS">VCAP VKS</button>
+            <button type="button" class="ts-cert-chip" data-cert="VCAP-VCF-Networking">VCAP Networking</button>
           </div>
 
           <div id="ts-lib-progress" class="ts-lib-progress" hidden>
@@ -1426,7 +1438,7 @@
               </div>
               <div class="field ts-build-full"><label>Description</label><input type="text" id="ts-build-desc" placeholder="One-line description of the fault"></div>
               <div class="field ts-build-full"><label>Topics (comma-separated)</label><input type="text" id="ts-build-topics" placeholder="bgp, nsx-routing"></div>
-              <div class="field ts-build-full"><label>Exam objectives (comma-separated)</label><input type="text" id="ts-build-exams" placeholder="VCP-NV, VCAP-NV"></div>
+              <div class="field ts-build-full"><label>Exam objectives (comma-separated)</label><input type="text" id="ts-build-exams" placeholder="VCP-VCF-Admin, VCAP-VCF-Networking"></div>
               <div class="field ts-build-full"><label>Lab requirements (comma-separated)</label><input type="text" id="ts-build-reqs" placeholder="nsx, vyos, nested-cluster-min-3"></div>
             </div>
 

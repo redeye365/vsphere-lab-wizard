@@ -20,9 +20,9 @@ const { chromium } = require('playwright');
     await page.goto(BASE);
     await page.click('#mode-learn');
     await page.evaluate(() => document.querySelector('.learn-goal-card[data-goal="certification"]').click());
-    await page.selectOption('#learn-cert-target', 'VCP-NV');
+    await page.selectOption('#learn-cert-target', 'VCAP-VCF-Networking');
     await page.evaluate(() => document.querySelector('.learn-exp-card[data-exp="some"]').click());
-    await page.fill('#learn-success-stmt', 'Practise NSX DFW for VCP-NV.');
+    await page.fill('#learn-success-stmt', 'Practise NSX BGP peering for VCAP Networking.');
     await page.evaluate(() => document.querySelector('.learn-time-card[data-time="full-day"]').click());
     await page.check('#learn-arch-toggle');
     await page.evaluate(() => document.getElementById('learn-onboard-start').click());
@@ -35,7 +35,7 @@ const { chromium } = require('playwright');
     await page.fill('#arch-problem-stmt', 'Need a reproducible NSX lab to validate DFW policies.');
     await page.selectOption('#arch-constraint-time', 'one-week');
     await page.selectOption('#arch-constraint-budget', 'homelab');
-    await page.fill('#arch-success-criteria', 'Pass VCP-NV exam.');
+    await page.fill('#arch-success-criteria', 'Pass VCAP Networking exam.');
     await page.fill('#arch-success-measure', 'Run through exam scenarios without notes.');
     await page.evaluate(() => document.querySelectorAll('.arch-principle-card')[0].click());
     await page.click('#arch-disc-start');
@@ -48,27 +48,56 @@ const { chromium } = require('playwright');
   await page.click('#mode-learn');
   await page.evaluate(() => document.querySelector('.learn-goal-card[data-goal="certification"]').click());
 
-  await check('VCP-VVF option present (replaces retired VCP-DCV)', async () =>
-    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCP-VVF"]')));
-  await check('VCP-DCV option NOT present (retired Dec 2025)', async () =>
-    page.evaluate(() => !document.querySelector('#learn-cert-target option[value="VCP-DCV"]')));
-  await check('VCP-NV option present', async () =>
-    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCP-NV"]')));
-  await check('VCAP-DCV option present', async () =>
-    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCAP-DCV"]')));
-  await check('VCAP-NV option present', async () =>
-    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCAP-NV"]')));
-  await check('VCP-VCF-Admin option present (2V0-17.25)', async () =>
-    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCP-VCF-Admin"]')));
+  // VCP level options
   await check('VCP-VCF-Architect option present (2V0-13.25)', async () =>
     page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCP-VCF-Architect"]')));
+  await check('VCP-VCF-Admin option present (2V0-17.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCP-VCF-Admin"]')));
+  await check('VCP-VCF-Support option present (2V0-15.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCP-VCF-Support"]')));
+  await check('VCP-VVF-Admin option present (2V0-16.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCP-VVF-Admin"]')));
+  await check('VCP-VVF-Support option present (2V0-18.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCP-VVF-Support"]')));
+  // VCAP level options
+  await check('VCAP-VCF-Automation option present (3V0-21.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCAP-VCF-Automation"]')));
+  await check('VCAP-VCF-Operations option present (3V0-22.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCAP-VCF-Operations"]')));
+  await check('VCAP-VCF-Storage option present (3V0-23.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCAP-VCF-Storage"]')));
+  await check('VCAP-VCF-VKS option present (3V0-24.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCAP-VCF-VKS"]')));
+  await check('VCAP-VCF-Networking option present (3V0-25.25)', async () =>
+    page.evaluate(() => !!document.querySelector('#learn-cert-target option[value="VCAP-VCF-Networking"]')));
+  // Retired certs absent
+  await check('Old VCP-VVF (no suffix) NOT present', async () =>
+    page.evaluate(() => !document.querySelector('#learn-cert-target option[value="VCP-VVF"]')));
+  await check('Old VCP-NV NOT present', async () =>
+    page.evaluate(() => !document.querySelector('#learn-cert-target option[value="VCP-NV"]')));
+  await check('Old VCAP-DCV NOT present', async () =>
+    page.evaluate(() => !document.querySelector('#learn-cert-target option[value="VCAP-DCV"]')));
+  await check('Old VCAP-NV NOT present', async () =>
+    page.evaluate(() => !document.querySelector('#learn-cert-target option[value="VCAP-NV"]')));
   await check('Old VCF catch-all NOT present', async () =>
     page.evaluate(() => !document.querySelector('#learn-cert-target option[value="VCF"]')));
-  await check('6 cert options total', async () =>
-    page.evaluate(() => document.querySelectorAll('#learn-cert-target option:not([value=""])').length === 6));
+  await check('10 cert options total', async () =>
+    page.evaluate(() => document.querySelectorAll('#learn-cert-target option:not([value=""])').length === 10));
 
   await check('VCP-VCF-Admin triggers NSX pre-fill', async () => {
     await page.selectOption('#learn-cert-target', 'VCP-VCF-Admin');
+    await page.evaluate(() => document.querySelector('.learn-exp-card[data-exp="some"]').click());
+    await page.evaluate(() => document.querySelector('.learn-time-card[data-time="full-day"]').click());
+    await page.evaluate(() => document.getElementById('learn-onboard-start').click());
+    await page.waitForTimeout(200);
+    return await page.evaluate(() => document.getElementById('nsxEnabled')?.checked === true);
+  });
+
+  await check('VCAP-VCF-Networking triggers NSX pre-fill', async () => {
+    await page.goto(BASE);
+    await page.click('#mode-learn');
+    await page.evaluate(() => document.querySelector('.learn-goal-card[data-goal="certification"]').click());
+    await page.selectOption('#learn-cert-target', 'VCAP-VCF-Networking');
     await page.evaluate(() => document.querySelector('.learn-exp-card[data-exp="some"]').click());
     await page.evaluate(() => document.querySelector('.learn-time-card[data-time="full-day"]').click());
     await page.evaluate(() => document.getElementById('learn-onboard-start').click());
@@ -84,9 +113,9 @@ const { chromium } = require('playwright');
     page.evaluate(() => document.getElementById('learn-arch-toggle-wrap').hidden));
 
   await page.evaluate(() => document.querySelector('.learn-goal-card[data-goal="certification"]').click());
-  await page.selectOption('#learn-cert-target', 'VCP-NV');
+  await page.selectOption('#learn-cert-target', 'VCAP-VCF-Networking');
   await page.evaluate(() => document.querySelector('.learn-exp-card[data-exp="some"]').click());
-  await page.fill('#learn-success-stmt', 'Practise NSX DFW for VCP-NV.');
+  await page.fill('#learn-success-stmt', 'Practise NSX BGP peering for VCAP Networking.');
   await page.evaluate(() => document.querySelector('.learn-time-card[data-time="full-day"]').click());
 
   await check('Architect toggle visible after all fields set', async () =>
@@ -141,7 +170,7 @@ const { chromium } = require('playwright');
   await page.fill('#arch-problem-stmt', 'Need a reproducible NSX lab.');
   await page.selectOption('#arch-constraint-time', 'one-week');
   await page.selectOption('#arch-constraint-budget', 'homelab');
-  await page.fill('#arch-success-criteria', 'Pass VCP-NV exam.');
+  await page.fill('#arch-success-criteria', 'Pass VCAP Networking exam.');
   await page.fill('#arch-success-measure', 'Run through scenarios without notes.');
   await page.click('#arch-disc-start');
   await page.waitForTimeout(400);
@@ -176,7 +205,7 @@ const { chromium } = require('playwright');
 
   // Select option + confirm → logs decision
   await page.evaluate(() => document.querySelectorAll('.arch-opt-header-btn')[0].click());
-  await page.fill('#arch-options-rationale', 'BGP practice needed for VCP-NV.');
+  await page.fill('#arch-options-rationale', 'BGP practice needed for VCAP Networking.');
   await page.click('#arch-options-confirm');
   await page.waitForTimeout(200);
   await check('Overlay dismissed after confirm', async () =>
