@@ -765,13 +765,8 @@ function wireForm() {
     document.getElementById('vsan-network-hint').hidden = !g.vsanEnabled;
     document.getElementById('vsan-arch-field').hidden = !g.vsanEnabled;
     onChange();
-    if (state.architectMode) {
-      const alreadySeen = state._optionsAnalysisSeen || {};
-      if (!alreadySeen.storage) {
-        alreadySeen.storage = true;
-        state._optionsAnalysisSeen = alreadySeen;
-        showOptionsAnalysis('storage');
-      }
+    if (state.architectMode && e.target.checked) {
+      showOptionsAnalysis('storage');
     }
   });
   bindRadio('vsanArch', g, 'vsanArch', () => {
@@ -3079,6 +3074,19 @@ function tsWirePhase4(data) {
     }
   }
 
+  // In architect mode, log the troubleshoot fault as a risk register entry
+  if (state.architectMode && data && data.faultDescription) {
+    const topicsStr = (data.topics || '').toLowerCase();
+    const likelihood = state.troubleshootHintLevel >= 3 ? 'high' : 'medium';
+    const impact = /vsan|storage|network|routing|bgp/.test(topicsStr) ? 'high' : 'medium';
+    addAutoRisk(
+      `${data.faultDescription} (identified in troubleshoot session)`,
+      likelihood,
+      impact,
+      (data.fixSteps && data.fixSteps.length) ? `Fix: ${data.fixSteps[0]}` : 'Review fix steps in troubleshoot debrief'
+    );
+  }
+
   document.getElementById('ts-another-scenario').onclick = () => {
     state.troubleshootToken = null; state.troubleshootScenario = null;
     state.troubleshootClueText = null; state.troubleshootClueUsed = false;
@@ -3362,6 +3370,30 @@ function wireGenerate() {
 
       renderWarnings(data.warnings);
       renderDownloads(data.id, data.generatedScripts || [], !!data.svgGenerated);
+
+      // Architect mode: show readiness banner + relabel heading
+      const archBanner  = document.getElementById('arch-readiness-banner');
+      const previewHdr  = document.getElementById('markdown-preview-heading');
+      if (state.architectMode && data.markdownPreview) {
+        const m = data.markdownPreview.match(/Design readiness:\s*(\d+)%/);
+        const score = m ? parseInt(m[1]) : null;
+        if (archBanner) {
+          archBanner.hidden = false;
+          if (score !== null) {
+            const scoreEl = document.getElementById('arch-readiness-score');
+            const color = score >= 80 ? 'green' : score >= 50 ? 'amber' : 'red';
+            if (scoreEl) {
+              scoreEl.textContent = `${score}%`;
+              scoreEl.className = `arch-readiness-score arch-readiness-${color}`;
+            }
+          }
+        }
+        if (previewHdr) previewHdr.textContent = 'Architect Design Document preview';
+      } else {
+        if (archBanner) archBanner.hidden = true;
+        if (previewHdr) previewHdr.textContent = 'Design doc preview';
+      }
+
       document.getElementById('markdown-preview').textContent = data.markdownPreview;
       document.getElementById('results').hidden = false;
       document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
