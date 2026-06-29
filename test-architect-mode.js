@@ -287,6 +287,45 @@ const { chromium } = require('playwright');
   await check('Standard mode: no options overlay visible', async () =>
     page.evaluate(() => document.getElementById('arch-options-panel').hidden));
 
+  // ── Unit: buildOpenItems MoSCoW 'could' → Open Items ────────────────────────
+  console.log('\n── buildOpenItems: MoSCoW could items ──');
+  const { buildOpenItems } = require('./lib/generateMarkdown');
+
+  function unitCheck(label, fn) {
+    try { const r = fn(); if (r === false) ko(label); else ok(label); }
+    catch (e) { ko(label, e.message); }
+  }
+
+  const discWithCould = {
+    problemStatement: 'Need NSX lab.',
+    moscow: { networking: 'must', compute: 'must', storage: 'could', security: 'could', management: 'should' },
+  };
+  const allDecisions = [
+    { decision: 'Virtual router', chosen: 'VyOS', alternative: 'pfSense', rationale: 'BGP' },
+    { decision: 'Storage architecture', chosen: 'vSAN', alternative: 'NFS', rationale: 'Integrated' },
+    { decision: 'NSX deployment', chosen: 'NSX-T', alternative: 'none', rationale: 'Required' },
+    { decision: 'Cluster size', chosen: '3 hosts', alternative: '2 hosts', rationale: 'HA' },
+  ];
+  const items = buildOpenItems(discWithCould, allDecisions, [], { successStatement: 'Build NSX lab.' });
+
+  unitCheck('Storage could item present', () => items.some(i => i.includes('Storage area marked "Could Have"')));
+  unitCheck('Security could item present', () => items.some(i => i.includes('Security area marked "Could Have"')));
+  unitCheck('Networking must NOT in items', () => !items.some(i => i.includes('Networking area marked "Could Have"')));
+  unitCheck('Compute must NOT in items', () => !items.some(i => i.includes('Compute area marked "Could Have"')));
+  unitCheck('Management should NOT in items', () => !items.some(i => i.includes('Management area marked "Could Have"')));
+  unitCheck('Problem statement check passes when provided', () => !items.some(i => i.includes('Problem statement')));
+
+  // No could items → only other checks contribute
+  const discNoCould = { problemStatement: 'Need NSX lab.', moscow: { networking: 'must', compute: 'must', storage: 'must', security: 'must', management: 'must' } };
+  const itemsNoCould = buildOpenItems(discNoCould, allDecisions, [], { successStatement: 'x' });
+  unitCheck('No could items produces empty list (when all other checks pass)', () => itemsNoCould.length === 0);
+
+  // High-risk without mitigation still added
+  const highRisk = [{ likelihood: 'high', impact: 'high', mitigation: '' }];
+  const itemsWithRisk = buildOpenItems(discNoCould, allDecisions, highRisk, { successStatement: 'x' });
+  unitCheck('High-severity unmitiated risk still appears in open items', () =>
+    itemsWithRisk.some(i => i.includes('high-severity risk')));
+
   console.log(`\n── Results: ${pass} passed, ${fail} failed ──\n`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);
