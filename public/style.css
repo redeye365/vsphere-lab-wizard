@@ -1890,6 +1890,41 @@ select:focus {
 .ts-snapshot-badge    { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:var(--accent-soft); color:var(--accent-text); }
 .ts-no-snapshot-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:var(--surface); color:var(--text-faint); border:1px solid var(--border); }
 
+/* Completion tracking */
+.ts-lib-card.ts-completed {
+  border-left: 3px solid #4ade80;
+}
+.ts-completed-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(74, 222, 128, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+.ts-complete-btn-done {
+  background: rgba(74, 222, 128, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: #4ade80;
+  font-weight: 600;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+.ts-complete-btn-done:hover {
+  background: rgba(74, 222, 128, 0.08);
+  color: #86efac;
+}
+.ts-debrief-completed-note {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4ade80;
+}
+
 /* Learning objectives on scenario cards */
 .ts-lib-card-objectives {
   margin-top: 8px;

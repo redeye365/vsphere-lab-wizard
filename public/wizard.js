@@ -2265,6 +2265,17 @@ async function tsLibLoad() {
   }
 }
 
+function tsGetCompleted() {
+  try { return new Set(JSON.parse(localStorage.getItem('vsphere-completed-scenarios') || '[]')); }
+  catch { return new Set(); }
+}
+
+function tsSetCompleted(id, done) {
+  const c = tsGetCompleted();
+  if (done) c.add(id); else c.delete(id);
+  localStorage.setItem('vsphere-completed-scenarios', JSON.stringify([...c]));
+}
+
 function tsObjectivesHtml(objectives) {
   if (!objectives || objectives.length === 0) return '';
   return `<div class="ts-lib-card-objectives"><span class="ts-obj-label">Objectives</span><ul class="ts-obj-list">${objectives.map(o => `<li>${escHtml(o)}</li>`).join('')}</ul></div>`;
@@ -2288,11 +2299,13 @@ function tsLibRender() {
   if (!listEl) return;
   if (filtered.length === 0) { listEl.innerHTML = '<p class="hint">No scenarios match the current filter.</p>'; return; }
 
+  const completed = tsGetCompleted();
   listEl.innerHTML = '';
   filtered.forEach(s => {
+    const isDone = completed.has(s.id);
     const certBadges = (s.certRelevance || []).map(c => `<span class="ts-cert-badge ts-cert-badge-${c.toLowerCase().replace(/[^a-z0-9]/g, '-')}">${escHtml(c)}</span>`).join('');
     const card = document.createElement('div');
-    card.className = 'ts-lib-card';
+    card.className = `ts-lib-card${isDone ? ' ts-completed' : ''}`;
     card.innerHTML = `
       <div class="ts-lib-card-main">
         <div class="ts-lib-card-name">${escHtml(s.name)}</div>
@@ -2301,6 +2314,7 @@ function tsLibRender() {
           <span class="ts-diff-badge ts-diff-${s.difficulty}">${escHtml(s.difficulty || '')}</span>
           ${(s.topics || []).map(t => `<span class="ts-topic-chip-inline">${escHtml(t)}</span>`).join('')}
           ${certBadges}
+          ${isDone ? '<span class="ts-completed-badge">✓ Completed</span>' : ''}
           ${s.snapshotName ? '<span class="ts-snapshot-badge">snapshot captured</span>' : '<span class="ts-no-snapshot-badge">no snapshot</span>'}
         </div>
         ${tsObjectivesHtml(s.learningObjectives)}
@@ -2310,6 +2324,7 @@ function tsLibRender() {
         <button type="button" class="btn btn-secondary btn-sm ts-edit-btn" data-id="${escHtml(s.id)}">Edit</button>
         <button type="button" class="btn btn-secondary btn-sm ts-export-btn" data-id="${escHtml(s.id)}">Export</button>
         <button type="button" class="btn btn-danger btn-sm ts-delete-btn" data-id="${escHtml(s.id)}">Delete</button>
+        <button type="button" class="btn btn-sm ts-complete-btn ${isDone ? 'ts-complete-btn-done' : 'btn-secondary'}" data-id="${escHtml(s.id)}">${isDone ? '✓ Done' : 'Mark done'}</button>
       </div>`;
     listEl.appendChild(card);
   });
@@ -2318,6 +2333,10 @@ function tsLibRender() {
   listEl.querySelectorAll('.ts-edit-btn').forEach(btn => btn.onclick = () => tsLibEdit(btn.dataset.id));
   listEl.querySelectorAll('.ts-export-btn').forEach(btn => btn.onclick = () => tsLibExport(btn.dataset.id));
   listEl.querySelectorAll('.ts-delete-btn').forEach(btn => btn.onclick = () => tsLibDelete(btn.dataset.id));
+  listEl.querySelectorAll('.ts-complete-btn').forEach(btn => btn.onclick = () => {
+    tsSetCompleted(btn.dataset.id, !tsGetCompleted().has(btn.dataset.id));
+    tsLibRender();
+  });
 }
 
 function tsRenderActiveBanner(scenario) {
@@ -2847,7 +2866,7 @@ async function tsStartSession(id) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to start session');
     state.troubleshootToken    = data.token;
-    state.troubleshootScenario = { callerName: data.callerName, message: data.scenarioMessage, name: data.scenarioName };
+    state.troubleshootScenario = { id, callerName: data.callerName, message: data.scenarioMessage, name: data.scenarioName };
     tsShowPhase(3);
     tsWirePhase3();
   } catch (err) {
@@ -3093,6 +3112,17 @@ function tsWirePhase4(data) {
     learnDebrief.hidden = !(state.troubleshootLearningMode && data);
     if (state.troubleshootLearningMode && data) {
       learnDebrief.innerHTML = tsBuildLearnDebrief(data);
+    }
+  }
+
+  // Auto-mark scenario complete on successful debrief
+  if (data && state.troubleshootScenario?.id) {
+    tsSetCompleted(state.troubleshootScenario.id, true);
+    if (statsEl) {
+      const note = document.createElement('p');
+      note.className = 'ts-debrief-completed-note';
+      note.textContent = '✓ Scenario marked as completed in your library.';
+      statsEl.appendChild(note);
     }
   }
 

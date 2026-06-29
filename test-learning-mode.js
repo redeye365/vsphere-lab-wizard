@@ -390,6 +390,92 @@ const { chromium } = require('playwright');
       return noObjCard && !noObjCard.querySelector('.ts-lib-card-objectives');
     }));
 
+  // ── Scenario completion tracking ─────────────────────────────────────────────
+  console.log('\n── Completion tracking ──');
+
+  // Clear any leftover state from localStorage
+  await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
+
+  // Inject two mock scenarios, re-render
+  await page.evaluate(() => {
+    state.tsAllScenarios = [
+      { id: 'sc-a', name: 'NSX DFW Lab', description: 'desc', difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-NV'], learningObjectives: ['Configure DFW'] },
+      { id: 'sc-b', name: 'vSphere HA Lab', description: 'desc', difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF'] }
+    ];
+    document.querySelector('.ts-cert-chip[data-cert=""]').click();
+  });
+  await page.waitForTimeout(100);
+
+  await check('"Mark done" button present on each card', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-complete-btn').length === 2));
+
+  await check('No completed badges before any marking', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-completed-badge').length === 0));
+
+  await check('No .ts-completed cards before marking', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-lib-card.ts-completed').length === 0));
+
+  // Mark the first scenario done
+  await check('Clicking "Mark done" marks scenario complete', async () => {
+    await page.evaluate(() => document.querySelectorAll('.ts-complete-btn')[0].click());
+    await page.waitForTimeout(100);
+    return page.evaluate(() => document.querySelectorAll('.ts-completed-badge').length === 1);
+  });
+
+  await check('Completed card gets .ts-completed class', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-lib-card.ts-completed').length === 1));
+
+  await check('Button label changes to "✓ Done" after marking', async () =>
+    page.evaluate(() => {
+      const btns = document.querySelectorAll('.ts-complete-btn');
+      return Array.from(btns).some(b => b.textContent.trim() === '✓ Done');
+    }));
+
+  await check('Completion persisted to localStorage', async () =>
+    page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem('vsphere-completed-scenarios') || '[]');
+      return stored.includes('sc-a');
+    }));
+
+  await check('Second card still shows "Mark done"', async () =>
+    page.evaluate(() => {
+      const btns = document.querySelectorAll('.ts-complete-btn');
+      return Array.from(btns).some(b => b.textContent.trim() === 'Mark done');
+    }));
+
+  // Toggle back off
+  await check('Clicking "✓ Done" unmarks the scenario', async () => {
+    await page.evaluate(() => {
+      const doneBtn = Array.from(document.querySelectorAll('.ts-complete-btn')).find(b => b.textContent.trim() === '✓ Done');
+      if (doneBtn) doneBtn.click();
+    });
+    await new Promise(r => setTimeout(r, 100));
+    return page.evaluate(() => document.querySelectorAll('.ts-completed-badge').length === 0);
+  });
+
+  await check('localStorage cleared after unmark', async () =>
+    page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem('vsphere-completed-scenarios') || '[]');
+      return !stored.includes('sc-a');
+    }));
+
+  // Test auto-mark via tsSetCompleted directly (simulates debrief auto-mark)
+  await check('tsGetCompleted and tsSetCompleted are callable from page context', async () =>
+    page.evaluate(() => {
+      if (typeof tsSetCompleted !== 'function' || typeof tsGetCompleted !== 'function') return false;
+      tsSetCompleted('sc-b', true);
+      return tsGetCompleted().has('sc-b');
+    }));
+
+  await check('Re-render reflects auto-marked scenario', async () => {
+    await page.evaluate(() => tsLibRender());
+    await new Promise(r => setTimeout(r, 100));
+    return page.evaluate(() => document.querySelectorAll('.ts-lib-card.ts-completed').length === 1);
+  });
+
+  // Clean up localStorage
+  await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
+
   console.log(`\n── Results: ${pass} passed, ${fail} failed ──\n`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);
