@@ -623,11 +623,48 @@
       <!-- Step 4: Domain controller -->
       <section class="step" data-step="4">
         <h1>Domain controller?</h1>
-        <p class="step-intro">A Windows DC gives the lab DNS, NTP, and Active Directory — required before vCenter is deployed if you want valid FQDNs and certificates.</p>
+        <p class="step-intro">A Windows DC gives the lab DNS, NTP, and Active Directory &mdash; required before vCenter is deployed if you want valid FQDNs and certificates. Choose how much you want on this VM.</p>
 
-        <div class="field checkbox-field">
-          <label class="checkbox-row"><input type="checkbox" id="dcEnabled"><span>Deploy a domain controller for this lab</span></label>
-          <p class="hint">Sized at 2 vCPU / 4GB RAM / 80GB disk. Windows Server ISO install is manual — same pattern as the nested ESXi hosts.</p>
+        <div class="field">
+          <div class="dc-profile-cards" id="dc-profile-cards">
+
+            <label class="dc-profile-card" data-profile="none">
+              <input type="radio" name="dcProfile" value="none" checked>
+              <div class="dc-profile-card-body">
+                <div class="dc-profile-card-title">No DC</div>
+                <div class="dc-profile-card-desc">Skip &mdash; use an external DNS/NTP server or configure manually after deployment.</div>
+                <div class="dc-profile-card-specs dc-profile-card-specs-none">No VM created</div>
+              </div>
+            </label>
+
+            <label class="dc-profile-card" data-profile="dc-only">
+              <input type="radio" name="dcProfile" value="dc-only">
+              <div class="dc-profile-card-body">
+                <div class="dc-profile-card-title">DC only</div>
+                <div class="dc-profile-card-desc">Active Directory, DNS, and NTP. Minimum footprint.</div>
+                <div class="dc-profile-card-specs">2 vCPU &middot; 4 GB RAM &middot; 60 GB disk</div>
+              </div>
+            </label>
+
+            <label class="dc-profile-card" data-profile="dc-jumpbox">
+              <input type="radio" name="dcProfile" value="dc-jumpbox">
+              <div class="dc-profile-card-body">
+                <div class="dc-profile-card-title">DC + Jumpbox</div>
+                <div class="dc-profile-card-desc">AD/DNS/NTP with RDP access configured. Generates a pre-configured <code>.rdp</code> file for instant double-click connection from your desktop.</div>
+                <div class="dc-profile-card-specs">4 vCPU &middot; 8 GB RAM &middot; 100 GB disk</div>
+              </div>
+            </label>
+
+            <label class="dc-profile-card" data-profile="dc-jumpbox-fileserver">
+              <input type="radio" name="dcProfile" value="dc-jumpbox-fileserver">
+              <div class="dc-profile-card-body">
+                <div class="dc-profile-card-title">DC + Jumpbox + File Server</div>
+                <div class="dc-profile-card-desc">All of the above plus a second disk for ISO and software storage, shared across the lab via a Windows file share.</div>
+                <div class="dc-profile-card-specs">4 vCPU &middot; 8 GB RAM &middot; 100 GB OS + storage disk</div>
+              </div>
+            </label>
+
+          </div>
         </div>
 
         <div id="dc-fields" hidden>
@@ -635,13 +672,18 @@
             <div class="field">
               <label for="dcDomainName">Domain name</label>
               <input type="text" id="dcDomainName" placeholder="lab.yourdomain.com">
-              <p class="hint">e.g. <code>lab.acme.internal</code> — used in the DC promotion command and the vCenter FQDN.</p>
+              <p class="hint">e.g. <code>lab.acme.internal</code> &mdash; used in the DC promotion command and the vCenter FQDN.</p>
             </div>
             <div class="field">
               <label for="dcIpAddress">DC IP address</label>
               <input type="text" id="dcIpAddress" placeholder="e.g. 192.168.10.5">
-              <p class="hint">This is checked against the lab network ranges in the next steps to flag IP conflicts.</p>
+              <p class="hint">Checked against the lab network ranges in the next steps to flag IP conflicts.</p>
             </div>
+          </div>
+          <div class="field" id="dc-storage-disk-field" hidden>
+            <label for="dcStorageDiskGB">Storage disk size (GB)</label>
+            <input type="number" id="dcStorageDiskGB" min="100" step="50" value="200" placeholder="200">
+            <p class="hint">This second disk is formatted and shared as <code>\\dc\LabISOs</code> &mdash; a central location to drop ISOs and software visible to all lab VMs. 200&ndash;500 GB is typical.</p>
           </div>
         </div>
       </section>

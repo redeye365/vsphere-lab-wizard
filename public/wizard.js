@@ -75,7 +75,7 @@ const ESXI_VERSION_LABELS = {
 const ESXI_MIN_VRAM = { '9.1': 8, '9.0u2': 8, '9.0u1': 8, '9.0': 8, '8.0u3': 8, '8.0u2': 8, '8.0u1': 8 };
 const ESXI9X_VERSIONS = new Set(['9.1', '9.0u2', '9.0u1', '9.0']);
 const VCENTER_TINY_RAM_GB = 14;
-const DC_RAM_GB_SIZING = 4;
+const DC_RAM_GB_BY_PROFILE = { 'none': 0, 'dc-only': 4, 'dc-jumpbox': 8, 'dc-jumpbox-fileserver': 8 };
 const VYOS_RAM_GB_SIZING = 1;
 const ESXI_OVERHEAD_GB = 4;
 
@@ -196,7 +196,7 @@ const state = {
       esxiVersion: null,
       esxiDeployMethod: 'ova',
       vyosEnabled: false, vyosNetworkMode: null,
-      dcEnabled: false, dcDomainName: null, dcIpAddress: null,
+      dcProfile: 'none', dcDomainName: null, dcIpAddress: null, dcStorageDiskGB: 200,
       mgmtCidr: null, mgmtVlan: null, mgmtVlanMode: 'untagged',
       vmotionCidr: null, vmotionVlan: null,
       vmCidr: null, vmVlan: null,
@@ -475,7 +475,7 @@ function calcHostTiers(physRamGB, esxiVer) {
   const g = state.answers.design;
   const perHostMin = ESXI_MIN_VRAM[esxiVer] || 8;
   const fixedRam = ESXI_OVERHEAD_GB + VCENTER_TINY_RAM_GB
-    + (g.dcEnabled   ? DC_RAM_GB_SIZING   : 0)
+    + (DC_RAM_GB_BY_PROFILE[g.dcProfile] || 0)
     + (g.vyosEnabled ? VYOS_RAM_GB_SIZING : 0);
   const available = Math.max(0, physRamGB - fixedRam);
   const maxHosts = Math.min(Math.floor(available / perHostMin), 12);
@@ -594,8 +594,8 @@ function renderResourceTips() {
 
   tips.push({ saving: '7 GB', text: 'Use vCenter Tiny deployment size (2 vCPU, 14 GB) instead of Small (4 vCPU, 21 GB) — fully adequate for a lab with fewer than 10 hosts.' });
 
-  if (g.dcEnabled) {
-    tips.push({ saving: '0–8 GB', text: 'Keep DC at minimum spec — 2 vCPU / 4 GB is sufficient for lab DNS and Active Directory.' });
+  if (g.dcProfile === 'dc-jumpbox' || g.dcProfile === 'dc-jumpbox-fileserver') {
+    tips.push({ saving: '4 GB', text: 'If you only need DNS/AD (no RDP jumpbox), switch the DC to "DC only" — saves 4 GB RAM by dropping from 8 GB to 4 GB.' });
   }
 
   tips.push({ saving: 'overhead', text: 'Disable memory reservation on nested ESXi VMs and rely on the memory balloon driver — lets the physical host reclaim idle guest RAM.' });
@@ -716,11 +716,20 @@ function wireForm() {
   });
   bindRadio('vyosNetworkMode', g, 'vyosNetworkMode', onChange);
 
-  // DC
-  const dcCheckbox = document.getElementById('dcEnabled');
-  dcCheckbox.addEventListener('change', () => {
-    g.dcEnabled = dcCheckbox.checked;
-    document.getElementById('dc-fields').hidden = !g.dcEnabled;
+  // DC profile cards
+  document.querySelectorAll('input[name="dcProfile"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      g.dcProfile = radio.value;
+      const dcEnabled = g.dcProfile !== 'none';
+      document.getElementById('dc-fields').hidden = !dcEnabled;
+      const storageDiskField = document.getElementById('dc-storage-disk-field');
+      if (storageDiskField) storageDiskField.hidden = g.dcProfile !== 'dc-jumpbox-fileserver';
+      onChange();
+    });
+  });
+  const dcStorageDiskEl = document.getElementById('dcStorageDiskGB');
+  if (dcStorageDiskEl) dcStorageDiskEl.addEventListener('input', () => {
+    g.dcStorageDiskGB = Number(dcStorageDiskEl.value) || 200;
     onChange();
   });
   bindText('dcDomainName', g, 'dcDomainName', () => { checkSsoCollision(); onChange(); });
@@ -1007,7 +1016,7 @@ function wireForm() {
         const isIis = el.value === 'iis';
         document.getElementById('depot-linux-hint').hidden = isIis;
         document.getElementById('depot-iis-hint').hidden = !isIis;
-        document.getElementById('depot-iis-no-dc-warning').hidden = !(isIis && !g.dcEnabled);
+        document.getElementById('depot-iis-no-dc-warning').hidden = !(isIis && g.dcProfile === 'none');
         onChange();
       }
     });
@@ -1376,7 +1385,7 @@ function updateDcNotice() {
   const g = state.answers.design;
   const notice = document.getElementById('dc-ip-notice');
   if (!notice) return;
-  if (g.dcEnabled && g.dcIpAddress) {
+  if (g.dcProfile !== 'none' && g.dcIpAddress) {
     notice.hidden = false;
     notice.textContent = `DC IP ${g.dcIpAddress} is planned for this lab. Make sure it falls inside the management CIDR below and doesn’t conflict with any DHCP range.`;
   } else {
@@ -1419,7 +1428,7 @@ function validateStep(n) {
       }
       return null;
     case 4:
-      if (g.dcEnabled) {
+      if (g.dcProfile !== 'none') {
         if (!g.dcDomainName) return 'Enter a domain name for the DC.';
         if (!g.dcIpAddress) return 'Enter an IP address for the DC.';
       }
@@ -1633,10 +1642,11 @@ function renderTopology() {
     a.textContent = `vyos${g.vyosNetworkMode === 'bgp' ? ' (BGP)' : ''}`;
     appliancesEl.appendChild(a);
   }
-  if (g.dcEnabled) {
+  if (g.dcProfile !== 'none') {
     const a = document.createElement('div');
     a.className = 'topo-appliance';
-    a.textContent = `dc${g.dcDomainName ? ' · ' + g.dcDomainName : ''}`;
+    const profileSuffix = g.dcProfile === 'dc-jumpbox' ? ' + jumpbox' : g.dcProfile === 'dc-jumpbox-fileserver' ? ' + jumpbox + files' : '';
+    a.textContent = `dc${profileSuffix}${g.dcDomainName ? ' · ' + g.dcDomainName : ''}`;
     appliancesEl.appendChild(a);
   }
   if (g.depotEnabled && depotStepVisible()) {
@@ -1765,10 +1775,12 @@ function renderReview() {
   if (g.vyosEnabled && g.vyosNetworkMode) {
     infraComponents.push(['VyOS mode', g.vyosNetworkMode === 'bgp' ? 'Basic + BGP' : 'Basic (NAT, DHCP, DNS)']);
   }
-  infraComponents.push(['Domain controller', g.dcEnabled ? 'Yes' : 'No']);
-  if (g.dcEnabled) {
+  const dcProfileLabels = { 'none': 'No', 'dc-only': 'DC only', 'dc-jumpbox': 'DC + Jumpbox', 'dc-jumpbox-fileserver': 'DC + Jumpbox + File Server' };
+  infraComponents.push(['Domain controller', dcProfileLabels[g.dcProfile] || 'No']);
+  if (g.dcProfile !== 'none') {
     infraComponents.push(['DC domain', val(g.dcDomainName)]);
     infraComponents.push(['DC IP', val(g.dcIpAddress)]);
+    if (g.dcProfile === 'dc-jumpbox-fileserver') infraComponents.push(['Storage disk', `${g.dcStorageDiskGB || 200} GB`]);
   }
   const localDsEnabled = (g.nestedDisks || []).some((dd) => dd.purpose === 'local_datastore');
   infraComponents.push(['Local datastore (host 1)', localDsEnabled ? 'Yes' : 'No']);
@@ -1914,7 +1926,7 @@ function renderReview() {
     }
   }
 
-  if (g.depotEnabled && g.depotMode === 'iis' && !g.dcEnabled) {
+  if (g.depotEnabled && g.depotMode === 'iis' && g.dcProfile === 'none') {
     const warn = document.createElement('div');
     warn.className = 'review-warn';
     warn.textContent = '⚠ Bundle depot is set to IIS mode but no domain controller is included. Enable the DC (step 4) or switch to Linux/nginx mode.';
@@ -2025,7 +2037,7 @@ function buildReviewSpec() {
     physicalHosts,
     esxiVersion: { label: ESXI_VERSION_LABELS[g.esxiVersion] || 'ESXi' },
     vyos: { enabled: !!g.vyosEnabled, networkMode: g.vyosNetworkMode || 'basic' },
-    domainController: { enabled: !!g.dcEnabled, domainName: g.dcDomainName || null, ipAddress: g.dcIpAddress || null },
+    domainController: { enabled: g.dcProfile !== 'none', profile: g.dcProfile || 'none', domainName: g.dcDomainName || null, ipAddress: g.dcIpAddress || null, storageDiskGB: g.dcStorageDiskGB || 200 },
     networks: {
       management: { cidr: g.mgmtCidr || null, vlanId: g.mgmtVlan != null ? Number(g.mgmtVlan) : null, mode: g.mgmtVlanMode || 'untagged' },
       vMotion: { cidr: g.vmotionCidr || null, vlanId: g.vmotionVlan != null ? Number(g.vmotionVlan) : null },
@@ -2105,9 +2117,17 @@ function loadSpecIntoState(spec) {
     if (spec.vyos.networkMode) g.vyosNetworkMode = spec.vyos.networkMode;
   }
   if (spec.domainController) {
-    g.dcEnabled = !!spec.domainController.enabled;
+    // Backward compat: old specs have `enabled` bool but no `profile`
+    g.dcProfile = spec.domainController.profile || (spec.domainController.enabled ? 'dc-only' : 'none');
     if (spec.domainController.domainName) g.dcDomainName = spec.domainController.domainName;
-    if (spec.domainController.ipAddress) g.dcIpAddress = spec.domainController.ipAddress;
+    if (spec.domainController.ipAddress)  g.dcIpAddress  = spec.domainController.ipAddress;
+    if (spec.domainController.storageDiskGB) g.dcStorageDiskGB = spec.domainController.storageDiskGB;
+    // Sync radio UI
+    const profileRadio = document.querySelector(`input[name="dcProfile"][value="${g.dcProfile}"]`);
+    if (profileRadio) profileRadio.checked = true;
+    document.getElementById('dc-fields').hidden = g.dcProfile === 'none';
+    const storageDiskField = document.getElementById('dc-storage-disk-field');
+    if (storageDiskField) storageDiskField.hidden = g.dcProfile !== 'dc-jumpbox-fileserver';
   }
   if (spec.networks) {
     const nets = spec.networks;
@@ -3900,7 +3920,7 @@ function computeUsedRam() {
   const hosts = Number(g.nestedHostCount) || 0;
   const perHost = Number(g.vramPerHostGB) || 0;
   let used = hosts * perHost + 21 /* vCenter */;
-  if (g.dcEnabled)  used += 4;
+  used += (DC_RAM_GB_BY_PROFILE[g.dcProfile] || 0);
   if (g.nsxEnabled) used += 48;
   return used;
 }

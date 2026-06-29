@@ -28,7 +28,7 @@ setInterval(() => {
 }, 300000); // prune every 5 minutes
 
 const { buildSpec } = require('./lib/generateSpec');
-const { buildPowerShellScripts } = require('./lib/generatePowerShell');
+const { buildPowerShellScripts, buildRdpFile } = require('./lib/generatePowerShell');
 const { buildMarkdown } = require('./lib/generateMarkdown');
 const { buildBuildGuide } = require('./lib/generateBuildGuide');
 const { buildPrerequisites } = require('./lib/generatePrerequisites');
@@ -220,6 +220,12 @@ app.post('/api/generate', (req, res) => {
     const ksFiles = buildKickstartFiles(spec);
     for (const [filename, content] of Object.entries(ksFiles)) {
       fs.writeFileSync(path.join(dir, filename), content);
+    }
+
+    // RDP file for DC+Jumpbox and DC+Jumpbox+FileServer profiles
+    const rdpContent = buildRdpFile(spec.domainController);
+    if (rdpContent) {
+      fs.writeFileSync(path.join(dir, 'lab-dc.rdp'), rdpContent);
     }
 
     // Strip sensitive fields before returning spec to browser — rootPassword and
