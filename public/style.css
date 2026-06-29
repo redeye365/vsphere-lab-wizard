@@ -1987,6 +1987,120 @@ select:focus {
 .btn-danger { background: rgba(217,105,106,0.15); color: var(--danger); border: 1px solid var(--danger); }
 .btn-danger:hover { background: rgba(217,105,106,0.25); }
 
+/* ── Study Plan tab ─────────────────────────────────────────────────────── */
+.ts-sp-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.ts-sp-overall-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 160px;
+}
+.ts-sp-overall-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.ts-sp-overall-bar {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.ts-sp-cert-section {
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.ts-sp-cert-section.ts-sp-empty {
+  opacity: 0.55;
+}
+.ts-sp-cert-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-raised);
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.ts-sp-cert-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+.ts-sp-cert-stats {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.ts-sp-cert-bar-wrap {
+  width: 80px;
+  height: 5px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.ts-sp-cert-bar {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.ts-sp-no-scenarios {
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 10px 14px;
+  margin: 0;
+}
+.ts-sp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.ts-sp-row:last-child { border-bottom: none; }
+.ts-sp-row:hover { background: var(--surface-raised); }
+.ts-sp-row.ts-sp-done { border-left: 3px solid #4ade80; padding-left: 11px; }
+.ts-sp-row-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+.ts-sp-check {
+  color: #4ade80;
+  font-size: 14px;
+  font-weight: 700;
+}
+.ts-sp-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ts-sp-load-btn { }
+.ts-sp-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+.ts-sp-toggle-btn:hover { border-color: var(--text-dim); color: var(--text); }
+.ts-sp-row.ts-sp-no-snap .ts-sp-load-btn { opacity: 0.5; }
+
 /* Build form */
 .ts-build-header {
   display: flex;

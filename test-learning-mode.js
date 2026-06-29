@@ -530,6 +530,189 @@ const { chromium } = require('playwright');
   // Clean up
   await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
 
+  // ── Study Plan tab ───────────────────────────────────────────────────────────
+  console.log('\n── Study Plan tab ──');
+
+  // Navigate to troubleshoot step
+  await page.goto(BASE);
+  await page.click('#mode-build');
+  for (let i = 0; i < 9; i++) {
+    const next = await page.$('#btn-next');
+    if (!next) break;
+    const disabled = await next.getAttribute('disabled');
+    if (disabled !== null) break;
+    await next.click();
+    await page.waitForTimeout(80);
+  }
+  const tsSection = await page.$('#troubleshoot-step');
+  if (!tsSection) {
+    // Navigate directly via step selector if needed
+    await page.evaluate(() => { showStep(9); initTroubleshootStep(); });
+    await page.waitForTimeout(200);
+  }
+
+  await check('Study Plan tab button exists', async () =>
+    page.evaluate(() => !!document.getElementById('ts-tab-studyplan')));
+
+  await check('Study Plan tab button text is "Study Plan"', async () =>
+    page.evaluate(() => document.getElementById('ts-tab-studyplan')?.textContent.trim() === 'Study Plan'));
+
+  await check('Study plan panel exists and is initially hidden', async () =>
+    page.evaluate(() => {
+      const p = document.getElementById('ts-studyplan-panel');
+      return p && p.hidden;
+    }));
+
+  // Switch to Study Plan
+  await page.evaluate(() => tsSwitchMode('studyplan'));
+  await page.waitForTimeout(150);
+
+  await check('Study plan panel visible after tsSwitchMode("studyplan")', async () =>
+    page.evaluate(() => !document.getElementById('ts-studyplan-panel').hidden));
+
+  await check('Library panel hidden when study plan active', async () =>
+    page.evaluate(() => document.getElementById('ts-library-panel').hidden));
+
+  await check('Overall progress header present in study plan', async () =>
+    page.evaluate(() => !!document.querySelector('#ts-studyplan-panel .ts-sp-header')));
+
+  await check('10 cert sections rendered (one per cert)', async () =>
+    page.evaluate(() => document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section').length === 10));
+
+  await check('All 10 cert section titles present', async () => {
+    const titles = await page.evaluate(() =>
+      [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-title')].map(el => el.textContent.trim()));
+    const expected = [
+      'VCP — VCF Architect', 'VCP — VCF Admin', 'VCP — VCF Support',
+      'VCP — VVF Admin', 'VCP — VVF Support',
+      'VCAP — VCF Automation', 'VCAP — VCF Operations', 'VCAP — VCF Storage',
+      'VCAP — VCF VKS', 'VCAP — VCF Networking',
+    ];
+    return expected.every(e => titles.includes(e));
+  });
+
+  // Inject scenarios with certRelevance into two certs
+  await page.evaluate(() => {
+    localStorage.removeItem('vsphere-completed-scenarios');
+    state.tsAllScenarios = [
+      { id: 'sp-a', name: 'Hard NSX Fault',   description: '', difficulty: 'hard',   topics: [], certRelevance: ['VCAP-VCF-Networking'], snapshotName: '' },
+      { id: 'sp-b', name: 'Easy NSX Fault',   description: '', difficulty: 'easy',   topics: [], certRelevance: ['VCAP-VCF-Networking'], snapshotName: 'snap-b' },
+      { id: 'sp-c', name: 'Medium NSX Fault', description: '', difficulty: 'medium', topics: [], certRelevance: ['VCAP-VCF-Networking'], snapshotName: '' },
+      { id: 'sp-d', name: 'vSphere Fault',    description: '', difficulty: 'easy',   topics: [], certRelevance: ['VCP-VVF-Admin'],       snapshotName: 'snap-d' },
+    ];
+    tsRenderStudyPlan();
+  });
+  await page.waitForTimeout(150);
+
+  await check('VCAP Networking section shows 3 scenario rows', async () =>
+    page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section')];
+      const nsxSection = sections.find(s => s.querySelector('.ts-sp-cert-title')?.textContent.includes('Networking'));
+      return nsxSection ? nsxSection.querySelectorAll('.ts-sp-row').length === 3 : false;
+    }));
+
+  await check('Scenarios sorted Easy first in cert section', async () =>
+    page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section')];
+      const nsxSection = sections.find(s => s.querySelector('.ts-sp-cert-title')?.textContent.includes('Networking'));
+      if (!nsxSection) return false;
+      const rows = nsxSection.querySelectorAll('.ts-sp-row');
+      return rows[0]?.querySelector('.ts-diff-badge')?.textContent.trim() === 'easy';
+    }));
+
+  await check('Scenarios sorted Medium second in cert section', async () =>
+    page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section')];
+      const nsxSection = sections.find(s => s.querySelector('.ts-sp-cert-title')?.textContent.includes('Networking'));
+      if (!nsxSection) return false;
+      const rows = nsxSection.querySelectorAll('.ts-sp-row');
+      return rows[1]?.querySelector('.ts-diff-badge')?.textContent.trim() === 'medium';
+    }));
+
+  await check('VCP-VVF Admin section shows 1 scenario row', async () =>
+    page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section')];
+      const vvfSection = sections.find(s => s.querySelector('.ts-sp-cert-title')?.textContent.includes('VVF Admin'));
+      return vvfSection ? vvfSection.querySelectorAll('.ts-sp-row').length === 1 : false;
+    }));
+
+  await check('Empty cert sections show "No scenarios yet" message', async () =>
+    page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section.ts-sp-empty')];
+      return sections.length > 0 && sections.every(s => s.querySelector('.ts-sp-no-scenarios') !== null);
+    }));
+
+  await check('Per-cert stats show 0/3 for VCAP Networking initially', async () =>
+    page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section')];
+      const nsxSection = sections.find(s => s.querySelector('.ts-sp-cert-title')?.textContent.includes('Networking'));
+      return nsxSection?.querySelector('.ts-sp-cert-stats')?.textContent.trim() === '0 / 3';
+    }));
+
+  await check('Overall progress label shows 0 of 4 initially', async () =>
+    page.evaluate(() =>
+      document.querySelector('#ts-studyplan-panel .ts-sp-overall-label')?.textContent.includes('0 of 4')));
+
+  // Mark one complete via toggle
+  await page.evaluate(() => {
+    tsSetCompleted('sp-b', true);
+    tsRenderStudyPlan();
+  });
+  await page.waitForTimeout(150);
+
+  await check('Completed row has ts-sp-done class', async () =>
+    page.evaluate(() => !!document.querySelector('#ts-studyplan-panel .ts-sp-row.ts-sp-done')));
+
+  await check('Completed row shows checkmark', async () =>
+    page.evaluate(() => !!document.querySelector('#ts-studyplan-panel .ts-sp-row.ts-sp-done .ts-sp-check')));
+
+  await check('Completed row toggle button has ts-complete-btn-done class', async () =>
+    page.evaluate(() =>
+      !!document.querySelector('#ts-studyplan-panel .ts-sp-row.ts-sp-done .ts-sp-toggle-btn.ts-complete-btn-done')));
+
+  await check('Overall progress label updates to 1 of 4 after mark', async () =>
+    page.evaluate(() =>
+      document.querySelector('#ts-studyplan-panel .ts-sp-overall-label')?.textContent.includes('1 of 4')));
+
+  await check('Per-cert stats update to 1 / 3 for VCAP Networking', async () =>
+    page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section')];
+      const nsxSection = sections.find(s => s.querySelector('.ts-sp-cert-title')?.textContent.includes('Networking'));
+      return nsxSection?.querySelector('.ts-sp-cert-stats')?.textContent.trim() === '1 / 3';
+    }));
+
+  await check('Per-cert bar width is 33% for VCAP Networking (1 of 3)', async () =>
+    page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-cert-section')];
+      const nsxSection = sections.find(s => s.querySelector('.ts-sp-cert-title')?.textContent.includes('Networking'));
+      const bar = nsxSection?.querySelector('.ts-sp-cert-bar');
+      return bar?.style.width === '33%';
+    }));
+
+  // Toggle mark-done via button click
+  await check('Clicking Mark done button in study plan marks scenario', async () => {
+    await page.evaluate(() => {
+      const undoneBtn = [...document.querySelectorAll('#ts-studyplan-panel .ts-sp-toggle-btn')]
+        .find(b => !b.classList.contains('ts-complete-btn-done'));
+      if (undoneBtn) undoneBtn.click();
+    });
+    await new Promise(r => setTimeout(r, 150));
+    return page.evaluate(() =>
+      document.querySelector('#ts-studyplan-panel .ts-sp-overall-label')?.textContent.includes('2 of 4'));
+  });
+
+  // Clicking Study Plan tab button
+  await page.evaluate(() => tsSwitchMode('library'));
+  await page.waitForTimeout(100);
+  await check('Clicking Study Plan tab button switches to study plan', async () => {
+    await page.evaluate(() => document.getElementById('ts-tab-studyplan').click());
+    await new Promise(r => setTimeout(r, 150));
+    return page.evaluate(() => !document.getElementById('ts-studyplan-panel').hidden);
+  });
+
+  // Clean up
+  await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
+
   console.log(`\n── Results: ${pass} passed, ${fail} failed ──\n`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);

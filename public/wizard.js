@@ -2225,18 +2225,127 @@ function toggleTroubleshootingMode() {
 // ── Mode switching ──────────────────────────────────────────────────────────
 
 function tsSwitchMode(mode) {
-  const libPanel  = document.getElementById('ts-library-panel');
-  const buildPanel = document.getElementById('ts-build-panel');
-  const sessPanel = document.getElementById('ts-session-panel');
-  [libPanel, buildPanel, sessPanel].forEach(el => { if (el) el.hidden = true; });
+  const libPanel      = document.getElementById('ts-library-panel');
+  const buildPanel    = document.getElementById('ts-build-panel');
+  const sessPanel     = document.getElementById('ts-session-panel');
+  const studyPanel    = document.getElementById('ts-studyplan-panel');
+  [libPanel, buildPanel, sessPanel, studyPanel].forEach(el => { if (el) el.hidden = true; });
 
   document.querySelectorAll('.ts-mode-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.mode === mode || (mode === 'build' && t.dataset.mode === 'library'));
   });
 
-  if (mode === 'library') { if (libPanel) { libPanel.hidden = false; tsLibLoad(); } }
-  else if (mode === 'build') { if (buildPanel) buildPanel.hidden = false; }
-  else if (mode === 'session') { if (sessPanel) { sessPanel.hidden = false; } }
+  if (mode === 'library')   { if (libPanel)   { libPanel.hidden   = false; tsLibLoad(); } }
+  else if (mode === 'build')    { if (buildPanel)  buildPanel.hidden  = false; }
+  else if (mode === 'session')  { if (sessPanel)   sessPanel.hidden   = false; }
+  else if (mode === 'studyplan') { if (studyPanel) { studyPanel.hidden = false; tsRenderStudyPlan(); } }
+}
+
+// ── Study Plan ───────────────────────────────────────────────────────────────
+
+const SP_CERT_LABELS = {
+  'VCP-VCF-Architect':   'VCP — VCF Architect',
+  'VCP-VCF-Admin':       'VCP — VCF Admin',
+  'VCP-VCF-Support':     'VCP — VCF Support',
+  'VCP-VVF-Admin':       'VCP — VVF Admin',
+  'VCP-VVF-Support':     'VCP — VVF Support',
+  'VCAP-VCF-Automation': 'VCAP — VCF Automation',
+  'VCAP-VCF-Operations': 'VCAP — VCF Operations',
+  'VCAP-VCF-Storage':    'VCAP — VCF Storage',
+  'VCAP-VCF-VKS':        'VCAP — VCF VKS',
+  'VCAP-VCF-Networking': 'VCAP — VCF Networking',
+};
+const SP_DIFF_ORDER = { easy: 0, medium: 1, hard: 2 };
+
+function tsRenderStudyPlan() {
+  const panel = document.getElementById('ts-studyplan-panel');
+  if (!panel) return;
+  const scenarios = state.tsAllScenarios || [];
+  const completed = tsGetCompleted();
+
+  const totalCount = scenarios.length;
+  const doneCount  = scenarios.filter(s => completed.has(s.id)).length;
+  const overallPct = totalCount ? Math.round(doneCount / totalCount * 100) : 0;
+
+  let html = `<div class="ts-sp-header">
+    <span class="ts-sp-overall-label">${doneCount} of ${totalCount} scenario${totalCount !== 1 ? 's' : ''} completed</span>
+    <div class="ts-sp-overall-bar-wrap"><div class="ts-sp-overall-bar" style="width:${overallPct}%"></div></div>
+  </div>`;
+
+  const certOrder = Object.keys(SP_CERT_LABELS);
+  certOrder.forEach(cert => {
+    const certScenarios = scenarios
+      .filter(s => Array.isArray(s.certRelevance) && s.certRelevance.includes(cert))
+      .sort((a, b) => (SP_DIFF_ORDER[a.difficulty] ?? 1) - (SP_DIFF_ORDER[b.difficulty] ?? 1));
+
+    const certTotal = certScenarios.length;
+    const certDone  = certScenarios.filter(s => completed.has(s.id)).length;
+    const certPct   = certTotal ? Math.round(certDone / certTotal * 100) : 0;
+    const label     = SP_CERT_LABELS[cert];
+
+    html += `<div class="ts-sp-cert-section${certTotal === 0 ? ' ts-sp-empty' : ''}">
+      <div class="ts-sp-cert-header">
+        <span class="ts-sp-cert-title">${escHtml(label)}</span>
+        <span class="ts-sp-cert-stats">${certTotal === 0 ? 'No scenarios yet' : `${certDone} / ${certTotal}`}</span>
+        ${certTotal > 0 ? `<div class="ts-sp-cert-bar-wrap"><div class="ts-sp-cert-bar" style="width:${certPct}%"></div></div>` : ''}
+      </div>`;
+
+    if (certTotal === 0) {
+      html += `<p class="ts-sp-no-scenarios">No scenarios available for this certification yet.</p>`;
+    } else {
+      certScenarios.forEach(s => {
+        const isDone   = completed.has(s.id);
+        const diffCls  = `ts-diff-${s.difficulty || 'medium'}`;
+        const noSnap   = !s.snapshotName ? ' ts-sp-no-snap' : '';
+        const snapTitle = !s.snapshotName ? ' title="No snapshot — configure in Scenario Library"' : '';
+        html += `<div class="ts-sp-row${isDone ? ' ts-sp-done' : ''}${noSnap}" data-sid="${escHtml(s.id)}">
+          <span class="ts-diff-badge ${diffCls}">${escHtml(s.difficulty || '')}</span>
+          <span class="ts-sp-row-name">${escHtml(s.name)}</span>
+          ${isDone ? '<span class="ts-sp-check">&#10003;</span>' : ''}
+          <div class="ts-sp-row-actions">
+            <button type="button" class="btn btn-primary btn-sm ts-sp-load-btn" data-sid="${escHtml(s.id)}"${snapTitle}>Load</button>
+            <button type="button" class="ts-sp-toggle-btn${isDone ? ' ts-complete-btn-done' : ''}" data-sid="${escHtml(s.id)}">${isDone ? '&#10003; Done' : 'Mark done'}</button>
+          </div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  panel.innerHTML = html;
+
+  panel.querySelectorAll('.ts-sp-load-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.sid;
+      btn.disabled = true; btn.textContent = 'Loading…';
+      try {
+        const res  = await fetch('/api/admin/scenario-load', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Load failed');
+        tsRenderActiveBanner(data.scenario);
+        const note = data.snapshotNote ? `\n\n${data.snapshotNote}` : '';
+        if (data.snapshotError) {
+          alert(`Scenario loaded: ${data.scenario.name}\n\n⚠ Snapshot revert failed:\n${data.snapshotError}`);
+        } else if (data.reverted && data.reverted.length > 0) {
+          alert(`Scenario loaded: ${data.scenario.name}\n\nReverted ${data.reverted.length} VM(s): ${data.reverted.map(v => v.name).join(', ')}`);
+        } else {
+          alert(`Scenario loaded: ${data.scenario.name}${note}`);
+        }
+      } catch (err) {
+        alert('Failed to load scenario: ' + err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Load';
+      }
+    };
+  });
+
+  panel.querySelectorAll('.ts-sp-toggle-btn').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.sid;
+      tsSetCompleted(id, !tsGetCompleted().has(id));
+      tsRenderStudyPlan();
+    };
+  });
 }
 
 // ── Library: load and render ────────────────────────────────────────────────
@@ -2677,6 +2786,7 @@ function initTroubleshootStep() {
   document.querySelectorAll('.ts-mode-tab').forEach(tab => {
     tab.onclick = () => {
       if (tab.dataset.mode === 'session') { tsSwitchMode('session'); tsShowPhase(0); tsWirePhase0(); }
+      else if (tab.dataset.mode === 'studyplan') { tsSwitchMode('studyplan'); }
       else tsSwitchMode('library');
     };
   });
