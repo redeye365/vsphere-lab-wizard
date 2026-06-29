@@ -476,6 +476,54 @@ const { chromium } = require('playwright');
   // Clean up localStorage
   await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
 
+  // ── Completion progress summary ──────────────────────────────────────────────
+  console.log('\n── Completion progress summary ──');
+
+  await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
+
+  // Inject 3 scenarios, none completed
+  await page.evaluate(() => {
+    state.tsAllScenarios = [
+      { id: 'p-a', name: 'Scenario A', description: '', difficulty: 'easy',   topics: [], certRelevance: [] },
+      { id: 'p-b', name: 'Scenario B', description: '', difficulty: 'medium', topics: [], certRelevance: [] },
+      { id: 'p-c', name: 'Scenario C', description: '', difficulty: 'hard',   topics: [], certRelevance: [] },
+    ];
+    tsLibRender();
+  });
+  await page.waitForTimeout(100);
+
+  await check('Progress bar visible when scenarios loaded', async () =>
+    page.evaluate(() => !document.getElementById('ts-lib-progress').hidden));
+
+  await check('Progress label shows 0 of 3 completed initially', async () =>
+    page.evaluate(() => document.getElementById('ts-progress-label').textContent === '0 of 3 completed'));
+
+  await check('Progress bar width is 0% initially', async () =>
+    page.evaluate(() => document.getElementById('ts-progress-bar').style.width === '0%'));
+
+  // Mark one complete
+  await page.evaluate(() => { tsSetCompleted('p-a', true); tsLibRender(); });
+  await page.waitForTimeout(100);
+
+  await check('Progress label updates to 1 of 3 after one marked', async () =>
+    page.evaluate(() => document.getElementById('ts-progress-label').textContent === '1 of 3 completed'));
+
+  await check('Progress bar width is 33% after one of three marked', async () =>
+    page.evaluate(() => document.getElementById('ts-progress-bar').style.width === '33%'));
+
+  // Mark all complete
+  await page.evaluate(() => { tsSetCompleted('p-b', true); tsSetCompleted('p-c', true); tsLibRender(); });
+  await page.waitForTimeout(100);
+
+  await check('Progress label shows 3 of 3 when all done', async () =>
+    page.evaluate(() => document.getElementById('ts-progress-label').textContent === '3 of 3 completed'));
+
+  await check('Progress bar width is 100% when all done', async () =>
+    page.evaluate(() => document.getElementById('ts-progress-bar').style.width === '100%'));
+
+  // Clean up
+  await page.evaluate(() => localStorage.removeItem('vsphere-completed-scenarios'));
+
   console.log(`\n── Results: ${pass} passed, ${fail} failed ──\n`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);

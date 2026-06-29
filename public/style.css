@@ -1890,6 +1890,36 @@ select:focus {
 .ts-snapshot-badge    { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:var(--accent-soft); color:var(--accent-text); }
 .ts-no-snapshot-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:var(--surface); color:var(--text-faint); border:1px solid var(--border); }
 
+/* Completion progress summary */
+.ts-lib-progress[hidden] { display: none !important; }
+.ts-lib-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ts-progress-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.ts-progress-bar {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+.ts-progress-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 110px;
+  text-align: right;
+}
+
 /* Completion tracking */
 .ts-lib-card.ts-completed {
   border-left: 3px solid #4ade80;

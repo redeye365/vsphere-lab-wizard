@@ -2300,6 +2300,22 @@ function tsLibRender() {
   if (filtered.length === 0) { listEl.innerHTML = '<p class="hint">No scenarios match the current filter.</p>'; return; }
 
   const completed = tsGetCompleted();
+
+  // Update progress summary (counts whole library, not just filtered view)
+  const allScenarios = state.tsAllScenarios || [];
+  const progressEl   = document.getElementById('ts-lib-progress');
+  const barEl        = document.getElementById('ts-progress-bar');
+  const labelEl      = document.getElementById('ts-progress-label');
+  if (progressEl && allScenarios.length > 0) {
+    const doneCount = allScenarios.filter(s => completed.has(s.id)).length;
+    const pct       = Math.round((doneCount / allScenarios.length) * 100);
+    progressEl.hidden        = false;
+    if (barEl)   barEl.style.width = `${pct}%`;
+    if (labelEl) labelEl.textContent = `${doneCount} of ${allScenarios.length} completed`;
+  } else if (progressEl) {
+    progressEl.hidden = true;
+  }
+
   listEl.innerHTML = '';
   filtered.forEach(s => {
     const isDone = completed.has(s.id);
