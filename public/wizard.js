@@ -2270,10 +2270,12 @@ function tsLibRender() {
   const search  = (document.getElementById('ts-lib-search')?.value || '').toLowerCase();
   const diff    = document.getElementById('ts-lib-filter-diff')?.value || '';
   const topic   = document.getElementById('ts-lib-filter-topic')?.value || '';
+  const cert    = state.tsCertFilter || '';
 
   const filtered = (state.tsAllScenarios || []).filter(s => {
     if (diff  && s.difficulty !== diff) return false;
     if (topic && !(s.topics || []).includes(topic)) return false;
+    if (cert  && !(s.certRelevance || []).includes(cert)) return false;
     if (search && !s.name.toLowerCase().includes(search) && !s.description.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -2283,6 +2285,7 @@ function tsLibRender() {
 
   listEl.innerHTML = '';
   filtered.forEach(s => {
+    const certBadges = (s.certRelevance || []).map(c => `<span class="ts-cert-badge ts-cert-badge-${c.toLowerCase().replace(/[^a-z0-9]/g, '-')}">${escHtml(c)}</span>`).join('');
     const card = document.createElement('div');
     card.className = 'ts-lib-card';
     card.innerHTML = `
@@ -2292,6 +2295,7 @@ function tsLibRender() {
         <div class="ts-lib-card-meta">
           <span class="ts-diff-badge ts-diff-${s.difficulty}">${escHtml(s.difficulty || '')}</span>
           ${(s.topics || []).map(t => `<span class="ts-topic-chip-inline">${escHtml(t)}</span>`).join('')}
+          ${certBadges}
           ${s.snapshotName ? '<span class="ts-snapshot-badge">snapshot captured</span>' : '<span class="ts-no-snapshot-badge">no snapshot</span>'}
         </div>
       </div>
@@ -2621,6 +2625,7 @@ function initTroubleshootStep() {
   state.troubleshootResolved        = false;
   state.troubleshootSessionData     = null;
   state.tsAllScenarios              = [];
+  state.tsCertFilter                = '';
   state.troubleshootLearningMode    = false;
   state.tsMethodology               = { symptom: '', scope: '', layer: '' };
 
@@ -2670,6 +2675,15 @@ function initTroubleshootStep() {
   document.getElementById('ts-lib-search')?.addEventListener('input',  tsLibRender);
   document.getElementById('ts-lib-filter-diff')?.addEventListener('change',  tsLibRender);
   document.getElementById('ts-lib-filter-topic')?.addEventListener('change', tsLibRender);
+
+  // Wire cert filter chips
+  document.querySelectorAll('.ts-cert-chip').forEach(chip => {
+    chip.onclick = () => {
+      state.tsCertFilter = chip.dataset.cert || '';
+      document.querySelectorAll('.ts-cert-chip').forEach(c => c.classList.toggle('active', c === chip));
+      tsLibRender();
+    };
+  });
 }
 
 // ── Phase helpers ───────────────────────────────────────────────────────────

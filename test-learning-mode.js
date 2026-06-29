@@ -250,6 +250,101 @@ const { chromium } = require('playwright');
     return items.length === 7;
   });
 
+  // ── Cert filter chips (library panel) ───────────────────────────────────────
+  console.log('\n── Cert filter chips ──');
+
+  // Return to library mode
+  await page.goto(BASE);
+  await page.click('#mode-build');
+  await page.waitForTimeout(200);
+  // Navigate to step 15 via showStep
+  await page.evaluate(() => { if (typeof showStep === 'function') showStep(15); });
+  await page.waitForTimeout(400);
+
+  await check('Cert filter row present in DOM', async () =>
+    page.evaluate(() => !!document.getElementById('ts-cert-filter-row')));
+
+  await check('7 cert chips (All + 6 certs)', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-cert-chip').length === 7));
+
+  await check('"All" chip active by default', async () =>
+    page.evaluate(() => {
+      const allChip = document.querySelector('.ts-cert-chip[data-cert=""]');
+      return allChip && allChip.classList.contains('active');
+    }));
+
+  await check('All 6 cert-specific chips present', async () =>
+    page.evaluate(() => {
+      const certs = ['VCP-VVF', 'VCP-NV', 'VCAP-DCV', 'VCAP-NV', 'VCP-VCF-Admin', 'VCP-VCF-Architect'];
+      return certs.every(c => !!document.querySelector(`.ts-cert-chip[data-cert="${c}"]`));
+    }));
+
+  await check('Clicking VCP-NV chip sets state.tsCertFilter', async () => {
+    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCP-NV"]').click());
+    return page.evaluate(() => state.tsCertFilter === 'VCP-NV');
+  });
+
+  await check('VCP-NV chip is active after click', async () =>
+    page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCP-NV"]').classList.contains('active')));
+
+  await check('"All" chip deactivated after VCP-NV selected', async () =>
+    page.evaluate(() => !document.querySelector('.ts-cert-chip[data-cert=""]').classList.contains('active')));
+
+  await check('Clicking All chip resets state.tsCertFilter', async () => {
+    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert=""]').click());
+    return page.evaluate(() => state.tsCertFilter === '');
+  });
+
+  await check('"All" chip is active after reset', async () =>
+    page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert=""]').classList.contains('active')));
+
+  // Inject mock scenarios and verify filtering
+  await check('VCP-NV filter shows only matching scenarios', async () => {
+    await page.evaluate(() => {
+      state.tsAllScenarios = [
+        { id: 'mock-a', name: 'NSX DFW Lab', description: 'Test DFW', difficulty: 'medium', topics: ['nsx'], certRelevance: ['VCP-NV', 'VCAP-NV'] },
+        { id: 'mock-b', name: 'vSphere HA Lab', description: 'Test HA', difficulty: 'easy', topics: ['ha'], certRelevance: ['VCP-VVF'] },
+      ];
+      document.querySelector('.ts-cert-chip[data-cert="VCP-NV"]').click();
+    });
+    await page.waitForTimeout(100);
+    const cards = await page.$$('.ts-lib-card');
+    return cards.length === 1;
+  });
+
+  await check('Filtered card is the NSX scenario', async () =>
+    page.evaluate(() => {
+      const card = document.querySelector('.ts-lib-card .ts-lib-card-name');
+      return card && card.textContent.includes('NSX DFW Lab');
+    }));
+
+  await check('Cert badges rendered on scenario card', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-lib-card .ts-cert-badge').length >= 1));
+
+  await check('"All" filter shows both scenarios', async () => {
+    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert=""]').click());
+    await page.waitForTimeout(100);
+    return page.evaluate(() => document.querySelectorAll('.ts-lib-card').length === 2);
+  });
+
+  await check('Both cert badges visible across all cards', async () =>
+    page.evaluate(() => document.querySelectorAll('.ts-lib-card .ts-cert-badge').length >= 2));
+
+  await check('VCAP-NV filter also matches NSX scenario (multi-cert scenario)', async () => {
+    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCAP-NV"]').click());
+    await page.waitForTimeout(100);
+    return page.evaluate(() => document.querySelectorAll('.ts-lib-card').length === 1);
+  });
+
+  await check('No-match cert shows empty state message', async () => {
+    await page.evaluate(() => document.querySelector('.ts-cert-chip[data-cert="VCP-VCF-Architect"]').click());
+    await page.waitForTimeout(100);
+    return page.evaluate(() => {
+      const hint = document.querySelector('#ts-scenario-list .hint');
+      return hint && hint.textContent.includes('No scenarios match');
+    });
+  });
+
   console.log(`\n── Results: ${pass} passed, ${fail} failed ──\n`);
   await browser.close();
   process.exit(fail > 0 ? 1 : 0);
