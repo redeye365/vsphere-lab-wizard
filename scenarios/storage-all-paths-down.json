@@ -24,6 +24,13 @@
     "Check the physical switch port configuration for the storage network uplinks. Add the storage VLAN back to the trunk if it was removed. Once the VLAN is restored, the paths should come back and the datastore will become accessible again."
   ],
   "labRequirements": ["nested-cluster-min-3", "vcenter", "vsan"],
+  "certRelevance": ["VCP-VVF", "VCAP-DCV"],
+  "learningObjectives": [
+    "Interpret simultaneous All-Paths-Down across all hosts as a network-layer rather than storage-hardware failure",
+    "Inspect vmkernel adapter connectivity and storage port group VLAN assignments",
+    "Identify how a switch firmware update can silently drop VLAN trunk entries",
+    "Restore datastore access by adding the storage VLAN back to the physical switch trunk"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

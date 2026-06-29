@@ -24,6 +24,13 @@
     "Add the Edge TEP VLAN to the trunk configuration on the physical switch port connected to the Edge node uplink. Once the VLAN is being passed, the TEP tunnel should establish and the Edge node will join the transport zone."
   ],
   "labRequirements": ["nested-cluster", "vcenter", "nsx", "nsx-edge"],
+  "certRelevance": ["VCP-NV", "VCAP-NV"],
+  "learningObjectives": [
+    "Explain the role of TEP VLANs in NSX overlay transport and why Edge nodes require separate TEP configuration",
+    "Use NSX Manager to inspect Edge node tunnel status and transport zone membership",
+    "Identify a missing VLAN trunk entry on a physical switch port as the root cause of TEP failure",
+    "Restore Edge node transport zone connectivity by correcting switch trunk configuration"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

@@ -26,6 +26,13 @@
     "The /etc/hosts file has a duplicate entry for the vCenter FQDN — one with the real IP and one with a stale or loopback IP, with the incorrect one listed first. This causes roughly half of all internal lookups to resolve to the wrong address.",
     "Edit /etc/hosts (vi /etc/hosts) and remove the incorrect duplicate entry. The correct line should be: <vcenter-real-ip>  <vcenter-fqdn>  <short-name>. The line starting with 127.0.0.1 should only have 'localhost'. Save and test with nslookup — should consistently return the correct IP every time."
   ],
+  "certRelevance": ["VCP-VVF", "VCAP-DCV"],
+  "learningObjectives": [
+    "Explain how /etc/hosts takes precedence over DNS on the VCSA and why duplicate entries cause intermittent failures",
+    "Inspect and interpret the VCSA /etc/hosts file to identify conflicting hostname mappings",
+    "Remove duplicate or incorrect entries from /etc/hosts without disrupting vCenter services",
+    "Verify consistent hostname resolution after correcting /etc/hosts"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-1"]

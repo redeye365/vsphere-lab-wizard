@@ -25,6 +25,13 @@
     "The reverse lookup zone for the management subnet is missing from the DNS server. PTR records for ESXi hosts were not included in the backup restore. You need to create the reverse lookup zone and add PTR records for each ESXi host and for vCenter.",
     "On the DNS server: create a reverse lookup zone for your management subnet (10.168.192.in-addr.arpa for a 192.168.10.0/24 network). Add PTR records: each ESXi host IP maps to its FQDN. Test with nslookup <ip>. vCenter performance should recover within a few minutes once all PTR records resolve successfully."
   ],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Explain how missing DNS PTR records cause vCenter performance degradation",
+    "Test forward and reverse DNS resolution from the VCSA using nslookup and dig",
+    "Create a reverse lookup zone and PTR records on a Windows DNS server",
+    "Verify vCenter performance recovery after DNS PTR records are restored"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-1", "domain-controller"]

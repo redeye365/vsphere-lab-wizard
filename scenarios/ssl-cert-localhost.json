@@ -26,6 +26,13 @@
     "In certificate-manager, Option 3 (Replace Machine SSL Certificate with VMCA Certificate) is what you need. This regenerates the certificate that browsers and clients see. Run it and provide the correct FQDN and IP address when prompted — the VMCA will issue a new cert with the right subject.",
     "Run /usr/lib/vmware-vmca/bin/certificate-manager on the VCSA > Option 3 > enter correct FQDN (e.g., vcenter.lab.local) and IP when prompted > confirm. Services will restart over 5-10 minutes. Afterwards check the browser certificate — SAN should include the correct FQDN and the warning should be gone (or resolvable by trusting the VMCA root)."
   ],
+  "certRelevance": ["VCP-VVF", "VCAP-DCV"],
+  "learningObjectives": [
+    "Explain how VMCA generates certificates at deployment time using the FQDN provided",
+    "Identify a certificate CN/SAN mismatch that causes browser warnings and integration failures",
+    "Use the VCSA certificate-manager utility to replace the Machine SSL certificate with a correctly-named one",
+    "Verify certificate renewal by inspecting the updated SAN in a browser after vCenter services restart"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-1", "domain-controller"]

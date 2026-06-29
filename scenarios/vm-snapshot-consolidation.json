@@ -23,6 +23,13 @@
     "Go to VM → Snapshots → Consolidate. This merges the snapshot delta files back into the base disk. Once complete the VM should power on normally."
   ],
   "labRequirements": ["nested-cluster", "vcenter"],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Identify unconsolidated snapshot state as a cause of VM power-on failure",
+    "Locate snapshot consolidation warnings in the vCenter VM summary view",
+    "Trigger snapshot consolidation and monitor the task to completion",
+    "Explain how backup-created snapshots can be left unconsolidated and how to prevent this"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

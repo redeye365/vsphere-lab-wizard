@@ -26,6 +26,13 @@
     "At least one component has drifted beyond 5 minutes from the others. Every component needs to be pointing to the same NTP source and resynced. The DC should be the internal NTP master for the lab, with all ESXi hosts and vCenter pointing to the DC IP.",
     "For each ESXi host: vCenter > Host > Configure > Time Configuration > Edit > NTP servers: <DC-IP>, startup policy: Start and stop with host. For vCenter: VAMI (https://<vcenter>:5480) > Time > NTP > add <DC-IP> > Save > Sync Now. Then verify all components show the same time."
   ],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Explain why time synchronisation within a 5-minute tolerance is mandatory for TLS and Kerberos in VMware environments",
+    "Check and compare system time across ESXi hosts, vCenter, and a domain controller",
+    "Configure a consistent NTP source hierarchy with the domain controller as the internal NTP master",
+    "Force an NTP resync and verify clock alignment before retrying SSO or VCF bringup"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-1", "domain-controller"]

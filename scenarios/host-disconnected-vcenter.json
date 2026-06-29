@@ -23,6 +23,13 @@
     "Add or correct the A record and PTR record for the host in DNS. Then right-click the host in vCenter and select Connect. It should reconnect successfully."
   ],
   "labRequirements": ["nested-cluster", "vcenter", "domain-controller"],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Correlate a vCenter host disconnection with DNS misconfiguration",
+    "Test ESXi host forward and reverse DNS resolution from vCenter",
+    "Correct missing or incorrect A and PTR records on a DNS server",
+    "Reconnect a disconnected ESXi host in vCenter after DNS is repaired"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

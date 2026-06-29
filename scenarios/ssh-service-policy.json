@@ -25,6 +25,13 @@
     "The startup policy was changed to 'Start and stop manually' or similar, meaning SSH no longer starts on boot. You need to change the policy back to 'Start and stop with host' (auto-start) and then explicitly start the service.",
     "In vCenter: Host > Configure > System > Services > SSH > Edit Startup Policy > 'Start and stop with host' > OK, then right-click SSH > Start. Or via PowerCLI for all hosts at once: Get-VMHost | Get-VMHostService | Where {$_.Key -eq 'TSM-SSH'} | Set-VMHostService -Policy 'On'; Start-VMHostService"
   ],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Identify the TSM-SSH service startup policy on ESXi hosts via vCenter",
+    "Distinguish between a service's running state and its persistent startup policy",
+    "Re-enable SSH by correcting the startup policy and starting the service via vCenter or PowerCLI",
+    "Understand the security trade-off between disabling SSH by default and operational access requirements"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-1"]

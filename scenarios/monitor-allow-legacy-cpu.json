@@ -26,6 +26,13 @@
     "The 'monitor.allowLegacyCPU = true' advanced parameter is missing. This parameter is sometimes absent from VMs that were originally built without following nested ESXi best practices, and Storage vMotion preserves the VM files but not parameters that might be set at the host level. Add this parameter via Configuration Parameters.",
     "Edit Settings on the nested ESXi VM > VM Options > Advanced > Configuration Parameters > Add Row: Name = monitor.allowLegacyCPU, Value = true. Also verify VM Hardware > CPU > 'Expose hardware assisted virtualization to the guest OS' is ticked. Save and power on — should start normally."
   ],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Identify the VM advanced parameters required for nested ESXi to function as a guest VM",
+    "Distinguish between CPU hardware virtualisation exposure and the monitor.allowLegacyCPU parameter",
+    "Add missing advanced VM configuration parameters via the vCenter Edit Settings dialog",
+    "Verify nested ESXi VMs power on successfully after configuration parameters are applied"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-1"]

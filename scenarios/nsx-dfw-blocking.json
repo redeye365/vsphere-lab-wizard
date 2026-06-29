@@ -23,6 +23,13 @@
     "Edit the DFW rule to narrow the destination scope, or add a specific allow rule above the deny rule for traffic between the two servers. Test connectivity after each change."
   ],
   "labRequirements": ["nested-cluster", "vcenter", "nsx", "nsx-dfw"],
+  "certRelevance": ["VCP-NV", "VCAP-NV"],
+  "learningObjectives": [
+    "Interpret effective DFW rule sets applied to individual VMs in NSX",
+    "Identify how rule ordering causes deny rules to match unintended east-west traffic",
+    "Distinguish between perimeter and micro-segmentation DFW rule intent",
+    "Restore application connectivity by adding targeted allow rules above broad deny rules"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

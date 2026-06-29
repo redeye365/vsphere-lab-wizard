@@ -24,6 +24,13 @@
     "Remove the malformed line from /etc/ssh/ssh_config. The line '@PasswordAuthentication yes@' with incorrect syntax was written to the client config by mistake. Use sed to remove it: sed -i '/@PasswordAuthentication yes@/d' /etc/ssh/ssh_config. Restart the bring-up validation — all four hosts should now pass."
   ],
   "labRequirements": ["nested-cluster-min-4", "vcenter", "sddc-manager"],
+  "certRelevance": ["VCP-VCF-Admin", "VCP-VCF-Architect"],
+  "learningObjectives": [
+    "Distinguish between /etc/ssh/sshd_config (server) and /etc/ssh/ssh_config (client) and their separate effects",
+    "Reason from a all-hosts-failing pattern to a problem on the initiating component rather than the targets",
+    "Inspect the SDDC Manager SSH client config for malformed directives introduced by manual edits",
+    "Remove the malformed line and restore bring-up SSH key validation for all hosts"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

@@ -24,6 +24,13 @@
     "Add the missing PTR record to your DNS server for the affected host's IP address. Verify the reverse lookup works from SDDC Manager using nslookup. Re-run bring-up validation — the host should now pass."
   ],
   "labRequirements": ["nested-cluster-min-4", "sddc-manager", "domain-controller"],
+  "certRelevance": ["VCP-VCF-Admin"],
+  "learningObjectives": [
+    "Understand why VCF bring-up validates reverse DNS for every component, not just forward lookups",
+    "Test reverse DNS resolution from SDDC Manager to identify missing PTR records",
+    "Add PTR records to a DNS server for VCF management components",
+    "Re-run bring-up validation after DNS is corrected to confirm host reachability"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

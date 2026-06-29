@@ -25,6 +25,13 @@
     "SDDC Manager is pointing at a different NTP source or NTP is not running correctly on it. Fix the NTP configuration: edit /etc/ntp.conf on SDDC Manager, ensure it points at the same source as all other components, restart ntpd, and verify sync with ntpdate before re-running bring-up validation."
   ],
   "labRequirements": ["nested-cluster-min-4", "sddc-manager", "domain-controller"],
+  "certRelevance": ["VCP-VCF-Admin"],
+  "learningObjectives": [
+    "Identify which VCF components are checked during bring-up NTP validation",
+    "Diagnose NTP drift by comparing ntpq or chronyc output across all management components",
+    "Correct NTP configuration on SDDC Manager by editing /etc/ntp.conf and restarting ntpd",
+    "Verify time synchronisation is within bring-up tolerance before re-running validation"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

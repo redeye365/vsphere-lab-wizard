@@ -23,6 +23,13 @@
     "Either reduce the admission control percentage to match actual cluster capacity, add more hosts to the cluster, or reduce VM resource reservations. Then verify all VMs show as HA protected."
   ],
   "labRequirements": ["nested-cluster-min-3", "vcenter"],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Understand how vSphere HA admission control reserves failover capacity",
+    "Identify why VMs become unprotected when cluster utilisation exceeds admission control limits",
+    "Adjust admission control policy to match real-world cluster utilisation",
+    "Verify HA protection status for all VMs after a configuration change"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

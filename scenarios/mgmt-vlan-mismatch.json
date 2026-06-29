@@ -24,6 +24,13 @@
     "The Management Network port group has an incorrect VLAN ID that was recently changed. The physical uplink is trunking management traffic on a different VLAN. You need to set the port group back to the original VLAN ID.",
     "From ESXi CLI: esxcli network vswitch standard portgroup set -p 'Management Network' -v <original-vlan>  (use 0 for untagged). Apply this to each affected host. Hosts should reconnect to vCenter within about 30 seconds."
   ],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Explain how an incorrect VLAN ID on the management port group causes mass host disconnection",
+    "Access ESXi host configuration via the DCUI when vCenter is unavailable",
+    "Inspect and correct management port group VLAN settings using esxcli",
+    "Confirm host reconnection to vCenter after management VLAN is restored"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-2"]

@@ -112,6 +112,8 @@ scenarios/
 | `description` | yes | One sentence. Describes the fault, not the symptom. Shown in the library card. |
 | `difficulty` | yes | `easy` / `medium` / `hard` — see calibration notes below |
 | `examObjectives` | no | VCP/VCAP objectives this fault covers. Helps learners map study material. |
+| `certRelevance` | yes | Array of current Broadcom cert IDs this scenario maps to (see values below). Every scenario must have at least one. |
+| `learningObjectives` | yes | Array of 2–4 short strings describing what the learner practises. Shown on the scenario card. |
 | `topics` | yes | Kebab-case tags. Used for filtering in the library. |
 | `author` | yes | Your GitHub handle or `"vSphere Lab Wizard starter library"` |
 | `created` | yes | ISO date `YYYY-MM-DD` |
@@ -122,6 +124,27 @@ scenarios/
 | `verifyScript` | yes | Filename of the accompanying `.ps1` |
 | `fixSteps` | yes | Array of strings. Step 1 onwards. Used on the debrief screen. |
 | `hints` | yes | Exactly 5 strings, progressive from broad to exact. |
+
+#### certRelevance values
+
+Use only these exact strings (current Broadcom certs as of June 2026):
+
+| Value | Certification |
+|-------|--------------|
+| `VCP-VVF` | VMware vSphere Foundation Administrator (replaces retired VCP-DCV) |
+| `VCP-NV` | Network Virtualization / NSX |
+| `VCAP-DCV` | Advanced Data Center Virtualization Design |
+| `VCAP-NV` | Advanced Network Virtualization Design |
+| `VCP-VCF-Admin` | VCF Administrator |
+| `VCP-VCF-Architect` | VCF Architect |
+
+Assignment guidance:
+- Basic vSphere / HA / DRS / vMotion / vSAN → `VCP-VVF`; advanced storage/cluster design → add `VCAP-DCV`
+- NSX / DFW / T0/T1 / BGP / overlay → `VCP-NV`; design-focused → add `VCAP-NV`
+- VCF / SDDC Manager / Cloud Builder → `VCP-VCF-Admin`; architecture-focused → add `VCP-VCF-Architect`
+- Multi-component scenarios → all relevant certs
+
+---
 
 #### Difficulty calibration
 

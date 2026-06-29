@@ -26,6 +26,13 @@
     "The vSAN port group teaming policy was changed from the VMware-recommended setting to 'Custom', which is overriding the default load balancing behaviour. For vSAN OSA, VMware recommends LBT (Route based on physical NIC load). For vSAN ESA, it's Route based on originating virtual port.",
     "Edit the vSAN port group on the DVS: DVS > Port Groups > vSAN portgroup > Edit > Teaming and Failover > change Load Balancing from 'Custom' to the VMware-recommended policy for your architecture (LBT for OSA, originating virtual port for ESA). Click OK. Monitor vSAN health — latency should recover within a few minutes."
   ],
+  "certRelevance": ["VCP-VVF", "VCAP-DCV"],
+  "learningObjectives": [
+    "Identify how non-standard DVS teaming policies degrade vSAN I/O performance",
+    "Distinguish VMware-recommended load balancing algorithms for vSAN OSA versus ESA",
+    "Navigate the DVS port group teaming and failover settings in vCenter",
+    "Restore vSAN latency to baseline by correcting the load balancing algorithm"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-3", "vsan"]

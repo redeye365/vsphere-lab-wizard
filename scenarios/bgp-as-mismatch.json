@@ -24,6 +24,13 @@
     "A BGP session stays in Active or Idle when the AS numbers don't match. Check the Local AS on the T0 in NSX-T, then SSH to VyOS and check what AS it expects for the NSX-T peer using: show configuration commands | grep bgp",
     "The T0 Local AS is 65001 but VyOS has remote-as 65002 for the NSX-T peer (or vice versa). On VyOS run: set protocols bgp neighbor <NSX-T-IP> remote-as 65001  then  commit save. The BGP session will re-establish within seconds."
   ],
+  "certRelevance": ["VCP-NV", "VCAP-NV"],
+  "learningObjectives": [
+    "Diagnose a BGP session failure between NSX-T T0 and an upstream VyOS router",
+    "Identify AS number mismatches by comparing NSX-T and VyOS BGP peer configuration",
+    "Understand how BGP session state (Active / Idle / Established) maps to north-south routing health",
+    "Correct a BGP peer configuration mismatch to restore external connectivity"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nsx", "vyos", "nested-cluster-min-3"]

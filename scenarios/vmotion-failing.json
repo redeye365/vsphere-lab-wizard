@@ -23,6 +23,13 @@
     "Correct the VLAN ID on the vMotion port group to match what the physical switch expects. Test vMotion again — it should complete successfully."
   ],
   "labRequirements": ["nested-cluster-min-2", "vcenter"],
+  "certRelevance": ["VCP-VVF"],
+  "learningObjectives": [
+    "Identify a vMotion VLAN mismatch as the cause of live migration failures",
+    "Verify vMotion vmkernel adapter configuration and VLAN settings on both source and destination hosts",
+    "Compare DVS port group VLAN assignments against physical switch trunk configuration",
+    "Correct the vMotion VLAN and validate successful live migration"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }

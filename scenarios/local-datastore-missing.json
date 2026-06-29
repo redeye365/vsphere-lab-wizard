@@ -26,6 +26,13 @@
     "Create a local VMFS datastore on a local disk (can be small — just for scratch, not for vSAN capacity). In vCenter: Host > Configure > Storage > Datastores > Add Datastore > VMFS > select a local disk not reserved for vSAN. Then update the scratch setting to point to this new datastore and reboot the host.",
     "For each of the three hosts: (1) Create a local VMFS datastore (Host > Configure > Storage > Datastores > New Datastore > VMFS). (2) Set ScratchConfig.ConfiguredScratchLocation = /vmfs/volumes/<datastore-name>/.locker in Advanced System Settings. (3) Reboot the host. After all three are rebooted, retry the vSAN wizard — they should now show as Compatible."
   ],
+  "certRelevance": ["VCP-VVF", "VCAP-DCV"],
+  "learningObjectives": [
+    "Explain why vSAN requires a persistent scratch partition before configuration can proceed",
+    "Identify scratch partition location using ESXi Advanced System Settings",
+    "Create a local VMFS datastore and redirect the scratch partition to persistent storage",
+    "Validate that all cluster hosts meet vSAN prerequisites after rebooting"
+  ],
   "author": "vSphere Lab Wizard starter library",
   "created": "2026-06-26",
   "labRequirements": ["nested-cluster-min-3", "vsan"]

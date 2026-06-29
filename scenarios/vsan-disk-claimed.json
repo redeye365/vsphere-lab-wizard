@@ -23,6 +23,13 @@
     "Run partedUtil mklabel on the affected disks to clear the partition table, then retry the vSAN disk claim. The disks should now be available for vSAN to use."
   ],
   "labRequirements": ["nested-cluster-min-3", "vcenter", "vsan"],
+  "certRelevance": ["VCP-VVF", "VCAP-DCV"],
+  "learningObjectives": [
+    "Diagnose why vSAN refuses to claim disks that carry existing partition tables",
+    "Use esxcli to inspect disk partition state on ESXi hosts",
+    "Safely clear existing VMFS or MBR partition tables using partedUtil",
+    "Confirm successful vSAN disk claim after partition table removal"
+  ],
   "author": "Jon — CloudITBlog.com",
   "created": "2026-06-26"
 }
