@@ -16,6 +16,48 @@ const os = require('os');
 const IS_PKG = typeof process.pkg !== 'undefined';
 const BASE_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 
+// ── Fatal startup error handling ───────────────────────────────────────────
+// On Windows, double-clicking the .exe (or a scheduled task) gives the user no
+// terminal to read a stack trace from — the console window can close before
+// they see anything. Show a blocking message box instead of failing silently.
+function logCrash(message) {
+  try {
+    fs.writeFileSync(path.join(BASE_DIR, 'crash.log'), `${new Date().toISOString()}\n${message}\n`);
+  } catch { /* best effort only */ }
+}
+
+// Shows a native Windows message box via PowerShell. The message is passed over
+// stdin (read with Console.In.ReadToEnd()) so error text never has to be escaped
+// into the PowerShell command line. No-op on non-Windows platforms.
+function showWindowsErrorBox(title, message) {
+  if (process.platform !== 'win32') return;
+  try {
+    const psScript = [
+      'Add-Type -AssemblyName System.Windows.Forms',
+      `[System.Windows.Forms.MessageBox]::Show([Console]::In.ReadToEnd(), '${title.replace(/'/g, "''")}', 'OK', 'Error') | Out-Null`
+    ].join('\n');
+    const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
+    spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
+      input: message,
+      timeout: 120000
+    });
+  } catch { /* best effort only — never let error reporting crash the process */ }
+}
+
+function fatalError(err) {
+  const message = (err && err.stack) || String(err);
+  console.error('Fatal error during startup:', message);
+  logCrash(message);
+  showWindowsErrorBox(
+    'vSphere Lab Wizard — Startup Error',
+    `The wizard failed to start.\n\n${message}\n\nDetails were written to:\n${path.join(BASE_DIR, 'crash.log')}`
+  );
+  process.exit(1);
+}
+
+process.on('uncaughtException', fatalError);
+process.on('unhandledRejection', (reason) => fatalError(reason instanceof Error ? reason : new Error(String(reason))));
+
 // ── Troubleshoot session store ─────────────────────────────────────────────
 // token → { scenario, createdAt, clueUsed, ticket, hintsGiven }
 const tsSessions = new Map();
@@ -95,7 +137,10 @@ function renderSvg(mermaidContent, outputPath) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// PORT env var (if set) is used as-is — no fallback. Otherwise try 3000, then
+// 3001, 3002 in case something else on the machine already holds the default
+// (e.g. another local dev server, common on Windows boxes running multiple tools).
+const CANDIDATE_PORTS = process.env.PORT ? [parseInt(process.env.PORT, 10)] : [3000, 3001, 3002];
 
 const OUTPUT_DIR = path.join(BASE_DIR, 'output');
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -651,11 +696,30 @@ app.post('/api/troubleshoot/debrief', (req, res) => {
 });
 
 // Bind to 127.0.0.1 only — this is a local tool and must not be reachable from the network.
-app.listen(PORT, '127.0.0.1', () => {
-  const url = `http://localhost:${PORT}`;
-  console.log(`vSphere Lab Wizard running at ${url}`);
-  if (IS_PKG) {
-    console.log('Opening browser...');
-    openBrowser(url);
-  }
-});
+// Walks CANDIDATE_PORTS in order, falling through to the next one on EADDRINUSE.
+function startServer(ports, index) {
+  const port = ports[index];
+  const server = app.listen(port, '127.0.0.1', () => {
+    const url = `http://localhost:${port}`;
+    console.log(`vSphere Lab Wizard running at ${url}`);
+    if (port !== ports[0]) {
+      console.log(`(Port ${ports[0]} was already in use — landed on ${port} instead.)`);
+    }
+    if (IS_PKG) {
+      console.log('Opening browser...');
+      openBrowser(url);
+    }
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' && index < ports.length - 1) {
+      console.log(`Port ${port} is already in use, trying ${ports[index + 1]}...`);
+      startServer(ports, index + 1);
+    } else if (err.code === 'EADDRINUSE') {
+      fatalError(new Error(`All candidate ports (${ports.join(', ')}) are already in use. Close whatever is using them, or set the PORT environment variable to pick a different one.`));
+    } else {
+      fatalError(err);
+    }
+  });
+}
+
+startServer(CANDIDATE_PORTS, 0);

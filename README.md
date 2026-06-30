@@ -169,9 +169,35 @@ npm install
 npm start
 ```
 
-Open **http://localhost:4173** in your browser.
+Open **http://localhost:3000** in your browser. If port 3000 is already taken, the wizard automatically falls back to 3001, then 3002 — check the console output for the URL it actually landed on.
 
 The wizard runs entirely locally. No data leaves your machine.
+
+### Getting started on Windows (standalone .exe)
+
+`npm run build` produces a standalone Windows executable (`dist/vsphere-lab-wizard.exe`, via `pkg`) that doesn't require Node.js to be installed on the target machine. Two one-time PowerShell steps clear up the most common first-run issues on Windows Server 2025:
+
+**1. Allow the port through Windows Firewall.** The wizard binds to `127.0.0.1` only, so this is usually unnecessary for local-only use, but if Windows Firewall is prompting or blocking anyway, allow it from an elevated PowerShell prompt:
+
+```powershell
+New-NetFirewallRule -DisplayName "vSphere Lab Wizard" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
+```
+
+If the wizard fell back to port 3001 or 3002 because 3000 was already in use, repeat the command with `-LocalPort 3001` (or `3002`) — the console output (and the browser window it opens) tells you which port it landed on.
+
+**2. Fix script/exe execution blocks.** PowerShell's default execution policy blocks unsigned scripts — this affects the `.ps1` files the wizard *generates* (`deploy-lab.ps1`, `vcenter-deploy.ps1`, etc.), not the wizard's own `.exe`. From an elevated PowerShell prompt:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+If the `.exe` itself won't launch because Windows SmartScreen flagged it as downloaded from the internet, unblock it first:
+
+```powershell
+Unblock-File -Path .\vsphere-lab-wizard.exe
+```
+
+If the wizard still fails to start, a message box now describes the error instead of the window just disappearing — full details are written to `crash.log` next to the `.exe`.
 
 ### Wizard steps
 
