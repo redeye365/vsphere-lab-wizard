@@ -7,7 +7,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { spawnSync, exec } = require('child_process');
+const { spawnSync } = require('child_process');
 const os = require('os');
 
 // pkg bundles the app as a standalone executable. Detect that mode so we can
@@ -159,25 +159,6 @@ app.get('/vendor/mermaid.min.js', (req, res) => {
     res.status(404).send('mermaid not found');
   }
 });
-
-function openBrowser(url) {
-  const { platform } = process;
-  // 'start' is a cmd.exe built-in, not an executable — spawn('start', ...) fails
-  // with ENOENT because there's no start.exe on PATH (this bit pkg'd Windows
-  // builds specifically). exec() runs the command through a real shell
-  // (cmd.exe on Windows, /bin/sh elsewhere), so the shell builtins resolve.
-  try {
-    if (platform === 'win32') {
-      exec(`start "" "${url}"`);
-    } else if (platform === 'darwin') {
-      exec(`open "${url}"`);
-    } else {
-      exec(`xdg-open "${url}"`);
-    }
-  } catch (err) {
-    console.log(`Open your browser at: ${url}`);
-  }
-}
 
 // Static files always present in every output
 const FIXED_OUTPUT_FILES = {
@@ -714,13 +695,9 @@ function startServer(ports, index) {
   const port = ports[index];
   const server = app.listen(port, '127.0.0.1', () => {
     const url = `http://localhost:${port}`;
-    console.log(`vSphere Lab Wizard running at ${url}`);
+    console.log(`vSphere Lab Wizard running at ${url} — open this URL in your browser`);
     if (port !== ports[0]) {
       console.log(`(Port ${ports[0]} was already in use — landed on ${port} instead.)`);
-    }
-    if (IS_PKG) {
-      console.log('Opening browser...');
-      openBrowser(url);
     }
   });
   server.on('error', (err) => {
