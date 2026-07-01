@@ -163,7 +163,19 @@ app.get('/vendor/mermaid.min.js', (req, res) => {
 function openBrowser(url) {
   const platform = process.platform;
   const cmd = platform === 'win32' ? 'start' : platform === 'darwin' ? 'open' : 'xdg-open';
-  spawn(cmd, [url], { detached: true, stdio: 'ignore' }).unref();
+  try {
+    const child = spawn(cmd, [url], { detached: true, stdio: 'ignore' });
+    // spawn() failures (e.g. the command not being found) surface asynchronously
+    // via this 'error' event rather than a synchronous throw. Without a listener
+    // here, an unhandled 'error' event would crash the whole server via the
+    // global uncaughtException handler — just because the browser didn't open.
+    child.on('error', () => {
+      console.log(`Could not open a browser automatically — please open ${url} manually.`);
+    });
+    child.unref();
+  } catch {
+    console.log(`Could not open a browser automatically — please open ${url} manually.`);
+  }
 }
 
 // Static files always present in every output
