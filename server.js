@@ -7,7 +7,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { spawnSync, spawn } = require('child_process');
+const { spawnSync, exec } = require('child_process');
 const os = require('os');
 
 // pkg bundles the app as a standalone executable. Detect that mode so we can
@@ -161,20 +161,21 @@ app.get('/vendor/mermaid.min.js', (req, res) => {
 });
 
 function openBrowser(url) {
-  const platform = process.platform;
-  const cmd = platform === 'win32' ? 'start' : platform === 'darwin' ? 'open' : 'xdg-open';
+  const { platform } = process;
+  // 'start' is a cmd.exe built-in, not an executable — spawn('start', ...) fails
+  // with ENOENT because there's no start.exe on PATH (this bit pkg'd Windows
+  // builds specifically). exec() runs the command through a real shell
+  // (cmd.exe on Windows, /bin/sh elsewhere), so the shell builtins resolve.
   try {
-    const child = spawn(cmd, [url], { detached: true, stdio: 'ignore' });
-    // spawn() failures (e.g. the command not being found) surface asynchronously
-    // via this 'error' event rather than a synchronous throw. Without a listener
-    // here, an unhandled 'error' event would crash the whole server via the
-    // global uncaughtException handler — just because the browser didn't open.
-    child.on('error', () => {
-      console.log(`Could not open a browser automatically — please open ${url} manually.`);
-    });
-    child.unref();
-  } catch {
-    console.log(`Could not open a browser automatically — please open ${url} manually.`);
+    if (platform === 'win32') {
+      exec(`start "" "${url}"`);
+    } else if (platform === 'darwin') {
+      exec(`open "${url}"`);
+    } else {
+      exec(`xdg-open "${url}"`);
+    }
+  } catch (err) {
+    console.log(`Open your browser at: ${url}`);
   }
 }
 
