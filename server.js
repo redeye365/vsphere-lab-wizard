@@ -70,7 +70,7 @@ setInterval(() => {
 }, 300000); // prune every 5 minutes
 
 const { buildSpec } = require('./lib/generateSpec');
-const { buildPowerShellScripts, buildRdpFile } = require('./lib/generatePowerShell');
+const { buildPowerShellScripts, buildRdpFile, buildLabConfigExample } = require('./lib/generatePowerShell');
 const { buildMarkdown } = require('./lib/generateMarkdown');
 const { buildBuildGuide } = require('./lib/generateBuildGuide');
 const { buildPrerequisites } = require('./lib/generatePrerequisites');
@@ -167,7 +167,8 @@ const FIXED_OUTPUT_FILES = {
   'build-guide':     'build-guide.md',
   'prerequisites':   'PREREQUISITES.md',
   'network-diagram': 'network-diagram.svg',
-  'diagram-html':    'diagram.html'
+  'diagram-html':    'diagram.html',
+  'lab-config-example': 'lab-config.json.example'
 };
 
 // Dynamic script filenames -- the key is the download URL kind
@@ -219,6 +220,7 @@ app.post('/api/generate', (req, res) => {
     fs.writeFileSync(path.join(dir, 'design-doc.md'), designDoc);
     fs.writeFileSync(path.join(dir, 'build-guide.md'), buildGuide);
     fs.writeFileSync(path.join(dir, 'PREREQUISITES.md'), prerequisites);
+    fs.writeFileSync(path.join(dir, 'lab-config.json.example'), buildLabConfigExample());
 
     // Attempt SVG network diagram (requires mmdc / @mermaid-js/mermaid-cli)
     const mermaidDiagram = buildMermaidDiagram(spec);
