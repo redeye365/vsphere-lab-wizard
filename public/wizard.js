@@ -34,12 +34,13 @@ function isValidSpecStructure(obj) {
   return required.every((k) => k in obj);
 }
 
-const TOTAL_STEPS = 17;
+const TOTAL_STEPS = 18;
 const PLACEMENT_STEP = 8;     // skipped when single physical host
 const DEPOT_STEP = 12;        // skipped when vSAN + local datastore not both configured
 const NSX_STEP = 9;           // always shown
 const VCF_STEP = 10;          // always shown; gated by vcfEnabled inside
-const TROUBLESHOOT_STEP = 16; // only reachable when troubleshooting mode is active
+const FILE_LOCATIONS_STEP = 15; // always shown; per-field visibility gated inside
+const TROUBLESHOOT_STEP = 17; // only reachable when troubleshooting mode is active
 
 const USE_CASE_LABELS = {
   certification: 'Certification study',
@@ -100,6 +101,8 @@ const SCRIPT_LABELS = {
   'prerequisites':    'PREREQUISITES.md',
   'diagram-html':     'diagram.html',
   'network-diagram':  'network-diagram.svg',
+  'lab-config':         'lab-config.json',
+  'lab-config-example': 'lab-config.json.example',
   'deploy-lab':       'deploy-lab.ps1',
   'vyos-deploy': 'vyos-deploy.ps1',
   'dc-deploy': 'dc-deploy.ps1',
@@ -226,7 +229,8 @@ const state = {
       nestedHostPlacement: 'auto', nestedHostAssignments: [],
       deployVyosHostIdx: 0, deployDcHostIdx: 0,
       isolateLab: false, firewallPolicy: null, internetAccess: false,
-      remoteAccessMethod: null, vpnType: null, vcenterSize: null
+      remoteAccessMethod: null, vpnType: null, vcenterSize: null,
+      vyosIso: null, windowsServerIso: null, esxiIso: null, nestedEsxiOva: null, vCenterOva: null
     }
   },
   generated: null
@@ -1014,6 +1018,13 @@ function wireForm() {
   bindRadio('vpnType', g, 'vpnType', onChange);
   bindSelect('vcenterSize', g, 'vcenterSize', onChange);
 
+  // File locations (step 15) — written into lab-config.json at generate time
+  bindText('vyosIsoPath', g, 'vyosIso', onChange);
+  bindText('windowsServerIsoPath', g, 'windowsServerIso', onChange);
+  bindText('esxiIsoPath', g, 'esxiIso', onChange);
+  bindText('nestedEsxiOvaPath', g, 'nestedEsxiOva', onChange);
+  bindText('vCenterOvaPath', g, 'vCenterOva', onChange);
+
   // Bundle depot (step 12)
   const depotCheckbox = document.getElementById('depotEnabled');
   depotCheckbox.addEventListener('change', () => {
@@ -1526,7 +1537,7 @@ function showStep(n) {
 
   // The review step (TOTAL_STEPS-2) is the effective last step in normal mode.
   // When troubleshootingMode is on, the user can navigate one step further to TROUBLESHOOT_STEP.
-  const reviewStep = TOTAL_STEPS - 2;  // step 15
+  const reviewStep = TOTAL_STEPS - 2;  // step 16
   const isLastVisible = state.troubleshootingMode ? n === TROUBLESHOOT_STEP : n === reviewStep;
   document.getElementById('btn-next').style.display = isLastVisible ? 'none' : 'inline-flex';
   document.getElementById('step-error').textContent = '';
@@ -1536,6 +1547,7 @@ function showStep(n) {
   if (n === TROUBLESHOOT_STEP) initTroubleshootStep();
   if (n === 7) { renderSizingRecommendations(); renderResourceTips(); updateVramWarning(); }
   if (n === PLACEMENT_STEP) renderDeploymentPlacement(_onFormChange);
+  if (n === FILE_LOCATIONS_STEP) renderFileLocationsVisibility();
   updateDcNotice();
   updateEsxi9Notices();
 
@@ -1548,7 +1560,7 @@ function showStep(n) {
   if (state.learningMode) {
     if (n === 1) updateLearnRamContext();
     if (n === 7) updateLearnRamHeadroom();
-    if (n === 15) renderScorecard();
+    if (n === reviewStep) renderScorecard();
   }
 
   // In architect mode, show options analysis before certain steps (once per session)
@@ -3500,6 +3512,8 @@ function renderDownloads(id, generatedScripts, svgGenerated) {
 
   // Always-present reference files
   container.appendChild(makeLink('prerequisites'));
+  container.appendChild(makeLink('lab-config'));
+  container.appendChild(makeLink('lab-config-example'));
   container.appendChild(makeLink('spec'));
   container.appendChild(makeLink('design-doc'));
   container.appendChild(makeLink('build-guide'));
@@ -4627,7 +4641,7 @@ function showOptionsAnalysis(key, onComplete) {
 // ── Save / Resume ──────────────────────────────────────────────────────────
 
 const AUTOSAVE_KEY = 'vsphere-wizard-autosave';
-const STEP_LABELS  = ['Use case', 'Hardware', 'ESXi version', 'Virtual router', 'Domain controller', 'Existing network', 'Lab networks', 'Nested cluster', 'Deployment placement', 'NSX-T', 'VCF Bring-up', 'Nested disks', 'Bundle depot', 'Workload VMs', 'Security & access', 'Review & generate'];
+const STEP_LABELS  = ['Use case', 'Hardware', 'ESXi version', 'Virtual router', 'Domain controller', 'Existing network', 'Lab networks', 'Nested cluster', 'Deployment placement', 'NSX-T', 'VCF Bring-up', 'Nested disks', 'Bundle depot', 'Workload VMs', 'Security & access', 'File locations', 'Review & generate'];
 
 function buildWizardSave(asTemplate = false) {
   const answers = JSON.parse(JSON.stringify(state.answers));
@@ -4643,6 +4657,14 @@ function buildWizardSave(asTemplate = false) {
     answers.design.vcfVcenterLicense  = '';
     answers.design.vcfSddcMgrIp   = null;
     answers.design.vcfVcenterIp   = null;
+    // Local file paths are specific to the machine that generated this
+    // template — strip them so a shared template doesn't leak someone else's
+    // folder layout.
+    answers.design.vyosIso           = null;
+    answers.design.windowsServerIso  = null;
+    answers.design.esxiIso           = null;
+    answers.design.nestedEsxiOva     = null;
+    answers.design.vCenterOva        = null;
   }
   return {
     _type:    asTemplate ? 'lab-template' : 'wizard-config',
@@ -4864,6 +4886,13 @@ function populateFormFromState() {
   if (vpnTypeField) vpnTypeField.hidden = g.remoteAccessMethod !== 'vpn';
   if (g.vpnType) setRadio('vpnType', g.vpnType);
   setVal('vcenterSize', g.vcenterSize);
+
+  // File locations (step 15)
+  setVal('vyosIsoPath', g.vyosIso);
+  setVal('windowsServerIsoPath', g.windowsServerIso);
+  setVal('esxiIsoPath', g.esxiIso);
+  setVal('nestedEsxiOvaPath', g.nestedEsxiOva);
+  setVal('vCenterOvaPath', g.vCenterOva);
 }
 
 function loadWizardConfig(config) {
@@ -5141,6 +5170,21 @@ function renderPlacementRamSummary() {
     html += '</div>';
   }
   summaryEl.innerHTML = html;
+}
+
+// Shows/hides each file-location field depending on which components this
+// design actually needs — evaluated fresh every time step 15 is entered,
+// since vyos/dc/esxiDeployMethod are all decided in earlier steps.
+function renderFileLocationsVisibility() {
+  const g = state.answers.design;
+  const setHidden = (id, hidden) => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = hidden;
+  };
+  setHidden('file-loc-vyos', !g.vyosEnabled);
+  setHidden('file-loc-windows', !g.dcProfile || g.dcProfile === 'none');
+  setHidden('file-loc-esxi-iso', g.esxiDeployMethod !== 'iso');
+  setHidden('file-loc-esxi-ova', g.esxiDeployMethod !== 'ova');
 }
 
 function renderDeploymentPlacement(onChange) {

@@ -45,7 +45,7 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 
 ---
 
-## Step numbering (as of v0.6.0-beta)
+## Step numbering (as of v1.13)
 
 | # | Step name | Notes |
 |---|-----------|-------|
@@ -56,17 +56,19 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 | 4 | Domain controller | |
 | 5 | Existing network | |
 | 6 | Lab networks | |
-| 7 | Nested cluster | ESA/OSA vSAN; memory tiering; placement when hostCount > 1 |
-| 8 | NSX-T | Edge node count/size; BGP route advert mode; redistribution checkboxes |
-| 9 | VCF Bring-up | Shown always; generates vcf-bringup.json + vcf-prep.ps1 when vcfEnabled |
-| 10 | Nested disks | |
-| 11 | Bundle depot | `depotStepVisible()` gates on vSAN + local_datastore |
-| 12 | Workload VMs | |
-| 13 | Security & access | |
-| 14 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
-| 15 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
+| 7 | Nested cluster | ESA/OSA vSAN; memory tiering; placement when hostCount > 1; `esxiDeployMethod` (iso/ova) chosen here |
+| 8 | Deployment placement | `PLACEMENT_STEP`; skipped via `getNextStep()`/`getPrevStep()` when hostCount === 1 |
+| 9 | NSX-T | Edge node count/size; BGP route advert mode; redistribution checkboxes |
+| 10 | VCF Bring-up | Shown always; generates vcf-bringup.json + vcf-prep.ps1 when vcfEnabled |
+| 11 | Nested disks | |
+| 12 | Bundle depot | `DEPOT_STEP`; skipped via `getNextStep()`/`getPrevStep()` when `depotStepVisible()` is false |
+| 13 | Workload VMs | |
+| 14 | Security & access | |
+| 15 | File locations | `FILE_LOCATIONS_STEP`; always shown, per-field visibility gated by `renderFileLocationsVisibility()` |
+| 16 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
+| 17 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
 
-`TOTAL_STEPS = 16`, `DEPOT_STEP = 11`, `NSX_STEP = 8`, `VCF_STEP = 9`, `TROUBLESHOOT_STEP = 15`
+`TOTAL_STEPS = 18`, `PLACEMENT_STEP = 8`, `DEPOT_STEP = 12`, `NSX_STEP = 9`, `VCF_STEP = 10`, `FILE_LOCATIONS_STEP = 15`, `TROUBLESHOOT_STEP = 17`
 
 ---
 
@@ -280,7 +282,17 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.11.0 (current — Save and resume)
+### v1.13 (current — lab-config.json / File locations step)
+- **New step 15 — File locations** (inserted between Security & access and Review; old step 15 Review → 16, step 16 Troubleshooting → 17; `TOTAL_STEPS` 17 → 18, new `FILE_LOCATIONS_STEP = 15`):
+  - Collects local Windows paths for `vyosIso`, `windowsServerIso`, `esxiIso`, `nestedEsxiOva`, `vCenterOva` — whichever are relevant given `vyosEnabled` / `dcProfile` / `esxiDeployMethod` (evaluated fresh on step entry by `renderFileLocationsVisibility()`, since those flags are decided in earlier steps)
+  - Fields are optional in the wizard — leaving one blank just means editing `lab-config.json` by hand later; the generated scripts still hard-require it at runtime
+  - New `spec.labConfig` section (`lib/generateSpec.js`) carries the five fields through to script generation
+- **`lab-config.json` is now generated pre-filled**, not just a `.example` template: `buildLabConfigFromSpec(spec)` (`lib/generatePowerShell.js`) writes real values (or `""` if left blank in the wizard) into `localPaths`; `datastorePaths` stays empty (manual escape hatch, documented in PREREQUISITES.md, not collected by the wizard). `buildLabConfigExample()` is still written alongside as a blank reference copy of the schema. Both are new download kinds (`lab-config` / `lab-config-example`) in `server.js` and `SCRIPT_LABELS`/`renderDownloads()` in `wizard.js`.
+- **Every deploy script reads ISO/OVA paths from `lab-config.json`, never a script parameter**: `vyos-deploy.ps1`, `dc-deploy.ps1`, `deploy-lab.ps1` (both ISO and OVA variants), `vcenter-deploy.ps1`. Shared helpers in `lib/generatePowerShell.js`: `emitLabConfigLoader()` (loads the JSON once, throws if missing), `emitLocalFileResolution()` (OVA appliances — Import-VApp/govc read the local file directly), `emitDatastoreIsoResolution()` (CD-ROM ISOs — auto-uploads the local file to `[<datastore>] ISOs/<filename>` via a `VimDatastore` PSDrive, or uses `datastorePaths` directly if set). No `[Parameter(Mandatory = $true)]` ISO/OVA params remain anywhere.
+- **Template strips** (`buildWizardSave(true)`) now also clears `vyosIso`, `windowsServerIso`, `esxiIso`, `nestedEsxiOva`, `vCenterOva` — local file paths are machine-specific and shouldn't leak into a shared `.labtemplate`.
+- Fixed a pre-existing parse bug found while syntax-validating the regenerated `vcenter-deploy.ps1` with PowerShell's own parser: `$ovfConfig.guestinfo.cis.vmdir.domain-name.Value` doesn't parse (hyphen in a bare dot-path) — quoted the property segment.
+
+### v1.11.0 (Save and resume)
 - **Auto-save to localStorage** (`vsphere-wizard-autosave`): state serialised after every `onChange` and every `showStep`. Cleared on successful generate. Key format: `{ _type, _version:1, _savedAt, _step, learningMode, architectMode, answers, designRationale, discovery, decisionLog, riskRegister }`.
 - **Resume banner** on mode-select screen: `checkAutoSave()` runs at init; if a valid autosave exists, `#autosave-banner` is shown above the mode cards with the saved step and time-ago. Resume loads the config and enters the app; Start Fresh discards it.
 - **4-option mode-select screen**: Build / Learning / Continue saved design / Start from template. Continue and template cards trigger hidden file inputs (`#load-config-input`, `#load-template-input`).

@@ -424,8 +424,9 @@
       <li data-step="12"><span class="rail-num">13</span><span>Bundle depot</span></li>
       <li data-step="13"><span class="rail-num">14</span><span>Workload VMs</span></li>
       <li data-step="14"><span class="rail-num">15</span><span>Security &amp; access</span></li>
-      <li data-step="15"><span class="rail-num">16</span><span>Review &amp; generate</span></li>
-      <li data-step="16" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
+      <li data-step="15"><span class="rail-num">16</span><span>File locations</span></li>
+      <li data-step="16"><span class="rail-num">17</span><span>Review &amp; generate</span></li>
+      <li data-step="17" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
     </ol>
     <div class="rail-footer">
       <a href="/diagram" target="_blank" rel="noopener" class="rail-diagram-btn" id="rail-diagram-btn">&#x1F5A7; View Diagram</a>
@@ -1364,8 +1365,50 @@
         </div>
       </section>
 
-      <!-- Step 15: Review & generate -->
+      <!-- Step 15: File locations -->
       <section class="step" data-step="15">
+        <h1>File locations</h1>
+        <p class="step-intro">
+          Point the wizard at the ISO/OVA files on this machine. These are written into
+          <code>lab-config.json</code> alongside the generated scripts — every script reads its
+          file path from there, so you won't be prompted for it again when you run them.
+          Leave any of these blank now and fill them in later by editing
+          <code>lab-config.json</code> directly.
+        </p>
+
+        <div class="field" id="file-loc-vcenter-ova">
+          <label for="vCenterOvaPath">vCenter Server Appliance (VCSA) OVA path</label>
+          <input type="text" id="vCenterOvaPath" placeholder="C:\Lab\ISOs\vcsa\vcsa.ova">
+          <p class="hint">Extract this from the downloaded <code>VMware-VCSA-all-*.iso</code> bundle first — see PREREQUISITES.md.</p>
+        </div>
+
+        <div class="field" id="file-loc-esxi-iso">
+          <label for="esxiIsoPath">ESXi install ISO path</label>
+          <input type="text" id="esxiIsoPath" placeholder="C:\Lab\ISOs\VMware-VMvisor-Installer-9.0.iso">
+          <p class="hint">Uploaded to the datastore automatically on first run.</p>
+        </div>
+
+        <div class="field" id="file-loc-esxi-ova">
+          <label for="nestedEsxiOvaPath">Nested ESXi appliance OVA path</label>
+          <input type="text" id="nestedEsxiOvaPath" placeholder="C:\Lab\ISOs\Nested_ESXi_Appliance.ova">
+          <p class="hint">William Lam's Nested ESXi Virtual Appliance — read directly from this path during import.</p>
+        </div>
+
+        <div class="field" id="file-loc-vyos">
+          <label for="vyosIsoPath">VyOS ISO path</label>
+          <input type="text" id="vyosIsoPath" placeholder="C:\Lab\ISOs\vyos-rolling.iso">
+          <p class="hint">Uploaded to the datastore automatically on first run.</p>
+        </div>
+
+        <div class="field" id="file-loc-windows">
+          <label for="windowsServerIsoPath">Windows Server ISO path</label>
+          <input type="text" id="windowsServerIsoPath" placeholder="C:\Lab\ISOs\WinServer2022-eval.iso">
+          <p class="hint">Uploaded to the datastore automatically on first run.</p>
+        </div>
+      </section>
+
+      <!-- Step 16: Review & generate -->
+      <section class="step" data-step="16">
         <h1>Review and generate</h1>
         <p class="step-intro">Checks out? Generate the spec, deployment scripts, and the design doc.</p>
 
@@ -1388,7 +1431,7 @@
           <div class="review-placement-body"></div>
         </div>
 
-        <div class="learn-block" data-learn-step="15">
+        <div class="learn-block" data-learn-step="16">
           <div class="learn-scorecard-wrap">
             <h2 class="learn-scorecard-title">Architecture Review</h2>
             <p class="learn-scorecard-intro">Your design rationale will be included in your design document &mdash; this is what separates a spec from a proper design.</p>
@@ -1420,8 +1463,8 @@
         </div>
       </section>
 
-      <!-- Step 16: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
-      <section class="step" data-step="16">
+      <!-- Step 17: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
+      <section class="step" data-step="17">
         <h1>Troubleshooting Lab</h1>
 
         <!-- Mode tabs -->
