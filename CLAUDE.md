@@ -282,7 +282,49 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.13 (current — lab-config.json / File locations step)
+### v1.18.0 (current — VLAN trunk network model, DC network placement)
+- **Two-vSwitch VLAN trunk model replaces one-port-group-per-network**: physical host now gets
+  **vSwitch0** (existing switch, physical uplink, carries VyOS's WAN NIC only) and **vSwitch1**
+  (no physical uplink, created automatically by `deploy-lab.ps1`) with a single **Nested-Trunk**
+  port group set to VLAN 4095 (trunk — passes every VLAN tag through). VyOS is the only device
+  that routes between VLANs, via a per-network `vif` sub-interface on its own trunk NIC (see
+  `vyos-config.txt`). All other lab VMs — nested ESXi, DC, jumpbox, workload VMs, depot — connect
+  a single NIC to Nested-Trunk instead of one NIC per network.
+  - `emitTrunkPortGroupBlock()` (`lib/generatePowerShell.js`) creates vSwitch1 + the trunk port
+    group with the required Promiscuous/Forged-transmits/MAC-changes security policy, replacing
+    the old per-network `emitPortGroupBlock()`.
+  - `vyos-deploy.ps1` now attaches exactly 2 NICs (WAN + Nested-Trunk) instead of one per network.
+  - Nested ESXi hosts (ISO and OVA paths) get one NIC on Nested-Trunk; they tag their own
+    vMotion/vSAN/VM-Traffic vmkernel ports internally using the VLAN IDs from `lab-spec.json`
+    (documented in the generated `.NOTES` and `build-guide.md`). OVA path additionally feeds the
+    real management VLAN ID into the appliance's `guestinfo.vlan` OVF property.
+  - `build-guide.md` / `design-doc.md` updated: two-vSwitch architecture description, VLAN
+    "two-layer rule" (VyOS vif + nested vmk0 — the port group is always a fixed trunk, so it's
+    no longer a factor, unlike the old three-layer rule).
+- **`vyos-config.txt`**: new ready-to-paste VyOS CLI configuration file, generated alongside
+  `vyos-deploy.ps1` whenever VyOS is enabled. Resolves real values from the spec — management
+  CIDR/VLAN, NAT, DHCP range, DNS/NTP source, and (BGP mode) the actual AS numbers and NSX T0
+  peer IP. `vyos-deploy.ps1`'s completion message now points here instead of printing generic
+  instructions. New download kind `vyos-config` in `server.js` / `SCRIPT_LABELS` in `wizard.js`.
+- **DC network placement option** (step 4): "Lab management network (Nested-Trunk)" vs
+  "Physical/home network (VM Network)" — `g.dcNetworkPlacement`, `spec.domainController.networkPlacement`.
+  Physical placement puts the DC's NIC on the WAN port group (`$PortGroup` param, default
+  `"VM Network"`) instead of Nested-Trunk, and `build-guide.md`'s static-IP instructions switch to
+  the home router as the gateway instead of VyOS. DNS/NTP references elsewhere already just use
+  `dc.ipAddress`, so no other changes were needed for those to pick up a home-network IP.
+- **VyOS DHCP syntax fixed for current/rolling release**: `subnet-id` is now required per subnet,
+  and `name-server`/`default-router` moved under `option` (`set service dhcp-server
+  shared-network-name LAB subnet '<cidr>' option name-server '<ip>'`) — the old flat
+  `subnet '<cidr>' name-server '<ip>'` syntax silently fails to commit on rolling. Fixed in both
+  `vyos-config.txt` and `build-guide.md`. Also added the previously-missing `option default-router`.
+- **Another parse bug found by validating every generated script with PowerShell's own parser**
+  (`[System.Management.Automation.Language.Parser]::ParseFile`): `nsx-configure.ps1` shelled out
+  to `openssl s_client ... </dev/null` — literal bash redirection syntax, invalid in PowerShell
+  (and the computed fingerprint was never even used — `thumbprint` was hardcoded to `""`).
+  Replaced with a native `System.Net.Security.SslStream` fetch and wired the real thumbprint into
+  the compute-manager registration body.
+
+### v1.13 (lab-config.json / File locations step)
 - **New step 15 — File locations** (inserted between Security & access and Review; old step 15 Review → 16, step 16 Troubleshooting → 17; `TOTAL_STEPS` 17 → 18, new `FILE_LOCATIONS_STEP = 15`):
   - Collects local Windows paths for `vyosIso`, `windowsServerIso`, `esxiIso`, `nestedEsxiOva`, `vCenterOva` — whichever are relevant given `vyosEnabled` / `dcProfile` / `esxiDeployMethod` (evaluated fresh on step entry by `renderFileLocationsVisibility()`, since those flags are decided in earlier steps)
   - Fields are optional in the wizard — leaving one blank just means editing `lab-config.json` by hand later; the generated scripts still hard-require it at runtime

@@ -698,6 +698,15 @@
         </div>
 
         <div id="dc-fields" hidden>
+          <div class="field">
+            <label>Where should the DC be deployed? <span class="info-icon">i<span class="info-tooltip">Lab management network: DC gets a NIC on Nested-Trunk, like the rest of the lab &mdash; reachable through VyOS. Physical/home network: DC gets a NIC on the WAN port group (VM Network) instead &mdash; simpler for home labs where the DC just needs to be reachable, with no lab-network routing to worry about.</span></span></label>
+            <div class="radio-group">
+              <label class="radio-row"><input type="radio" name="dcNetworkPlacement" value="lab" checked><span>Lab management network (Nested-Trunk)</span></label>
+              <label class="radio-row"><input type="radio" name="dcNetworkPlacement" value="physical"><span>Physical/home network (VM Network)</span></label>
+            </div>
+            <p class="hint" id="dc-network-placement-hint-lab">DC connects to Nested-Trunk, the same internal lab network as everything else. Its IP must fall inside the management CIDR (set in step 6).</p>
+            <p class="hint" id="dc-network-placement-hint-physical" hidden>DC connects directly to the WAN port group instead of the lab network &mdash; its IP address below should be on your physical/home network, not the lab management CIDR. Every script that references the DC for DNS/NTP will use this home-network IP.</p>
+          </div>
           <div class="field-row">
             <div class="field">
               <label for="dcDomainName">Domain name</label>
@@ -705,9 +714,9 @@
               <p class="hint">e.g. <code>lab.acme.internal</code> &mdash; used in the DC promotion command and the vCenter FQDN.</p>
             </div>
             <div class="field">
-              <label for="dcIpAddress">DC IP address</label>
+              <label for="dcIpAddress" id="dc-ip-address-label">DC IP address</label>
               <input type="text" id="dcIpAddress" placeholder="e.g. 192.168.10.5">
-              <p class="hint">Checked against the lab network ranges in the next steps to flag IP conflicts.</p>
+              <p class="hint" id="dc-ip-address-hint">Checked against the lab network ranges in the next steps to flag IP conflicts.</p>
             </div>
           </div>
           <div class="field" id="dc-storage-disk-field" hidden>
@@ -761,7 +770,7 @@
       <section class="step" data-step="6">
 
         <h1>Lay out the lab's networks</h1>
-        <p class="step-intro">Each one becomes its own tagged port group on the physical vSwitch.</p>
+        <p class="step-intro">All of these ride a single VLAN trunk port group on the physical host &mdash; VyOS is the only thing that routes between them.</p>
 
         <div class="learn-block" data-learn-step="6">
           <div class="learn-context">
@@ -794,7 +803,7 @@
               <span class="pg-dot pg-dot-internal"></span>
               Internal lab port group
             </div>
-            <p><strong>No physical uplink</strong> — traffic stays entirely inside the physical host. All inter-VLAN routing is handled by VyOS. Set this port group to <code>VLAN 4095</code> (trunk mode) so VyOS receives tagged frames for every VLAN.</p>
+            <p><strong>No physical uplink</strong> — traffic stays entirely inside the physical host. All inter-VLAN routing is handled by VyOS. <code>deploy-lab.ps1</code> creates this automatically as <code>Nested-Trunk</code> on a dedicated <code>vSwitch1</code>, set to <code>VLAN 4095</code> (trunk mode) so VyOS receives tagged frames for every VLAN.</p>
           </div>
         </div>
 
@@ -806,16 +815,16 @@
             <input type="text" id="mgmtCidr" placeholder="192.168.10.0/24">
           </div>
           <div class="field">
-            <label>Management VLAN mode <span class="info-icon">i<span class="info-tooltip">Tagged (best practice): each component adds a VLAN ID to its frames. Requires the physical internal port group to be set to VLAN 4095 trunk. Untagged (simpler): management traffic runs on the native VLAN with no tagging &mdash; easier to set up but all traffic shares one broadcast domain.</span></span></label>
+            <label>Management VLAN mode <span class="info-icon">i<span class="info-tooltip">Tagged (best practice): VyOS and each nested ESXi host tag their management traffic with a VLAN ID. The physical port group is always a VLAN 4095 trunk (created automatically), so it's never part of this. Untagged (simpler): management traffic runs on the native VLAN with no tagging &mdash; also the only option non-ESXi lab VMs (DC, jumpbox, workload VMs) can use, since they can't tag VLANs themselves.</span></span></label>
             <div class="radio-group">
               <label class="radio-row"><input type="radio" name="mgmtVlanMode" value="untagged" checked><span>Untagged (simpler — VLAN 0)</span></label>
               <label class="radio-row"><input type="radio" name="mgmtVlanMode" value="tagged"><span>Tagged (best practice)</span></label>
             </div>
-            <p class="hint" id="mgmt-vlan-hint-untagged">Management traffic runs on native VLAN. Port group, VyOS, and nested vmk0 all untagged.</p>
-            <p class="hint" id="mgmt-vlan-hint-tagged" hidden>All three layers must use the same VLAN ID: physical port group, VyOS <code>eth1 vif N</code>, and nested vmk0.</p>
+            <p class="hint" id="mgmt-vlan-hint-untagged">Management traffic runs on the native VLAN over the trunk. VyOS and nested vmk0 both untagged.</p>
+            <p class="hint" id="mgmt-vlan-hint-tagged" hidden>Both layers must use the same VLAN ID: VyOS <code>eth1 vif N</code> and nested vmk0. The physical port group is always a VLAN 4095 trunk, so it's never a factor.</p>
           </div>
           <div class="field" id="mgmt-vlan-id-field" hidden>
-            <label for="mgmtVlan">Management VLAN ID <span class="info-icon">i<span class="info-tooltip">The VLAN tag number used by management traffic. All three layers must match: (1) the physical vSwitch port group VLAN ID, (2) the VyOS sub-interface (eth1.N), and (3) nested vmk0. A mismatch at any layer breaks management connectivity.</span></span></label>
+            <label for="mgmtVlan">Management VLAN ID <span class="info-icon">i<span class="info-tooltip">The VLAN tag number used by management traffic. Both layers must match: (1) the VyOS sub-interface (eth1.N) and (2) nested vmk0. A mismatch breaks management connectivity.</span></span></label>
             <input type="number" id="mgmtVlan" min="1" max="4094" placeholder="e.g. 10">
           </div>
         </div>

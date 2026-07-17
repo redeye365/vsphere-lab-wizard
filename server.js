@@ -176,6 +176,7 @@ const FIXED_OUTPUT_FILES = {
 const SCRIPT_KINDS = {
   'deploy-lab':          'deploy-lab.ps1',
   'vyos-deploy':         'vyos-deploy.ps1',
+  'vyos-config':         'vyos-config.txt',
   'dc-deploy':           'dc-deploy.ps1',
   'vcenter-deploy':      'vcenter-deploy.ps1',
   'vsan-cluster':        'vsan-cluster.ps1',

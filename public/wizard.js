@@ -105,6 +105,7 @@ const SCRIPT_LABELS = {
   'lab-config-example': 'lab-config.json.example',
   'deploy-lab':       'deploy-lab.ps1',
   'vyos-deploy': 'vyos-deploy.ps1',
+  'vyos-config': 'vyos-config.txt',
   'dc-deploy': 'dc-deploy.ps1',
   'vcenter-deploy': 'vcenter-deploy.ps1',
   'vsan-cluster': 'vsan-cluster.ps1',
@@ -200,7 +201,7 @@ const state = {
       esxiVersion: null,
       esxiDeployMethod: 'ova',
       vyosEnabled: false, vyosNetworkMode: null,
-      dcProfile: 'none', dcDomainName: null, dcIpAddress: null, dcStorageDiskGB: 200,
+      dcProfile: 'none', dcDomainName: null, dcIpAddress: null, dcStorageDiskGB: 200, dcNetworkPlacement: 'lab',
       mgmtCidr: null, mgmtVlan: null, mgmtVlanMode: 'untagged',
       vmotionCidr: null, vmotionVlan: null,
       vmCidr: null, vmVlan: null,
@@ -750,6 +751,7 @@ function wireForm() {
   });
   bindText('dcDomainName', g, 'dcDomainName', () => { checkSsoCollision(); onChange(); });
   bindText('dcIpAddress', g, 'dcIpAddress', onChange);
+  bindRadio('dcNetworkPlacement', g, 'dcNetworkPlacement', onChange);
 
   bindRadio('networkType', d, 'networkType', onChange);
   bindRadio('vlanCapable', d, 'vlanCapable', onChange, (v) => (v === 'yes' ? true : v === 'no' ? false : null));
@@ -1407,11 +1409,31 @@ function updateWorkloadNote() {
 
 function updateDcNotice() {
   const g = state.answers.design;
+  const isPhysical = g.dcNetworkPlacement === 'physical';
+
+  const hintLab = document.getElementById('dc-network-placement-hint-lab');
+  const hintPhysical = document.getElementById('dc-network-placement-hint-physical');
+  if (hintLab) hintLab.hidden = isPhysical;
+  if (hintPhysical) hintPhysical.hidden = !isPhysical;
+
+  const ipLabel = document.getElementById('dc-ip-address-label');
+  const ipHint = document.getElementById('dc-ip-address-hint');
+  const ipInput = document.getElementById('dcIpAddress');
+  if (ipLabel) ipLabel.textContent = isPhysical ? 'DC IP address (physical/home network)' : 'DC IP address';
+  if (ipHint) {
+    ipHint.textContent = isPhysical
+      ? 'This is an IP on your physical/home network, not the lab management CIDR — the DC connects to the WAN port group directly.'
+      : 'Checked against the lab network ranges in the next steps to flag IP conflicts.';
+  }
+  if (ipInput) ipInput.placeholder = isPhysical ? 'e.g. 10.0.0.50' : 'e.g. 192.168.10.5';
+
   const notice = document.getElementById('dc-ip-notice');
   if (!notice) return;
   if (g.dcProfile !== 'none' && g.dcIpAddress) {
     notice.hidden = false;
-    notice.textContent = `DC IP ${g.dcIpAddress} is planned for this lab. Make sure it falls inside the management CIDR below and doesn’t conflict with any DHCP range.`;
+    notice.textContent = isPhysical
+      ? `DC IP ${g.dcIpAddress} is planned for this lab, on your physical/home network. All DNS/NTP references in the generated scripts will point at this address.`
+      : `DC IP ${g.dcIpAddress} is planned for this lab. Make sure it falls inside the management CIDR below and doesn’t conflict with any DHCP range.`;
   } else {
     notice.hidden = true;
   }
@@ -1813,6 +1835,7 @@ function renderReview() {
   if (g.dcProfile !== 'none') {
     infraComponents.push(['DC domain', val(g.dcDomainName)]);
     infraComponents.push(['DC IP', val(g.dcIpAddress)]);
+    infraComponents.push(['DC network', g.dcNetworkPlacement === 'physical' ? 'Physical/home network (VM Network)' : 'Lab management network (Nested-Trunk)']);
     if (g.dcProfile === 'dc-jumpbox-fileserver') infraComponents.push(['Storage disk', `${g.dcStorageDiskGB || 200} GB`]);
   }
   const localDsEnabled = (g.nestedDisks || []).some((dd) => dd.purpose === 'local_datastore');
@@ -2082,7 +2105,7 @@ function buildReviewSpec() {
     physicalHosts,
     esxiVersion: { label: ESXI_VERSION_LABELS[g.esxiVersion] || 'ESXi' },
     vyos: { enabled: !!g.vyosEnabled, networkMode: g.vyosNetworkMode || 'basic' },
-    domainController: { enabled: g.dcProfile !== 'none', profile: g.dcProfile || 'none', domainName: g.dcDomainName || null, ipAddress: g.dcIpAddress || null, storageDiskGB: g.dcStorageDiskGB || 200 },
+    domainController: { enabled: g.dcProfile !== 'none', profile: g.dcProfile || 'none', domainName: g.dcDomainName || null, ipAddress: g.dcIpAddress || null, storageDiskGB: g.dcStorageDiskGB || 200, networkPlacement: g.dcNetworkPlacement || 'lab' },
     networks: {
       management: { cidr: g.mgmtCidr || null, vlanId: g.mgmtVlan != null ? Number(g.mgmtVlan) : null, mode: g.mgmtVlanMode || 'untagged' },
       vMotion: { cidr: g.vmotionCidr || null, vlanId: g.vmotionVlan != null ? Number(g.vmotionVlan) : null },
@@ -2167,6 +2190,9 @@ function loadSpecIntoState(spec) {
     if (spec.domainController.domainName) g.dcDomainName = spec.domainController.domainName;
     if (spec.domainController.ipAddress)  g.dcIpAddress  = spec.domainController.ipAddress;
     if (spec.domainController.storageDiskGB) g.dcStorageDiskGB = spec.domainController.storageDiskGB;
+    g.dcNetworkPlacement = spec.domainController.networkPlacement === 'physical' ? 'physical' : 'lab';
+    const placementRadio = document.querySelector(`input[name="dcNetworkPlacement"][value="${g.dcNetworkPlacement}"]`);
+    if (placementRadio) placementRadio.checked = true;
     // Sync radio UI
     const profileRadio = document.querySelector(`input[name="dcProfile"][value="${g.dcProfile}"]`);
     if (profileRadio) profileRadio.checked = true;
@@ -3529,7 +3555,7 @@ function renderDownloads(id, generatedScripts, svgGenerated) {
 
   // Script files in deployment order
   const scriptOrder = [
-    'vyos-deploy', 'dc-deploy', 'deploy-lab', 'vcenter-deploy',
+    'vyos-deploy', 'vyos-config', 'dc-deploy', 'deploy-lab', 'vcenter-deploy',
     'vsan-cluster', 'memory-tiering',
     'depot-deploy', 'depot-configure', 'depot-iis',
     'deploy-workloads', 'jumpbox-deploy', 'wireguard-server', 'vyos-site-to-site',
@@ -4784,6 +4810,7 @@ function populateFormFromState() {
   setVal('dcDomainName', g.dcDomainName);
   setVal('dcIpAddress', g.dcIpAddress);
   setVal('dcStorageDiskGB', g.dcStorageDiskGB || 200);
+  setRadio('dcNetworkPlacement', g.dcNetworkPlacement || 'lab');
 
   // Step 5
   setRadio('networkType', d.networkType);
