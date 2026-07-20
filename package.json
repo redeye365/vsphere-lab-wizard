@@ -1,6 +1,6 @@
 {
   "name": "vsphere-lab-wizard",
-  "version": "1.18.0",
+  "version": "1.18.1",
   "description": "Local wizard for designing a nested vSphere home lab. Generates a JSON spec, a PowerCLI deployment script, and a markdown design doc.",
   "main": "server.js",
   "bin": "server.js",

@@ -282,7 +282,29 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.18.0 (current — VLAN trunk network model, DC network placement)
+### v1.18.1 (current — fix mis-encoded .ps1 scripts on Windows PowerShell 5.1)
+- **Root cause of the recurring "random syntax error deep in the file" reports**: generated
+  `.ps1` files are written as UTF-8 with no BOM. Windows PowerShell 5.1 (`powershell.exe`,
+  still the default on most Windows machines — as opposed to PowerShell Core/`pwsh`, which
+  defaults to UTF-8) reads a BOM-less script using the system's ANSI codepage instead. Every
+  non-ASCII character we emitted (em dashes throughout comments/`Write-Host` strings) got
+  mis-decoded byte-by-byte, and depending on the codepage one of those stray bytes can land on
+  an actual quote or brace character — producing exactly the "missing quote terminator" /
+  "missing closing '}'" errors reported, at a line number nowhere near the real cause. This
+  never reproduced under `pwsh` (used for validation), which is why it looked intermittent.
+  - `writeGeneratedFile()` (`server.js`) now prepends a UTF-8 BOM (`\uFEFF`) to every `.ps1`
+    file at write time — this makes both `powershell.exe` and `pwsh` detect the encoding
+    correctly regardless of system codepage. `.sh` scripts are deliberately excluded (a BOM
+    before `#!` breaks shebang detection); `.json`/`.md` etc. don't need one.
+  - Also replaced every em dash with `--` in the generator files that actually emit `.ps1`
+    content (`generatePowerShell.js`, `generateNsx.js`, `generateVcf.js`, `generateDepot.js`)
+    as a belt-and-suspenders fix, so the BOM isn't the only thing standing between a stray
+    typographic character and a broken script.
+  - Confirmed via `[System.Management.Automation.Language.Parser]::ParseFile` across several
+    configs (single/multi-host, ISO/OVA, minimal and heavy/ESA+legacy-CPU+VCF+NSX+depot) that
+    every generated script still parses cleanly with the BOM present.
+
+### v1.18.0 (VLAN trunk network model, DC network placement)
 - **Two-vSwitch VLAN trunk model replaces one-port-group-per-network**: physical host now gets
   **vSwitch0** (existing switch, physical uplink, carries VyOS's WAN NIC only) and **vSwitch1**
   (no physical uplink, created automatically by `deploy-lab.ps1`) with a single **Nested-Trunk**

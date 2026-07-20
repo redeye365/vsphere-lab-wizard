@@ -16,6 +16,22 @@ const os = require('os');
 const IS_PKG = typeof process.pkg !== 'undefined';
 const BASE_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 
+// Windows PowerShell 5.1 (powershell.exe, still the default on most Windows
+// machines) reads .ps1 files with no BOM using the system's ANSI codepage,
+// not UTF-8. Any non-ASCII character we emit (em dashes, etc.) then gets
+// mis-decoded byte-by-byte, and if one of those stray bytes happens to land
+// on a quote/brace character in that codepage, the script fails to parse --
+// with an error that looks like a random "missing quote terminator" deep in
+// the file. A UTF-8 BOM makes both powershell.exe and pwsh (Core) detect the
+// encoding correctly regardless of system codepage. Only .ps1 needs this --
+// .sh scripts must NOT get a BOM (it breaks shebang detection), and
+// .json/.md/etc. readers already handle UTF-8 without one just fine.
+const UTF8_BOM = '\uFEFF';
+function writeGeneratedFile(dir, filename, content) {
+  const withBom = filename.endsWith('.ps1') ? UTF8_BOM + content : content;
+  fs.writeFileSync(path.join(dir, filename), withBom);
+}
+
 // ── Fatal startup error handling ───────────────────────────────────────────
 // On Windows, double-clicking the .exe (or a scheduled task) gives the user no
 // terminal to read a stack trace from — the console window can close before
@@ -234,14 +250,14 @@ app.post('/api/generate', (req, res) => {
 
     // Write each generated PowerShell/bash script
     for (const [filename, content] of Object.entries(scripts)) {
-      fs.writeFileSync(path.join(dir, filename), content);
+      writeGeneratedFile(dir, filename, content);
       const kind = Object.entries(SCRIPT_KINDS).find(([, fn]) => fn === filename)?.[0];
       if (kind) generatedScripts.push(kind);
     }
 
     // Depot files (only when depot is enabled and conditions met in spec)
     for (const [filename, content] of Object.entries(depotFiles)) {
-      fs.writeFileSync(path.join(dir, filename), content);
+      writeGeneratedFile(dir, filename, content);
       const kind = Object.entries(SCRIPT_KINDS).find(([, fn]) => fn === filename)?.[0];
       if (kind) generatedScripts.push(kind);
     }
@@ -249,7 +265,7 @@ app.post('/api/generate', (req, res) => {
     // NSX scripts (only when NSX is enabled)
     const nsxFiles = buildNsxScripts(spec);
     for (const [filename, content] of Object.entries(nsxFiles)) {
-      fs.writeFileSync(path.join(dir, filename), content);
+      writeGeneratedFile(dir, filename, content);
       const kind = Object.entries(SCRIPT_KINDS).find(([, fn]) => fn === filename)?.[0];
       if (kind) generatedScripts.push(kind);
     }
@@ -257,7 +273,7 @@ app.post('/api/generate', (req, res) => {
     // VCF bring-up files (only when VCF is enabled)
     const vcfFiles = buildVcfFiles(spec);
     for (const [filename, content] of Object.entries(vcfFiles)) {
-      fs.writeFileSync(path.join(dir, filename), content);
+      writeGeneratedFile(dir, filename, content);
     }
 
     // Kickstart files (ISO-based deploys only)
