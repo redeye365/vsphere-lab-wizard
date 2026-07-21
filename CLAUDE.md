@@ -282,7 +282,39 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.18.1 (current — fix mis-encoded .ps1 scripts on Windows PowerShell 5.1)
+### v1.18.2 (current -- govc OVA import for standalone ESXi, remaining em-dash sweep)
+- **`buildDeployLabOva` now detects and prefers `govc` for the nested-ESXi OVA import**,
+  matching the pattern already used in `vcenter-deploy.ps1`: `Get-OvfConfiguration`/`Import-VApp`
+  has known reliability problems against a standalone ESXi host, since vApp import assumes a
+  vCenter-managed inventory that doesn't exist yet at this stage. When `govc` is on PATH:
+  `govc import.spec` generates the OVF property spec, guestinfo properties (hostname, IP,
+  netmask, gateway, VLAN, DNS, domain, NTP, password, ssh, createvmfs) and the network mapping
+  are patched into it, `govc import.ova` deploys, then `govc vm.change -e` sets
+  `vhv.enable`/`monitor.allowLegacyCPU`. Falls back to the existing PowerCLI `Import-VApp` path
+  when `govc` isn't installed. `$env:GOVC_URL`/`GOVC_USERNAME`/`GOVC_PASSWORD` are set from the
+  same credential already collected for `Connect-VIServer`, so the user isn't prompted twice.
+  - **ESA vSAN storage-pool disks stay on PowerCLI regardless of import path** -- govc's
+    `vm.disk.create` only supports SCSI controllers (verified against the govmomi docs), not
+    NVMe, so there's no govc equivalent for the raw `VirtualNVMEController` API calls this
+    needs. After a govc import, the script bridges back to a PowerCLI object (`Get-VM -Name
+    $vmName`) and reuses the same `emitEsaNvmeBlock()` used by the PowerCLI/ISO paths.
+  - **Found and fixed a real pre-existing bug while wiring this up**: `emitEsaNvmeBlock()`
+    reused `$ds` as a local variable name for the per-disk `VirtualDeviceConfigSpec`, which
+    collided with the `$ds` datastore object every caller already had in scope (`Get-Datastore`).
+    On host 2+ in any multi-host deployment with ESA vSAN, this silently clobbered `$ds` after
+    host 1, so `-Datastore $ds` on subsequent hosts passed a leftover device-config object
+    instead of the datastore. Renamed to `$diskCfgSpec`. Affected both the ISO and OVA paths,
+    pre-dating this release.
+- **Em dash/en dash sweep completed**: every remaining `lib/generate*.js` file
+  (`generateBuildGuide.js`, `generateMarkdown.js`, `generatePrerequisites.js`,
+  `generateKickstart.js`, `generateDiagramHtml.js`) had its `—`/`–` characters
+  replaced with `--`, on top of the `.ps1`-generating files already fixed in v1.18.1. Zero
+  em/en-dash characters remain anywhere in the generator source or in a full regeneration's
+  output (`.ps1`, `.md`, `.json`, `.sh`, `.txt`).
+- Re-validated every generated script with PowerShell's own parser across single/multi-host,
+  ISO/OVA, ESA/OSA, and BGP+NSX+VCF+depot configs after both changes.
+
+### v1.18.1 (fix mis-encoded .ps1 scripts on Windows PowerShell 5.1)
 - **Root cause of the recurring "random syntax error deep in the file" reports**: generated
   `.ps1` files are written as UTF-8 with no BOM. Windows PowerShell 5.1 (`powershell.exe`,
   still the default on most Windows machines — as opposed to PowerShell Core/`pwsh`, which
