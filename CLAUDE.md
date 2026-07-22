@@ -282,7 +282,30 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.18.2 (current -- govc OVA import for standalone ESXi, remaining em-dash sweep)
+### v1.19.0 (current -- govc-only OVA import, dropping the PowerCLI fallback)
+- **`buildDeployLabOva` now requires `govc` for the nested-ESXi OVA import -- no PowerCLI**
+  **fallback.** v1.18.2 added `govc` as the preferred path with `Import-VApp`/
+  `Get-OvfConfiguration` kept as a fallback for when `govc` wasn't installed; this release
+  removes that fallback entirely; PowerCLI's OVF import is not just unreliable against a
+  standalone ESXi host, it's unwanted here at all now.
+  - The script throws early (`if (-not (Get-Command govc ...)) { throw ... }`) if `govc`
+    isn't on PATH, instead of silently falling back.
+  - `$env:GOVC_URL`/`GOVC_USERNAME`/`GOVC_PASSWORD` (from the same credential already
+    collected for `Connect-VIServer`) and the `govc import.spec` / patch-JSON /
+    `govc import.ova` / `govc vm.change -e vhv.enable=TRUE` / `monitor.allowLegacyCPU=TRUE`
+    sequence are now unconditional, not branched on `$govcAvailable`.
+  - PowerCLI is still required for everything else in the script (vSwitch/port group setup,
+    host/datastore lookup, ESA NVMe disk attachment via the existing `emitEsaNvmeBlock()` --
+    govc still has no NVMe controller support -- and post-import SCSI disk/Start-VM).
+  - `vcenter-deploy.ps1`'s own govc/PowerCLI dual-path is unrelated and unchanged -- this only
+    affects `deploy-lab.ps1`'s OVA-based nested ESXi import.
+  - `PREREQUISITES.md` and `build-guide.md` updated: the govc section is now conditional on
+    `spec.esxiDeployMethod === 'ova'` -- "required, no fallback" instead of "at least one of
+    PowerCLI/govc, both is fine" when OVA deploy is selected.
+- Re-validated every generated script with PowerShell's own parser after removing the
+  fallback branch, across single/multi-host and ESA/OSA configs.
+
+### v1.18.2 (govc OVA import for standalone ESXi, remaining em-dash sweep)
 - **`buildDeployLabOva` now detects and prefers `govc` for the nested-ESXi OVA import**,
   matching the pattern already used in `vcenter-deploy.ps1`: `Get-OvfConfiguration`/`Import-VApp`
   has known reliability problems against a standalone ESXi host, since vApp import assumes a
