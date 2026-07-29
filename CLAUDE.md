@@ -282,7 +282,47 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.19.0 (current -- govc-only OVA import, dropping the PowerCLI fallback)
+### v1.20.0 (current -- Docker & Harbor support)
+- **`Dockerfile`**: `node:18-alpine` (multi-arch manifests already cover amd64/arm64 --
+  no per-arch branching needed); `npm install --production` (skips `mermaid-cli`/`pkg`/
+  `playwright` devDependencies, which aren't needed at runtime); runs as the built-in
+  non-root `node` user; `EXPOSE 3000`; `CMD ["node", "server.js"]`.
+- **Binding conflict with the v0.6.6-beta security audit, resolved via env vars, not by
+  reverting the audit**: the server still defaults to `127.0.0.1` (see `startServer()`,
+  `HOST` const) for native/`npm start` use -- unchanged. The Docker image sets two env
+  vars instead: `HOST=0.0.0.0` (127.0.0.1 inside a container is unreachable through
+  Docker's port mapping) and `ADMIN_ENABLED=false` (new -- when false, `/api/admin/*`
+  is replaced with a blanket 404 instead of being wired to `requireLocalhost`, since that
+  middleware's loopback-IP check stops being a meaningful gate once `HOST` is `0.0.0.0`).
+  `ADMIN_ENABLED` defaults to `true` (enabled) for native use, so `npm start` behavior is
+  unchanged. This was a deliberate tradeoff discussed and chosen over two alternatives:
+  shipping Docker support but leaving the app unreachable in a container, or trusting the
+  Docker bridge subnet in `requireLocalhost` instead of disabling admin outright.
+- **`docker-compose.yml`**: builds from the local `Dockerfile`, maps `3000:3000`, mounts
+  `./scenarios:/app/scenarios` for persistence, sets `PORT`/`HOST`/`ADMIN_ENABLED`.
+- **`.dockerignore`**: `node_modules/`, `dist/`, `output/`, `.git/`, `*.exe`, `*.zip`,
+  plus `vcenter-config.json` / `scenarios/active.json` / `crash.log` so local secrets and
+  run state never get baked into an image layer.
+- **`harbor-push.sh`**: builds, tags (`<version>` from `package.json` + `latest`), and
+  pushes a single-arch image to Harbor. Registry defaults: `harbor.lab.clouditblog.com`,
+  project `lab-tools`, image `zero-to-hero` -- overridable via `HARBOR_URL`/
+  `HARBOR_PROJECT` env vars. Credentials (`HARBOR_USERNAME`/`HARBOR_PASSWORD`) are read
+  from the environment only, never hardcoded or committed.
+- **`build-multiarch.sh`**: `docker buildx build --platform linux/amd64,linux/arm64
+  --push`, tagging and pushing to **both** Docker Hub (`redeye365/zero-to-hero`) and
+  Harbor in one pass. Creates a dedicated buildx builder (`zero-to-hero-builder`) if one
+  doesn't already exist. Same env-var credential handling as `harbor-push.sh`, plus
+  optional `DOCKERHUB_USERNAME`/`DOCKERHUB_PASSWORD` (skippable if already `docker
+  login`'d to Docker Hub).
+- **`package.json`**: `docker:build` / `docker:run` / `docker:push` scripts added;
+  version bumped `1.19.0` -> `1.20.0`.
+- **README**: new "Running with Docker" section -- Docker Hub run command, Harbor
+  pull+run command, Raspberry Pi instructions (64-bit Pi OS, Docker pulls arm64
+  automatically), `docker compose up -d --build`, and the build/push scripts. Explicitly
+  documents the `HOST=0.0.0.0` / `ADMIN_ENABLED=false` tradeoff and warns the image isn't
+  hardened for exposure beyond a trusted home-lab network.
+
+### v1.19.0 (govc-only OVA import, dropping the PowerCLI fallback)
 - **`buildDeployLabOva` now requires `govc` for the nested-ESXi OVA import -- no PowerCLI**
   **fallback.** v1.18.2 added `govc` as the preferred path with `Import-VApp`/
   `Get-OvfConfiguration` kept as a fallback for when `govc` wasn't installed; this release
@@ -508,8 +548,13 @@ network diagram, prerequisites.
 - Step visibility in `showStep()` uses `TOTAL_STEPS - 2` for the review step index so
   the troubleshooting step can follow without hardcoding.
 - Troubleshooting endpoints intentionally not in README, UI text, or any error messages.
-- Server binds to `127.0.0.1` only — never `0.0.0.0`. All `/api/admin/*` routes are
-  additionally protected by `requireLocalhost` middleware as defence-in-depth.
+- Server binds to `127.0.0.1` by default — never `0.0.0.0` for local/native use. All
+  `/api/admin/*` routes are additionally protected by `requireLocalhost` middleware as
+  defence-in-depth. The one sanctioned exception is the Docker image: `HOST=0.0.0.0`
+  (required because `127.0.0.1` inside a container is unreachable through Docker's port
+  mapping) is paired with `ADMIN_ENABLED=false`, which removes `/api/admin/*` entirely
+  (404) rather than relying on `requireLocalhost`'s loopback check, since that check's
+  assumption breaks once the server listens on `0.0.0.0`. See `Dockerfile` / `docker-compose.yml`.
 - `saveScenario` and the admin-verify endpoint both validate `verifyScript` filenames
   with `^[a-zA-Z0-9-]+\.ps1$` to prevent path traversal via imported `.labscenario` files.
 - Sensitive spec fields (`rootPassword`, `esxiPassword`, `esxiLicense`, `vcenterLicense`)

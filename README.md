@@ -216,6 +216,107 @@ If the wizard still fails to start, a message box now describes the error instea
 
 ---
 
+## Running with Docker
+
+The container image is built from `node:18-alpine` and published for both `linux/amd64`
+and `linux/arm64` — it runs on a Raspberry Pi as well as a normal x86 host.
+
+**Security note:** the wizard normally binds to `127.0.0.1` only and restricts admin
+endpoints (scenario library management, vCenter credential storage) to localhost callers
+— see [Project layout](#project-layout) / `CLAUDE.md`. The container needs to bind
+`0.0.0.0` so the published port actually works, so the image sets `ADMIN_ENABLED=false`
+by default, which removes the admin API entirely (404) rather than relying on a
+loopback check that no longer holds. **Only run this container on a network you trust**
+(a home lab / private LAN) — it is not hardened for exposure to the public internet.
+
+### Run from Docker Hub
+
+```sh
+docker run -d \
+  --name zero-to-hero \
+  -p 3000:3000 \
+  -v "$(pwd)/scenarios:/app/scenarios" \
+  redeye365/zero-to-hero:latest
+```
+
+Open `http://<host-ip>:3000` from any machine on your network.
+
+### Pull and run from Harbor
+
+```sh
+docker pull harbor.lab.clouditblog.com/lab-tools/zero-to-hero:latest
+
+docker run -d \
+  --name zero-to-hero \
+  -p 3000:3000 \
+  -v "$(pwd)/scenarios:/app/scenarios" \
+  harbor.lab.clouditblog.com/lab-tools/zero-to-hero:latest
+```
+
+Substitute your own registry/project if you've pushed there with a non-default
+`HARBOR_URL` / `HARBOR_PROJECT` (see `harbor-push.sh` below).
+
+### Raspberry Pi
+
+Use a 64-bit Pi OS (Raspberry Pi OS Bookworm 64-bit or newer) so Docker pulls the
+`linux/arm64` variant of the image automatically — no separate steps needed:
+
+```sh
+curl -fsSL https://get.docker.com | sh   # if Docker isn't installed yet
+sudo usermod -aG docker $USER            # log out/in after this
+docker run -d \
+  --name zero-to-hero \
+  -p 3000:3000 \
+  -v "$(pwd)/scenarios:/app/scenarios" \
+  redeye365/zero-to-hero:latest
+```
+
+A Pi 4/5 with 4 GB+ RAM is comfortably enough — this container only runs the wizard's
+Express server, not any of the nested-lab VMs it designs scripts for.
+
+### docker-compose
+
+```sh
+docker compose up -d --build
+```
+
+This builds the local `Dockerfile`, maps port 3000, and mounts `./scenarios` into the
+container so scenario data (and anything added via the Troubleshooter's scenario
+library) survives container restarts/recreation. Edit `docker-compose.yml` to point at
+a published image instead of `build: .` once you're not iterating on the Dockerfile.
+
+### Building and pushing images yourself
+
+```sh
+npm run docker:build   # local single-arch build, tagged zero-to-hero:latest
+npm run docker:run     # run that local build on port 3000
+npm run docker:push    # build + tag + push to Harbor (harbor-push.sh)
+```
+
+`harbor-push.sh` and `build-multiarch.sh` both read Harbor credentials from the
+`HARBOR_USERNAME` / `HARBOR_PASSWORD` environment variables — they are never hardcoded
+in the scripts or committed to the repo:
+
+```sh
+export HARBOR_USERNAME=youruser
+export HARBOR_PASSWORD=yourpassword   # or a Harbor robot account token
+./harbor-push.sh
+```
+
+`build-multiarch.sh` additionally builds and pushes `linux/amd64` + `linux/arm64` in one
+pass (via `docker buildx`) to **both** Docker Hub (`redeye365/zero-to-hero`) and Harbor,
+tagging each with the current `package.json` version and `latest`:
+
+```sh
+export HARBOR_USERNAME=youruser
+export HARBOR_PASSWORD=yourpassword
+export DOCKERHUB_USERNAME=youruser     # optional -- skip if already `docker login`'d
+export DOCKERHUB_PASSWORD=yourpassword
+./build-multiarch.sh
+```
+
+---
+
 ## Known limitations (v1)
 
 - **VCF / SDDC Manager out of scope.** The wizard is designed to produce a vSphere foundation that *could* have VCF layered on top later (correct SSO domain, DNS PTR records, NTP single-source, cluster naming, vSAN ESA) but does not deploy VCF itself.
@@ -244,6 +345,10 @@ lib/
   generatePrerequisites.js   Builds PREREQUISITES.md from the spec
   generateNetworkDiagram.js  Builds Mermaid topology diagram from the spec
 output/                      Generated files (one subfolder per run, gitignored)
+Dockerfile                   Container image (node:18-alpine, multi-arch)
+docker-compose.yml           Local build + run, with scenarios/ volume
+harbor-push.sh               Build, tag, and push to Harbor
+build-multiarch.sh           buildx multi-arch build + push to Docker Hub and Harbor
 ```
 
 ---

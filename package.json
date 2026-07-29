@@ -1,13 +1,16 @@
 {
   "name": "vsphere-lab-wizard",
-  "version": "1.19.0",
+  "version": "1.20.0",
   "description": "Local wizard for designing a nested vSphere home lab. Generates a JSON spec, a PowerCLI deployment script, and a markdown design doc.",
   "main": "server.js",
   "bin": "server.js",
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "build": "pkg . --targets node18-win-x64,node18-macos-arm64,node18-macos-x64 --output dist/vsphere-lab-wizard"
+    "build": "pkg . --targets node18-win-x64,node18-macos-arm64,node18-macos-x64 --output dist/vsphere-lab-wizard",
+    "docker:build": "docker build -t zero-to-hero .",
+    "docker:run": "docker run -p 3000:3000 -v \"$(pwd)/scenarios:/app/scenarios\" --name zero-to-hero zero-to-hero",
+    "docker:push": "./harbor-push.sh"
   },
   "engines": {
     "node": ">=18"

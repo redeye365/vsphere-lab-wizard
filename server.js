@@ -157,6 +157,7 @@ const app = express();
 // 3001, 3002 in case something else on the machine already holds the default
 // (e.g. another local dev server, common on Windows boxes running multiple tools).
 const CANDIDATE_PORTS = process.env.PORT ? [parseInt(process.env.PORT, 10)] : [3000, 3001, 3002];
+const HOST = process.env.HOST || '127.0.0.1';
 
 const OUTPUT_DIR = path.join(BASE_DIR, 'output');
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -415,7 +416,15 @@ function requireLocalhost(req, res, next) {
   res.status(403).json({ error: 'Admin endpoints are only accessible from localhost' });
 }
 
-app.use('/api/admin', requireLocalhost);
+// ADMIN_ENABLED=false (set in the Docker image) removes the admin surface entirely,
+// rather than relying solely on requireLocalhost's loopback check — that check assumes
+// HOST=127.0.0.1, which no longer holds once the container listens on 0.0.0.0.
+const ADMIN_ENABLED = process.env.ADMIN_ENABLED !== 'false';
+if (ADMIN_ENABLED) {
+  app.use('/api/admin', requireLocalhost);
+} else {
+  app.use('/api/admin', (req, res) => res.status(404).end());
+}
 
 // ── Admin: Scenario Library endpoints ──────────────────────────────────────
 // Activated via Cmd+Shift+X — not documented in README or public UI.
@@ -710,11 +719,16 @@ app.post('/api/troubleshoot/debrief', (req, res) => {
   });
 });
 
-// Bind to 127.0.0.1 only — this is a local tool and must not be reachable from the network.
+// Binds to 127.0.0.1 by default — this is a local tool and must not be reachable from
+// the network. The Docker image is the one sanctioned exception: it sets HOST=0.0.0.0
+// so the container's published port actually works (127.0.0.1 inside a container is
+// unreachable through Docker's port mapping), and pairs it with ADMIN_ENABLED=false so
+// the admin surface (vCenter credential storage, PowerShell execution) never opens up
+// to the network just because requireLocalhost's loopback check no longer holds.
 // Walks CANDIDATE_PORTS in order, falling through to the next one on EADDRINUSE.
 function startServer(ports, index) {
   const port = ports[index];
-  const server = app.listen(port, '127.0.0.1', () => {
+  const server = app.listen(port, HOST, () => {
     const url = `http://localhost:${port}`;
     console.log(`vSphere Lab Wizard running at ${url} — open this URL in your browser`);
     if (port !== ports[0]) {

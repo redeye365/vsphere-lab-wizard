@@ -1,0 +1,11 @@
+node_modules/
+dist/
+output/
+.git/
+*.exe
+*.zip
+
+# Never bake local/secret state into the image
+vcenter-config.json
+scenarios/active.json
+crash.log
