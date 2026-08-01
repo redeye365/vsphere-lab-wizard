@@ -165,7 +165,10 @@ if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve mermaid.js locally so wizard pages don't depend on CDN
+// Serve mermaid.js locally so wizard pages don't depend on CDN. `mermaid` is a direct
+// dependency (not just a transitive devDependency of mermaid-cli) specifically so this
+// file survives `npm install --production` -- otherwise the Docker image would 404 here
+// and both the review-screen preview and /diagram would silently fail to render.
 app.get('/vendor/mermaid.min.js', (req, res) => {
   const localPath = path.join(__dirname, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js');
   if (fs.existsSync(localPath)) {
@@ -371,7 +374,10 @@ app.get('/api/diagram/:id', (req, res) => {
 
   try {
     const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
-    const mermaid = buildMermaidDiagram(spec);
+    // A saved edit (via POST /api/diagram/:id/save) takes priority over the
+    // wizard-generated diagram — that's the whole point of "save changes".
+    const edited  = typeof spec.diagramOverride === 'string' && spec.diagramOverride.length > 0;
+    const mermaid = edited ? spec.diagramOverride : buildMermaidDiagram(spec);
     // Return only the fields the viewer needs for its status line — not the full spec.
     const nc = spec.nestedCluster || {};
     const meta = {
@@ -380,9 +386,47 @@ app.get('/api/diagram/:id', (req, res) => {
       esxiVersionLabel:  spec.esxiVersion?.label || '',
       clusterName:       nc.clusterName  || ''
     };
-    res.json({ mermaid, meta });
+    res.json({ mermaid, meta, edited });
   } catch {
     res.status(500).json({ error: 'Failed to read spec' });
+  }
+});
+
+// POST /api/diagram/:id/save — persist a hand-edited Mermaid source back onto the
+// session's spec, so future loads of this session (reload, /diagram?id=, re-downloading
+// diagram-html/network-diagram) show the edit instead of the wizard-generated diagram.
+app.post('/api/diagram/:id/save', (req, res) => {
+  const { id } = req.params;
+  if (!/^[a-f0-9]{8}$/.test(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  const dir = path.join(OUTPUT_DIR, id);
+  const specPath = path.join(dir, 'lab-spec.json');
+  const resolvedOutput = path.resolve(OUTPUT_DIR);
+  if (!path.resolve(specPath).startsWith(resolvedOutput + path.sep)) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+  if (!fs.existsSync(specPath)) return res.status(404).json({ error: 'Not found' });
+
+  const { mermaid } = req.body || {};
+  if (typeof mermaid !== 'string' || !mermaid.trim()) {
+    return res.status(400).json({ error: 'mermaid source (non-empty string) required' });
+  }
+  if (mermaid.length > 200_000) {
+    return res.status(400).json({ error: 'Mermaid source too large' });
+  }
+
+  try {
+    const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+    spec.diagramOverride = mermaid;
+    fs.writeFileSync(specPath, JSON.stringify(spec, null, 2));
+
+    // Keep the downloadable artifacts for this session in sync with the edit.
+    fs.writeFileSync(path.join(dir, 'diagram.html'), buildDiagramHtml(spec, mermaid));
+    const svgGenerated = renderSvg(mermaid, path.join(dir, 'network-diagram.svg'));
+
+    res.json({ ok: true, svgGenerated });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save diagram: ' + err.message });
   }
 });
 
@@ -393,8 +437,9 @@ app.post('/api/diagram/from-spec', (req, res) => {
     if (!spec || typeof spec !== 'object') {
       return res.status(400).json({ error: 'spec object required' });
     }
-    const mermaid = buildMermaidDiagram(spec);
-    res.json({ mermaid });
+    const edited  = typeof spec.diagramOverride === 'string' && spec.diagramOverride.length > 0;
+    const mermaid = edited ? spec.diagramOverride : buildMermaidDiagram(spec);
+    res.json({ mermaid, edited });
   } catch (err) {
     res.status(500).json({ error: 'Diagram generation failed' });
   }

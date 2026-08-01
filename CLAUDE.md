@@ -13,7 +13,7 @@ document, network diagram, and build guide. No framework (React/Vue/etc.) — pl
 HTML/CSS/JS in `public/`. Server-side generation only (no client-side bundling).
 
 Key files:
-- `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/from-spec`, `/api/ks/:sessionId/:hostIndex`, `/diagram`, troubleshoot scenario endpoints
+- `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/:id/save`, `/api/diagram/from-spec`, `/api/ks/:sessionId/:hostIndex`, `/diagram`, troubleshoot scenario endpoints
 - `lib/scenarioLibrary.js` — scenario CRUD (loadScenarios, getScenario, saveScenario, deleteScenario, getActive, setActive)
 - `lib/vcenterClient.js` — vSphere REST API client (createSession, listVMs, findSnapshot, revertAllToSnapshot, testConnection)
 - `lib/vcenterConfig.js` — load/save vcenter-config.json from BASE_DIR (gitignored)
@@ -23,7 +23,7 @@ Key files:
 - `public/index.html` — all wizard steps in one HTML file
 - `public/wizard.js` — all client state, step logic, form wiring
 - `public/style.css` — all styles
-- `public/diagram.html` — standalone diagram viewer (live Mermaid, zoom/pan, download SVG/PNG, file picker, session load)
+- `public/diagram.html` — diagram viewer (live Mermaid, zoom/pan, download SVG/PNG, file picker, session load, edit mode with live-preview source editor, manual component addition)
 - `lib/generateSpec.js` — builds the canonical spec object from wizard answers
 - `lib/sizing.js` — resource maths (vCPU / vRAM totals, warnings)
 - `lib/validateAnswers.js` — server-side input validation
@@ -282,7 +282,68 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.20.0 (current -- Docker & Harbor support)
+### v1.21.0 (current -- diagram fixes: Docker rendering, editable source, manual components)
+- **Root-caused and fixed the "diagram doesn't render in Docker" bug**: `mermaid` (the
+  client-side rendering library served at `/vendor/mermaid.min.js`) was only ever pulled
+  in as a *transitive* dependency of `@mermaid-js/mermaid-cli`, which is a devDependency.
+  `npm install --production` (what the Docker image runs) therefore never installed it,
+  so `/vendor/mermaid.min.js` 404'd in every container -- both the review-screen preview
+  (`public/index.html` / `wizard.js`) and `/diagram` (`public/diagram.html`) were broken
+  in Docker specifically, silently, since both already loaded Mermaid locally rather than
+  from a CDN (that part was already correct). Fix: `mermaid` promoted to a **direct**
+  `dependencies` entry (`package.json`) at the same version mermaid-cli already pins, so
+  it survives `--production`/`--omit=dev` installs regardless of whether mermaid-cli is
+  present. Verified with a real `docker build` + fresh container: `/vendor/mermaid.min.js`
+  now 200s, and with Playwright driving the actual Brave Browser binary
+  (`executablePath` to `/Applications/Brave Browser.app/...`) against that container --
+  zero console/page errors on both the review screen and `/diagram`, confirming the
+  "must render in Brave without errors" requirement too. The CDN-loaded Mermaid in the
+  standalone downloaded `diagram.html` (`lib/generateDiagramHtml.js`) is unrelated and
+  intentional -- that file has to work with no server behind it at all, hence CDN +
+  offline fallback (mermaid.live link + raw source) is the correct design there, not a bug.
+- **`/diagram` edit mode**: new toolbar toggle (`#btn-toggle-edit`) opens a side panel
+  with the raw Mermaid source in a textarea (`#mermaid-editor`). Every edit re-renders
+  the preview after a 350ms debounce (`renderFromEditor()`); a bad edit shows an inline
+  error under the textarea (`#editor-error`) without blanking the last good diagram.
+  Panel also has Download SVG (shares `downloadSvg()` with the toolbar button) and Copy
+  Mermaid source (`copyText()` -- tries `navigator.clipboard`, falls back to a hidden
+  `execCommand('copy')` textarea, since the Clipboard API requires a secure context and
+  this app is commonly reached over plain HTTP on a LAN IP, e.g. a Raspberry Pi).
+- **Save changes persists to the session, not just the browser**: `spec.diagramOverride`
+  (string) is a new optional field on the spec. `POST /api/diagram/:id/save` writes the
+  edited Mermaid onto `lab-spec.json` as `diagramOverride`, and regenerates that session's
+  `diagram.html` / `network-diagram.svg` download artifacts to match (`svgGenerated:
+  false` in the container, since `mmdc` isn't bundled there -- handled gracefully, same
+  as the existing pattern). `GET /api/diagram/:id` and `POST /api/diagram/from-spec` both
+  now check for `diagramOverride` first and return it in place of a fresh
+  `buildMermaidDiagram(spec)` call when present (`edited: true` in the response). Only
+  available when loaded via a session ID (`currentSessionId` tracked client-side, set by
+  `?id=`/`Load session`, cleared on file-based loads) -- file-uploaded specs have no
+  server-side session to persist to, so Save is a no-op toast pointing at Copy/Download
+  instead.
+- **Manual component addition** (`+ Component` toolbar button, opens the same edit panel):
+  simple form -- name, IP (optional), type (router/switch/server/VM/appliance), and a
+  checkbox list of existing components to connect to. `parseMermaidNodes()` is a
+  best-effort regex scan of the current source (`^\s*ID\s*[bracket]+"label"`, deliberately
+  narrow so it only matches wizard-shaped node-def lines, never subgraph/class/style/edge
+  lines) used purely to populate that connection checklist -- not a real Mermaid parser.
+  Submitting appends a new `classDef custom` (once) + a shaped node (stadium/hexagon/
+  rect/rounded/subroutine per type, orange dashed border to visually mark it as
+  hand-added) + `--- ` edges to every checked component, directly into the same textarea
+  buffer edit mode uses, then re-renders and flows through the same Save Changes path.
+  This is exactly the William-Lam-adds-a-VIS-appliance case -- no wizard re-run needed.
+- **`lastConnectionNodeIds` diffing** in `refreshConnectionsList()`: the checkbox list is
+  only rebuilt when the parsed node-ID set actually changes, not on every debounced
+  keystroke -- otherwise a user mid-edit with some connection boxes already checked would
+  see them silently uncheck themselves on the next render tick.
+- Verified end-to-end (Playwright + real Brave, against both `node server.js` and a real
+  `docker build` container): generate -> load `/diagram?id=` -> open edit mode -> add a
+  component with two connections -> confirm it renders -> Save changes -> confirm
+  `GET /api/diagram/:id` returns `edited:true` with the new node -> fresh page load shows
+  the saved edit -> Copy Mermaid source -> Download SVG. Zero page/console errors
+  (excluding an unrelated, pre-existing `favicon.ico` 404) in both environments.
+
+### v1.20.0 (Docker & Harbor support)
 - **`Dockerfile`**: `node:18-alpine` (multi-arch manifests already cover amd64/arm64 --
   no per-arch branching needed); `npm install --production` (skips `mermaid-cli`/`pkg`/
   `playwright` devDependencies, which aren't needed at runtime); runs as the built-in
@@ -548,6 +609,19 @@ network diagram, prerequisites.
 - Step visibility in `showStep()` uses `TOTAL_STEPS - 2` for the review step index so
   the troubleshooting step can follow without hardcoding.
 - Troubleshooting endpoints intentionally not in README, UI text, or any error messages.
+- `mermaid` is a **direct** dependency (`package.json`), not just a transitive
+  devDependency of `@mermaid-js/mermaid-cli` — it must survive `npm install
+  --production` so `/vendor/mermaid.min.js` (served by `server.js`, consumed by both
+  `public/index.html`'s review-screen preview and `public/diagram.html`) works in the
+  Docker image. `mermaid-cli` itself (needed only for server-side SVG export via `mmdc`)
+  stays devDependency-only and is legitimately absent in Docker — `renderSvg()` already
+  degrades gracefully when `mmdc` isn't found.
+- `spec.diagramOverride` (string, optional) — a hand-edited Mermaid source saved via
+  `POST /api/diagram/:id/save` from `/diagram`'s edit mode. When present, it takes
+  priority over `buildMermaidDiagram(spec)` everywhere a diagram is produced for that
+  session (`GET /api/diagram/:id`, `POST /api/diagram/from-spec` when the override rode
+  along in an uploaded spec.json, and the session's `diagram.html`/`network-diagram.svg`
+  download artifacts, regenerated at save time).
 - Server binds to `127.0.0.1` by default — never `0.0.0.0` for local/native use. All
   `/api/admin/*` routes are additionally protected by `requireLocalhost` middleware as
   defence-in-depth. The one sanctioned exception is the Docker image: `HOST=0.0.0.0`

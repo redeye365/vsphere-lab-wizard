@@ -1,6 +1,6 @@
 {
   "name": "vsphere-lab-wizard",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "description": "Local wizard for designing a nested vSphere home lab. Generates a JSON spec, a PowerCLI deployment script, and a markdown design doc.",
   "main": "server.js",
   "bin": "server.js",
@@ -16,7 +16,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "mermaid": "^11.15.0"
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.15.0",
