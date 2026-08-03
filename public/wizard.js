@@ -3953,6 +3953,71 @@ function updateOnboardSummary() {
   summaryEl.hidden = false;
 }
 
+// Prerequisites gate, shown before the mode-select screen. Checkbox state is stored in
+// localStorage (not autosave/session state) so it persists across browser sessions —
+// once someone has confirmed PowerCLI/OVF Tool/etc. are installed, they shouldn't have
+// to re-tick the same boxes the next time they open the wizard.
+const PREREQ_STORAGE_KEY = 'vsphere-wizard-prereq-checklist';
+
+function loadPrereqState() {
+  try {
+    const raw = localStorage.getItem(PREREQ_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePrereqState(stateObj) {
+  try { localStorage.setItem(PREREQ_STORAGE_KEY, JSON.stringify(stateObj)); }
+  catch { /* storage unavailable/full — checklist just won't persist this time */ }
+}
+
+function updatePrereqStart() {
+  const checks = Array.from(document.querySelectorAll('.prereq-check'));
+  const allChecked = checks.length > 0 && checks.every((c) => c.checked);
+  const btn  = document.getElementById('prereq-start-btn');
+  const hint = document.getElementById('prereq-actions-hint');
+  if (btn) btn.disabled = !allChecked;
+  if (hint) {
+    const remaining = checks.filter((c) => !c.checked).length;
+    hint.textContent = allChecked
+      ? "You're all set."
+      : `Tick everything above to continue (${remaining} remaining).`;
+  }
+}
+
+function wirePrereqScreen() {
+  const checks = Array.from(document.querySelectorAll('.prereq-check'));
+  if (checks.length === 0) return;
+
+  // Each checkbox is wrapped in a <label> so clicking anywhere in the item toggles it —
+  // except the help links, which should just navigate, not also flip the checkbox.
+  document.querySelectorAll('.prereq-item-desc a').forEach((a) => {
+    a.addEventListener('click', (e) => e.stopPropagation());
+  });
+
+  const saved = loadPrereqState();
+  checks.forEach((c) => {
+    const id = c.dataset.prereqId;
+    if (saved[id]) c.checked = true;
+    c.addEventListener('change', () => {
+      const current = loadPrereqState();
+      current[id] = c.checked;
+      savePrereqState(current);
+      updatePrereqStart();
+    });
+  });
+  updatePrereqStart();
+
+  document.getElementById('prereq-start-btn')?.addEventListener('click', () => {
+    const prereqScreen = document.getElementById('prereq-screen');
+    const modeScreen    = document.getElementById('mode-select-screen');
+    if (prereqScreen) prereqScreen.hidden = true;
+    if (modeScreen)   modeScreen.hidden   = false;
+  });
+}
+
 // Wires the opening mode selector. Standard mode goes straight to the wizard.
 // Learning mode goes to the onboarding screen first.
 function wireModeSelect() {
@@ -5323,6 +5388,7 @@ wireForm();
 wireNav();
 wireGenerate();
 wireInlineValidation();
+wirePrereqScreen();
 wireModeSelect();
 wireLearningOnboard();
 wireLearningInputs();

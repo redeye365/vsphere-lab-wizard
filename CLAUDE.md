@@ -282,7 +282,49 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.21.1 (current -- "Open in viewer" was a dead link before Generate; init-order hardening)
+### v1.22.0 (current -- prerequisites gate before the wizard starts)
+- **New `#prereq-screen`** (`public/index.html`), shown first on page load, before
+  `#mode-select-screen` (which now starts with the `hidden` attribute instead of being
+  visible by default). Five checklist items, each a `<label class="prereq-item">`
+  wrapping a `.prereq-check` checkbox + title/description, styled to match the existing
+  `.mode-card` aesthetic (`.prereq-item:has(.prereq-check:checked)` for the checked
+  state, consistent with the `:has()` pattern already used for `.radio-card`/
+  `.choice-pill`/`.dc-profile-card` elsewhere in `style.css`):
+  1. Broadcom portal account (free registration, needed before any ISO downloads)
+  2. PowerShell 7.2+
+  3. VMware PowerCLI 13.x+
+  4. VMware OVF Tool (new -- not referenced by any generated script; documented here as a
+     standalone/alternative command-line OVA deployment option, same spirit as govc)
+  5. Physical host hardware minimum -- 64GB RAM (128GB+ recommended), 8+ cores,
+     500GB+ NVMe/SSD, nested virtualization enabled
+- **`wirePrereqScreen()`** (`public/wizard.js`, called from Init alongside the other
+  `wire*()` calls): restores checkbox state from `localStorage['vsphere-wizard-prereq-checklist']`
+  (a plain `{id: bool}` map, deliberately separate from the `vsphere-wizard-autosave` key
+  -- this is a standing preference, not wizard progress) on load, wires each checkbox's
+  `change` to persist and re-run `updatePrereqStart()`, which enables `#prereq-start-btn`
+  only when every `.prereq-check` is checked and updates the hint text with a remaining
+  count. Clicking Start hides `#prereq-screen` and reveals `#mode-select-screen` -- the
+  previous single entry point, unchanged beyond no longer being visible by default.
+  Help links inside each item's description have `click` -> `stopPropagation()` wired
+  (`.prereq-item-desc a`) so opening one doesn't also toggle that item's checkbox --
+  labels forward clicks to their wrapped control by default, links included.
+  - Does **not** auto-skip the screen when all items are already checked from a previous
+    visit -- by design, restoring checked state and immediately enabling Start (one click
+    to continue) was judged sufficient; auto-skip would need extra logic to reliably
+    distinguish "returning, already confirmed" from "first-ever load with a lucky
+    localStorage collision," not worth it for a one-click screen.
+  - `checkAutoSave()` is unaffected -- it only toggles `#autosave-banner` (inside
+    `#mode-select-screen`), not that screen's own visibility, so a saved in-progress
+    session is still offered once the user gets past the prereq gate.
+- Verified with Playwright + real Brave, against both `node server.js` and a real
+  Docker container: fresh load shows the gate with Start disabled; a real click
+  (not just programmatic) on an item's title toggles its checkbox and re-toggles on a
+  second click; clicking a help link does NOT toggle its checkbox; checking all five
+  enables Start and correctly populates localStorage; clicking Start reveals
+  mode-select; a full page reload restores all checked state and Start stays enabled.
+  Zero console/page errors throughout.
+
+### v1.21.1 ("Open in viewer" was a dead link before Generate; init-order hardening)
 - **Root cause of "the /diagram page shows nothing"**: the review screen's "Open in
   viewer" link (`.review-diagram-open` in `public/index.html`) was always a static
   `href="/diagram"` with no session id -- unlike the left-rail "View Diagram" button

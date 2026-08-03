@@ -10,7 +10,95 @@
 
 <div id="ts-badge" class="ts-badge" hidden>Troubleshooting Mode</div>
 
-<div id="mode-select-screen" class="mode-select-screen">
+<div id="prereq-screen" class="prereq-screen">
+  <div class="prereq-panel">
+    <div class="prereq-hdr">
+      <h1 class="prereq-title">Before you start</h1>
+      <p class="prereq-sub">Quick Check &mdash; confirm these once, and the wizard remembers for next time.</p>
+    </div>
+
+    <div class="prereq-list">
+      <label class="prereq-item">
+        <input type="checkbox" class="prereq-check" data-prereq-id="broadcom-account">
+        <span class="prereq-item-body">
+          <span class="prereq-item-title">Broadcom portal account (free)</span>
+          <span class="prereq-item-desc">
+            Required before downloading any VMware ISOs (ESXi, vCenter Server Appliance) &mdash; register first,
+            everything else in this checklist can wait until after.
+            <a href="https://support.broadcom.com" target="_blank" rel="noopener">support.broadcom.com</a>
+            &rarr; Register &rarr; <strong>My Dashboard &rarr; My Downloads &rarr; VMware vSphere</strong>.
+            First-time registration can take 15&ndash;30 minutes.
+          </span>
+        </span>
+      </label>
+
+      <label class="prereq-item">
+        <input type="checkbox" class="prereq-check" data-prereq-id="powershell">
+        <span class="prereq-item-body">
+          <span class="prereq-item-title">PowerShell 7.2+ installed</span>
+          <span class="prereq-item-desc">
+            The generated scripts use PowerShell 7 (Core) syntax &mdash; Windows PowerShell 5.1 will not run them.
+            <strong>Windows:</strong> <code>winget install Microsoft.PowerShell</code> &middot;
+            <strong>macOS:</strong> <code>brew install powershell/tap/powershell</code> &middot;
+            <strong>Linux:</strong> see
+            <a href="https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux" target="_blank" rel="noopener">Microsoft's install guide</a>.
+            Verify with <code>pwsh --version</code>.
+          </span>
+        </span>
+      </label>
+
+      <label class="prereq-item">
+        <input type="checkbox" class="prereq-check" data-prereq-id="powercli">
+        <span class="prereq-item-body">
+          <span class="prereq-item-title">VMware PowerCLI 13.x+ installed</span>
+          <span class="prereq-item-desc">
+            Required to run the deploy scripts against your nested lab.
+            <code>Install-Module VMware.PowerCLI -Scope CurrentUser</code>, then
+            <code>Set-PowerCLIConfiguration -ParticipateInCEIP $false -Confirm:$false</code>.
+            You'll see an "untrusted repository" prompt &mdash; type <code>Y</code>. The download is around 200&nbsp;MB.
+            Verify with <code>Get-Module VMware.PowerCLI -ListAvailable | Select Version</code>.
+          </span>
+        </span>
+      </label>
+
+      <label class="prereq-item">
+        <input type="checkbox" class="prereq-check" data-prereq-id="ovftool">
+        <span class="prereq-item-body">
+          <span class="prereq-item-title">VMware OVF Tool installed</span>
+          <span class="prereq-item-desc">
+            Command-line OVA/OVF deployment for the VCSA and nested-ESXi appliances &mdash; useful on its own or as
+            a fallback alongside PowerCLI/govc. Download the installer for your platform from
+            <a href="https://support.broadcom.com" target="_blank" rel="noopener">support.broadcom.com</a>
+            (VMware vSphere &rarr; Drivers &amp; Tools &rarr; search "OVF Tool"), run it, then verify with
+            <code>ovftool --version</code>.
+          </span>
+        </span>
+      </label>
+
+      <label class="prereq-item">
+        <input type="checkbox" class="prereq-check" data-prereq-id="hardware">
+        <span class="prereq-item-body">
+          <span class="prereq-item-title">Physical host meets the minimum spec</span>
+          <span class="prereq-item-desc">
+            <strong>Minimum 64&nbsp;GB RAM &mdash; 128&nbsp;GB+ recommended.</strong>
+            Also: 8+ CPU cores (16&ndash;32 recommended), 500&nbsp;GB+ NVMe or SSD storage, and
+            <strong>nested virtualization enabled</strong> in BIOS/UEFI &mdash; the deploy scripts require
+            promiscuous mode, forged transmits, and MAC address changes on the port groups they create.
+          </span>
+        </span>
+      </label>
+    </div>
+
+    <div class="prereq-actions">
+      <button type="button" id="prereq-start-btn" class="btn btn-primary prereq-start-btn" disabled>
+        Start designing your lab &rarr;
+      </button>
+      <p class="prereq-actions-hint" id="prereq-actions-hint">Tick everything above to continue.</p>
+    </div>
+  </div>
+</div>
+
+<div id="mode-select-screen" class="mode-select-screen" hidden>
   <div class="mode-select-hero">
     <h1 class="mode-select-title">vSphere Lab Wizard</h1>
     <p class="mode-select-tagline">Design your nested vSphere lab</p>
