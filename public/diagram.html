@@ -764,7 +764,21 @@ document.getElementById('btn-load-session').addEventListener('click', async () =
   if (id) {
     document.getElementById('session-id-input').value = id;
     document.getElementById('btn-load-session').click();
+    return;
   }
+
+  // No session id — this is likely the review screen's "Open in viewer" link, opened
+  // before Generate has run (so there's no session yet). It stashes the in-progress
+  // spec into localStorage before navigating, which any same-origin tab can read
+  // regardless of how it was opened. Consume-once: clear it after loading so a later
+  // plain visit to /diagram doesn't confusingly resurface a stale preview.
+  try {
+    const stashed = localStorage.getItem('vsphere-diagram-preview-spec');
+    if (stashed) {
+      localStorage.removeItem('vsphere-diagram-preview-spec');
+      loadFromSpec(JSON.parse(stashed));
+    }
+  } catch { /* malformed/unavailable — fall through to the empty state */ }
 })();
 
 // ── Download ──────────────────────────────────────────────────────────────

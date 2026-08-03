@@ -282,7 +282,52 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.21.0 (current -- diagram fixes: Docker rendering, editable source, manual components)
+### v1.21.1 (current -- "Open in viewer" was a dead link before Generate; init-order hardening)
+- **Root cause of "the /diagram page shows nothing"**: the review screen's "Open in
+  viewer" link (`.review-diagram-open` in `public/index.html`) was always a static
+  `href="/diagram"` with no session id -- unlike the left-rail "View Diagram" button
+  (`#rail-diagram-btn`), which was already correctly updated to `/diagram?id=<session>`
+  inside the `/api/generate` success handler in `wireGenerate()`. Clicking "Open in
+  viewer" from the review screen -- the natural thing to do right next to the live
+  preview, and before Generate has necessarily been run yet -- opened `/diagram` with
+  no id and no spec, i.e. the genuinely-empty "load a file or enter a session id" state.
+  This was a real, reproducible bug, independent of the v1.21.0 Docker/mermaid fix.
+  - Fix: `renderReviewDiagram()` now stashes the in-progress review spec into
+    `localStorage['vsphere-diagram-preview-spec']` after every successful live-preview
+    render (localStorage, not sessionStorage -- sessionStorage is only reliably inherited
+    by a new tab when it's a same-origin *auxiliary browsing context*, an extra condition
+    not worth depending on; localStorage is shared with any same-origin tab
+    unconditionally, opened however). `public/diagram.html`'s `autoLoadFromQuery()` falls
+    back to reading and consuming (removing) that key when there's no `?id=`/`?session=`
+    param, via the existing `loadFromSpec()`.
+  - Once `/api/generate` succeeds, `wireGenerate()`'s success handler now updates
+    `.review-diagram-open`'s href to `/diagram?id=<session>` exactly like it already did
+    for `#rail-diagram-btn` -- the real session link takes over and the localStorage
+    fallback becomes moot (though harmless if stale).
+  - Verified with Playwright + real Brave: review screen renders live -> stash lands in
+    localStorage -> a separate new tab (opened independently in the same context, not
+    via the flaky "click a target=_blank link" pattern some Playwright/Brave headless
+    combinations don't reliably fire a `popup` event for) loads `/diagram` with no id and
+    correctly renders the stashed spec, clearing the key after. Re-verified after
+    Generate that both links correctly carry the real session id and `/diagram?id=`
+    renders. Zero page errors in all cases.
+- **Init-order hardening on the review screen** (the other half of this fix, requested
+  explicitly): `<script src="/vendor/mermaid.min.js">` already loads before `wizard.js`
+  in `public/index.html` as a classic (non-async/non-module) script, so `mermaid` is
+  guaranteed defined by the time any wizard.js code runs -- the previous one-shot
+  `typeof mermaid === 'undefined'` check wasn't actually racy under normal script
+  loading. Hardened anyway for defense-in-depth on slow connections: `renderReviewDiagram()`
+  is now `async` and calls a new `waitForMermaid()` (polls every 100ms, up to 3s) instead
+  of failing immediately on the first check. Only shows the "diagram preview
+  unavailable" fallback if mermaid genuinely never becomes defined within that window.
+- Re-verified the whole v1.21.0 Docker/Brave fix still holds with a **`docker build
+  --no-cache`** fresh image (not relying on any previously-built/cached image or running
+  container) -- `/vendor/mermaid.min.js` 200s, review screen and `/diagram?id=` both
+  render, zero console/page errors. If you were still seeing the old symptoms, the
+  running container was almost certainly built from an image tag predating v1.21.0/1 --
+  pull `redeye365/zero-to-hero:latest` again (or `:1.21.1`) and recreate the container.
+
+### v1.21.0 (Docker rendering fix, editable diagram source, manual components)
 - **Root-caused and fixed the "diagram doesn't render in Docker" bug**: `mermaid` (the
   client-side rendering library served at `/vendor/mermaid.min.js`) was only ever pulled
   in as a *transitive* dependency of `@mermaid-js/mermaid-cli`, which is a devDependency.

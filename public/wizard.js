@@ -2019,7 +2019,29 @@ function renderReview() {
 let reviewMermaidInit = false;
 let reviewDiagramPending = false;
 
-function renderReviewDiagram() {
+// The <script src="/vendor/mermaid.min.js"> tag is at the end of the document, so on a
+// slow connection (or a very fast click-through straight to the review step on first
+// page load) it's possible to reach renderReviewDiagram() before the global exists yet.
+// Poll briefly rather than giving up on the very first check — this is the "fix the
+// initialisation order" half of the diagram fix: a slow load is no longer indistinguishable
+// from mermaid genuinely being unavailable.
+function waitForMermaid(timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    if (typeof mermaid !== 'undefined') return resolve(true);
+    const start = Date.now();
+    const poll = setInterval(() => {
+      if (typeof mermaid !== 'undefined') {
+        clearInterval(poll);
+        resolve(true);
+      } else if (Date.now() - start > timeoutMs) {
+        clearInterval(poll);
+        resolve(false);
+      }
+    }, 100);
+  });
+}
+
+async function renderReviewDiagram() {
   const section = document.getElementById('review-diagram-section');
   const inner   = document.getElementById('review-diagram-inner');
   const empty   = document.getElementById('review-diagram-empty');
@@ -2030,7 +2052,8 @@ function renderReviewDiagram() {
   empty.style.display = 'flex';
 
   if (!reviewMermaidInit) {
-    if (typeof mermaid === 'undefined') {
+    const ready = await waitForMermaid();
+    if (!ready) {
       empty.textContent = 'Diagram preview unavailable — your network-diagram.svg will still be included in the generated zip';
       return;
     }
@@ -2046,10 +2069,11 @@ function renderReviewDiagram() {
   }, 5000);
 
   // Build spec from current state and request mermaid source from server
+  const reviewSpec = buildReviewSpec();
   fetch('/api/diagram/from-spec', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ spec: buildReviewSpec() })
+    body: JSON.stringify({ spec: reviewSpec })
   })
     .then((r) => r.json())
     .then(async (data) => {
@@ -2064,6 +2088,17 @@ function renderReviewDiagram() {
       const svgEl = inner.querySelector('svg');
       if (svgEl) { svgEl.style.maxWidth = '100%'; svgEl.style.height = 'auto'; }
       empty.style.display = 'none';
+
+      // "Open in viewer" has no session id to link to until Generate has run (see the
+      // /api/generate success handler below, which overwrites this with a real
+      // ?id=<session> link once one exists). Until then, hand /diagram the in-progress
+      // spec via localStorage (not sessionStorage — a new tab only reliably inherits
+      // sessionStorage when opened as a same-origin auxiliary browsing context, which is
+      // an extra condition to depend on; localStorage is shared with any same-origin tab
+      // unconditionally) so the link isn't just a dead, empty page.
+      try {
+        localStorage.setItem('vsphere-diagram-preview-spec', JSON.stringify(reviewSpec));
+      } catch { /* storage unavailable/full — non-fatal, link just won't have a fallback */ }
     })
     .catch(() => {
       clearTimeout(renderTimeout);
@@ -3680,10 +3715,15 @@ function wireGenerate() {
       document.getElementById('results').hidden = false;
       document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-      // Update "View Diagram" rail button to link directly to this session
+      // Update "View Diagram" rail button and the review screen's "Open in viewer"
+      // link to point directly at this session now that one actually exists.
       const railDiagramBtn = document.getElementById('rail-diagram-btn');
       if (railDiagramBtn && data.id) {
         railDiagramBtn.href = `/diagram?id=${data.id}`;
+      }
+      const reviewOpenLink = document.querySelector('.review-diagram-open');
+      if (reviewOpenLink && data.id) {
+        reviewOpenLink.href = `/diagram?id=${data.id}`;
       }
     } catch (err) {
       if (err.message) {
