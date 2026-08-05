@@ -365,4 +365,20 @@ build-multiarch.sh           buildx multi-arch build + push to Docker Hub and Ha
 
 ---
 
+## License
+
+Non-commercial community license — see [LICENSE](LICENSE) for the full terms.
+
+- **Free** for personal, educational, and other non-commercial use.
+- **Commercial use** — selling it, bundling it into a paid product or service, using it
+  for paid consulting/training, or white-labelling it — **requires written permission**
+  from the author. Contact [CloudITBlog.com](https://CloudITBlog.com) to request it.
+- **Attribution required**: credit CloudITBlog.com and link back to
+  [the original repository](https://github.com/redeye365/vsphere-lab-wizard) in any use
+  or redistribution.
+- **Forks**: welcome for personal/non-commercial use (attribution preserved); forks for
+  commercial use are prohibited without permission.
+
+---
+
 *Built by [CloudITBlog.com](https://CloudITBlog.com)*

@@ -78,6 +78,13 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 - Three leaked PATs have been revoked — they MUST NOT be referenced, regenerated, or
   re-used under any circumstances. If git operations fail, investigate SSH key auth only.
 - git config: `user.email = claude.faceless597@passmail.net`, `user.name = redeye365`
+- **License**: non-commercial community license (`LICENSE` file), not MIT/permissive.
+  Free for personal/educational/non-commercial use; commercial use, paid-product
+  redistribution, and white-labelling require written permission from CloudITBlog.com;
+  attribution (credit + link back to the repo) is required in all cases; forks for
+  personal use are fine, forks for commercial use are not without permission. Keep this
+  in mind before suggesting an OSI-approved/permissive license, a standard MIT badge, or
+  wording that implies unrestricted commercial reuse.
 
 ---
 
