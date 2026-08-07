@@ -1447,9 +1447,7 @@ function validateStep(n) {
   const g = state.answers.design;
 
   switch (n) {
-    case 0:
-      return d.useCase ? null : 'Pick a use case to continue.';
-    case 1: {
+    case 0: {
       if (!h.cpuCores || !h.ramGB) {
         return 'CPU cores and RAM are needed to size the nested cluster.';
       }
@@ -1467,13 +1465,15 @@ function validateStep(n) {
       return null;
     }
     case 2:
-      return g.esxiVersion ? null : 'Select an ESXi version to continue.';
+      return d.useCase ? null : 'Pick a use case to continue.';
     case 3:
+      return g.esxiVersion ? null : 'Select an ESXi version to continue.';
+    case 4:
       if (g.vyosEnabled && !g.vyosNetworkMode) {
         return 'Select a VyOS network mode.';
       }
       return null;
-    case 4:
+    case 5:
       if (g.dcProfile !== 'none') {
         if (!g.dcDomainName) return 'Enter a domain name for the DC.';
         if (!g.dcIpAddress) return 'Enter an IP address for the DC.';
@@ -1580,14 +1580,14 @@ function showStep(n) {
     el.style.display = (state.learningMode && learnStep === n) ? '' : 'none';
   });
   if (state.learningMode) {
-    if (n === 1) updateLearnRamContext();
+    if (n === 0) updateLearnRamContext();
     if (n === 7) updateLearnRamHeadroom();
     if (n === reviewStep) renderScorecard();
   }
 
   // In architect mode, show options analysis before certain steps (once per session)
   if (state.architectMode) {
-    const analysisMap = { 3: 'router', 7: 'clusterSize', 9: 'nsx' };
+    const analysisMap = { 4: 'router', 7: 'clusterSize', 9: 'nsx' };
     const key = analysisMap[n];
     const alreadySeen = state._optionsAnalysisSeen || {};
     if (key && !alreadySeen[key]) {
@@ -1985,7 +1985,7 @@ function renderReview() {
   if (g.depotEnabled && g.depotMode === 'iis' && g.dcProfile === 'none') {
     const warn = document.createElement('div');
     warn.className = 'review-warn';
-    warn.textContent = '⚠ Bundle depot is set to IIS mode but no domain controller is included. Enable the DC (step 4) or switch to Linux/nginx mode.';
+    warn.textContent = '⚠ Bundle depot is set to IIS mode but no domain controller is included. Enable the DC (step 5) or switch to Linux/nginx mode.';
     container.appendChild(warn);
   }
 
@@ -3632,10 +3632,10 @@ function wireGenerate() {
           // step: data-step value (0-indexed); railNum: user-visible step number shown in rail
           const sectionHint = (msg) => {
             const map = [
-              [/^(cpuCores|ramGB|nicCount|nicSpeed|nicModel|hostCount|storageDevice)/,  {label: 'Hardware',          step: 1,  railNum: 2}],
+              [/^(cpuCores|ramGB|nicCount|nicSpeed|nicModel|hostCount|storageDevice)/,  {label: 'Hardware',          step: 0,  railNum: 1}],
               [/^(mgmtCidr|mgmtVlan|vmotionCidr|vmotionVlan|vsanCidr|vsanVlan|vmCidr|vmVlan)/, {label: 'Lab networks',     step: 6,  railNum: 7}],
-              [/^(dcIpAddress|dcDomainName)/,                                  {label: 'Domain controller', step: 4,  railNum: 5}],
-              [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 3,  railNum: 4}],
+              [/^(dcIpAddress|dcDomainName)/,                                  {label: 'Domain controller', step: 5,  railNum: 6}],
+              [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 4,  railNum: 5}],
               [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering|nestedEsxiPassword)/, {label: 'Nested cluster',    step: 7,  railNum: 8}],
               [/^(nsxSize|nsxTopology|nsxEdge|nsxIpAddress|nsxBgp|nsxRedist)/,   {label: 'NSX-T',             step: 9,  railNum: 10}],
               [/^vcf/,                                                          {label: 'VCF Bring-up',      step: 10, railNum: 11}],
@@ -4065,13 +4065,13 @@ function wireLearningInputs() {
   const avail = document.getElementById('learn-availability-req');
   if (avail) avail.addEventListener('change', () => { dr.availabilityRequirement = avail.value; });
 
-  // Refresh the RAM insight when RAM (step 1) changes.
+  // Refresh the RAM insight when RAM (step 0) changes.
   document.getElementById('ramGB')?.addEventListener('input', () => {
-    if (state.learningMode && state.step === 1) updateLearnRamContext();
+    if (state.learningMode && state.step === 0) updateLearnRamContext();
   });
 }
 
-// Step 1 insight: what cluster sizes are realistically possible at this RAM.
+// Step 0 insight: what cluster sizes are realistically possible at this RAM.
 function updateLearnRamContext() {
   const el = document.getElementById('learn-ram-context');
   if (!el) return;
@@ -4772,7 +4772,7 @@ function showOptionsAnalysis(key, onComplete) {
 // ── Save / Resume ──────────────────────────────────────────────────────────
 
 const AUTOSAVE_KEY = 'vsphere-wizard-autosave';
-const STEP_LABELS  = ['Use case', 'Hardware', 'ESXi version', 'Virtual router', 'Domain controller', 'Existing network', 'Lab networks', 'Nested cluster', 'Deployment placement', 'NSX-T', 'VCF Bring-up', 'Nested disks', 'Bundle depot', 'Workload VMs', 'Security & access', 'File locations', 'Review & generate'];
+const STEP_LABELS  = ['Hardware', 'Existing network', 'Use case', 'ESXi version', 'Virtual router', 'Domain controller', 'Lab networks', 'Nested cluster', 'Deployment placement', 'NSX-T', 'VCF Bring-up', 'Nested disks', 'Bundle depot', 'Workload VMs', 'Security & access', 'File locations', 'Review & generate'];
 
 function buildWizardSave(asTemplate = false) {
   const answers = JSON.parse(JSON.stringify(state.answers));

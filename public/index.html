@@ -497,12 +497,12 @@
       <span class="rail-brand-tag">v1 &middot; vSphere only, no VCF</span>
     </div>
     <ol class="rail-steps" id="rail-steps">
-      <li data-step="0"><span class="rail-num">01</span><span>Use case</span></li>
-      <li data-step="1"><span class="rail-num">02</span><span>Hardware</span></li>
-      <li data-step="2"><span class="rail-num">03</span><span>ESXi version</span></li>
-      <li data-step="3"><span class="rail-num">04</span><span>Virtual router</span></li>
-      <li data-step="4"><span class="rail-num">05</span><span>Domain controller</span></li>
-      <li data-step="5"><span class="rail-num">06</span><span>Existing network</span></li>
+      <li data-step="0"><span class="rail-num">01</span><span>Hardware</span></li>
+      <li data-step="1"><span class="rail-num">02</span><span>Existing network</span></li>
+      <li data-step="2"><span class="rail-num">03</span><span>Use case</span></li>
+      <li data-step="3"><span class="rail-num">04</span><span>ESXi version</span></li>
+      <li data-step="4"><span class="rail-num">05</span><span>Virtual router</span></li>
+      <li data-step="5"><span class="rail-num">06</span><span>Domain controller</span></li>
       <li data-step="6"><span class="rail-num">07</span><span>Lab networks</span></li>
       <li data-step="7"><span class="rail-num">08</span><span>Nested cluster</span></li>
       <li data-step="8"><span class="rail-num">09</span><span>Deployment placement</span></li>
@@ -547,48 +547,12 @@
 
     <div id="wizard-steps">
 
-      <!-- Step 0: Use case -->
+      <!-- Step 0: Hardware -->
       <section class="step" data-step="0">
-        <h1>What's this lab for?</h1>
-        <p class="step-intro">This shapes the defaults for cluster size and sizing checks later. You can override anything.</p>
-
-        <div class="field">
-          <label>Lab session</label>
-          <div class="choice-row">
-            <label class="choice-pill"><input type="radio" name="labMode" value="new" checked><span>New lab</span></label>
-            <label class="choice-pill"><input type="radio" name="labMode" value="extend"><span>Extend existing lab</span></label>
-          </div>
-          <p class="hint">Load a previously generated <code>lab-spec.json</code> to pre-fill the wizard with your current lab&rsquo;s settings — then change only what you&rsquo;re adding.</p>
-        </div>
-
-        <div id="spec-file-field" class="field" hidden>
-          <label>Load existing spec</label>
-          <input type="file" id="spec-file-input" accept=".json" style="width:auto;font-family:var(--mono);font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;">
-          <span id="spec-load-status" class="hint"></span>
-        </div>
-
-        <div id="extend-mode-indicator" class="extend-indicator" hidden>
-          Extending existing lab — wizard pre-filled from spec. Modify what you want to add or change.
-        </div>
-
-        <div class="field">
-          <label>Use case</label>
-          <div class="radio-grid" id="useCase-options">
-            <label class="radio-card"><input type="radio" name="useCase" value="certification"><span class="radio-card-title">Certification study</span><span class="radio-card-sub">VCP / VCF exam practice</span></label>
-            <label class="radio-card"><input type="radio" name="useCase" value="feature_testing"><span class="radio-card-title">Feature testing</span><span class="radio-card-sub">vSAN, NSX, specific behaviour</span></label>
-            <label class="radio-card"><input type="radio" name="useCase" value="homelab"><span class="radio-card-title">General homelab</span><span class="radio-card-sub">Tinkering, no fixed goal</span></label>
-            <label class="radio-card"><input type="radio" name="useCase" value="demo"><span class="radio-card-title">Customer demo</span><span class="radio-card-sub">Something to show, not break</span></label>
-            <label class="radio-card"><input type="radio" name="useCase" value="devtest"><span class="radio-card-title">Dev/test sandbox</span><span class="radio-card-sub">Disposable, rebuilt often</span></label>
-          </div>
-        </div>
-      </section>
-
-      <!-- Step 1: Hardware -->
-      <section class="step" data-step="1">
         <h1>What are you running this on?</h1>
         <p class="step-intro">The physical host's specs decide how big the nested cluster can realistically be.</p>
 
-        <div class="learn-block" data-learn-step="1">
+        <div class="learn-block" data-learn-step="0">
           <div class="learn-context">
             <p>Your physical hardware defines your constraints. Every design decision we make has to work within what you actually have. There are no wrong answers here &mdash; but being honest about your constraints leads to a better design.</p>
           </div>
@@ -658,8 +622,83 @@
         </div>
       </section>
 
-      <!-- Step 2: ESXi version -->
+      <!-- Step 1: Existing network -->
+      <section class="step" data-step="1">
+        <h1>What does the network around this look like?</h1>
+        <p class="step-intro">Not the lab itself yet &mdash; the network the physical host already sits on.</p>
+
+        <div class="learn-block" data-learn-step="1">
+          <div class="learn-context">
+            <p>Understanding your existing network is critical &mdash; your lab has to coexist with it. The most common lab networking mistakes come from not thinking through how lab traffic interacts with the home or office network. An IP conflict or broadcast storm from the lab can knock out your main network.</p>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Network type <span class="info-icon">i<span class="info-tooltip">Flat means all devices share a single broadcast domain with no VLAN separation &mdash; typical of a home router with one LAN port. VLANs allow traffic isolation and require a managed switch. If your switch has a web UI or CLI for configuration, it&rsquo;s probably managed and VLAN-capable.</span></span></label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="networkType" value="flat"><span>Flat, no VLANs</span></label>
+            <label class="choice-pill"><input type="radio" name="networkType" value="vlans"><span>VLANs configured</span></label>
+            <label class="choice-pill"><input type="radio" name="networkType" value="unsure"><span>Not sure</span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Can your router/switch tag VLANs? <span class="info-icon">i<span class="info-tooltip">Managed switches (those with a web UI or CLI) can tag VLAN IDs onto frames. Unmanaged consumer switches cannot. If you bought it from a consumer electronics shop with no setup required, it&rsquo;s probably unmanaged. If unsure, choose &ldquo;Not sure&rdquo; &mdash; the wizard will keep things simple.</span></span></label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="vlanCapable" value="yes"><span>Yes</span></label>
+            <label class="choice-pill"><input type="radio" name="vlanCapable" value="no"><span>No</span></label>
+            <label class="choice-pill"><input type="radio" name="vlanCapable" value="unsure"><span>Not sure</span></label>
+          </div>
+          <p class="hint">If no, the nested networks below will need to share a VLAN or run untagged.</p>
+        </div>
+
+        <div class="field">
+          <label>Is DHCP available, or static IPs only? <span class="info-icon">i<span class="info-tooltip">DHCP automatically assigns IP addresses to devices when they connect. Most home routers do this &mdash; if your laptop gets an IP automatically when you plug in, DHCP is available. Your physical ESXi host itself still needs a static IP, but this affects how VyOS and the DC are configured.</span></span></label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="dhcpAvailable" value="yes"><span>DHCP available</span></label>
+            <label class="choice-pill"><input type="radio" name="dhcpAvailable" value="no"><span>Static only</span></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 2: Use case -->
       <section class="step" data-step="2">
+        <h1>What's this lab for?</h1>
+        <p class="step-intro">This shapes the defaults for cluster size and sizing checks later. You can override anything.</p>
+
+        <div class="field">
+          <label>Lab session</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="labMode" value="new" checked><span>New lab</span></label>
+            <label class="choice-pill"><input type="radio" name="labMode" value="extend"><span>Extend existing lab</span></label>
+          </div>
+          <p class="hint">Load a previously generated <code>lab-spec.json</code> to pre-fill the wizard with your current lab&rsquo;s settings — then change only what you&rsquo;re adding.</p>
+        </div>
+
+        <div id="spec-file-field" class="field" hidden>
+          <label>Load existing spec</label>
+          <input type="file" id="spec-file-input" accept=".json" style="width:auto;font-family:var(--mono);font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;">
+          <span id="spec-load-status" class="hint"></span>
+        </div>
+
+        <div id="extend-mode-indicator" class="extend-indicator" hidden>
+          Extending existing lab — wizard pre-filled from spec. Modify what you want to add or change.
+        </div>
+
+        <div class="field">
+          <label>Use case</label>
+          <div class="radio-grid" id="useCase-options">
+            <label class="radio-card"><input type="radio" name="useCase" value="certification"><span class="radio-card-title">Certification study</span><span class="radio-card-sub">VCP / VCF exam practice</span></label>
+            <label class="radio-card"><input type="radio" name="useCase" value="feature_testing"><span class="radio-card-title">Feature testing</span><span class="radio-card-sub">vSAN, NSX, specific behaviour</span></label>
+            <label class="radio-card"><input type="radio" name="useCase" value="homelab"><span class="radio-card-title">General homelab</span><span class="radio-card-sub">Tinkering, no fixed goal</span></label>
+            <label class="radio-card"><input type="radio" name="useCase" value="demo"><span class="radio-card-title">Customer demo</span><span class="radio-card-sub">Something to show, not break</span></label>
+            <label class="radio-card"><input type="radio" name="useCase" value="devtest"><span class="radio-card-title">Dev/test sandbox</span><span class="radio-card-sub">Disposable, rebuilt often</span></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3: ESXi version -->
+      <section class="step" data-step="3">
         <h1>Which ESXi version are you deploying?</h1>
         <p class="step-intro">Sets the GuestId in the generated scripts and triggers version-specific minimum resource checks.</p>
 
@@ -691,12 +730,12 @@
         </div>
       </section>
 
-      <!-- Step 3: VyOS virtual router -->
-      <section class="step" data-step="3">
+      <!-- Step 4: VyOS virtual router -->
+      <section class="step" data-step="4">
         <h1>Top-of-rack virtual router?</h1>
         <p class="step-intro">A VyOS VM acts as the lab's router and firewall — gives nested hosts a routable path and provides NAT, DHCP, and DNS forwarding.</p>
 
-        <div class="learn-block" data-learn-step="3">
+        <div class="learn-block" data-learn-step="4">
           <div class="learn-context">
             <p>Your virtual router choice shapes your networking options throughout the lab. Consider the trade-offs before deciding:</p>
             <div class="learn-comparison">
@@ -738,8 +777,8 @@
         </div>
       </section>
 
-      <!-- Step 4: Domain controller -->
-      <section class="step" data-step="4">
+      <!-- Step 5: Domain controller -->
+      <section class="step" data-step="5">
         <h1>Domain controller?</h1>
         <p class="step-intro">A Windows DC gives the lab DNS, NTP, and Active Directory &mdash; required before vCenter is deployed if you want valid FQDNs and certificates. Choose how much you want on this VM.</p>
 
@@ -811,45 +850,6 @@
             <label for="dcStorageDiskGB">Storage disk size (GB)</label>
             <input type="number" id="dcStorageDiskGB" min="100" step="50" value="200" placeholder="200">
             <p class="hint">This second disk is formatted and shared as <code>\\dc\LabISOs</code> &mdash; a central location to drop ISOs and software visible to all lab VMs. 200&ndash;500 GB is typical.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Step 5: Existing network -->
-      <section class="step" data-step="5">
-        <h1>What does the network around this look like?</h1>
-        <p class="step-intro">Not the lab itself yet &mdash; the network the physical host already sits on.</p>
-
-        <div class="learn-block" data-learn-step="5">
-          <div class="learn-context">
-            <p>Understanding your existing network is critical &mdash; your lab has to coexist with it. The most common lab networking mistakes come from not thinking through how lab traffic interacts with the home or office network. An IP conflict or broadcast storm from the lab can knock out your main network.</p>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Network type <span class="info-icon">i<span class="info-tooltip">Flat means all devices share a single broadcast domain with no VLAN separation &mdash; typical of a home router with one LAN port. VLANs allow traffic isolation and require a managed switch. If your switch has a web UI or CLI for configuration, it&rsquo;s probably managed and VLAN-capable.</span></span></label>
-          <div class="choice-row">
-            <label class="choice-pill"><input type="radio" name="networkType" value="flat"><span>Flat, no VLANs</span></label>
-            <label class="choice-pill"><input type="radio" name="networkType" value="vlans"><span>VLANs configured</span></label>
-            <label class="choice-pill"><input type="radio" name="networkType" value="unsure"><span>Not sure</span></label>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Can your router/switch tag VLANs? <span class="info-icon">i<span class="info-tooltip">Managed switches (those with a web UI or CLI) can tag VLAN IDs onto frames. Unmanaged consumer switches cannot. If you bought it from a consumer electronics shop with no setup required, it&rsquo;s probably unmanaged. If unsure, choose &ldquo;Not sure&rdquo; &mdash; the wizard will keep things simple.</span></span></label>
-          <div class="choice-row">
-            <label class="choice-pill"><input type="radio" name="vlanCapable" value="yes"><span>Yes</span></label>
-            <label class="choice-pill"><input type="radio" name="vlanCapable" value="no"><span>No</span></label>
-            <label class="choice-pill"><input type="radio" name="vlanCapable" value="unsure"><span>Not sure</span></label>
-          </div>
-          <p class="hint">If no, the nested networks below will need to share a VLAN or run untagged.</p>
-        </div>
-
-        <div class="field">
-          <label>Is DHCP available, or static IPs only? <span class="info-icon">i<span class="info-tooltip">DHCP automatically assigns IP addresses to devices when they connect. Most home routers do this &mdash; if your laptop gets an IP automatically when you plug in, DHCP is available. Your physical ESXi host itself still needs a static IP, but this affects how VyOS and the DC are configured.</span></span></label>
-          <div class="choice-row">
-            <label class="choice-pill"><input type="radio" name="dhcpAvailable" value="yes"><span>DHCP available</span></label>
-            <label class="choice-pill"><input type="radio" name="dhcpAvailable" value="no"><span>Static only</span></label>
           </div>
         </div>
       </section>

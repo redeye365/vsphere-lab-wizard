@@ -45,16 +45,16 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 
 ---
 
-## Step numbering (as of v1.13)
+## Step numbering (as of v1.23 — reordered so hardware/network are gathered before goals)
 
 | # | Step name | Notes |
 |---|-----------|-------|
-| 0 | Use case | |
-| 1 | Hardware | NIC model + inline HCL check; per-host specs when hostCount > 1 |
-| 2 | ESXi version | |
-| 3 | Virtual router (VyOS) | |
-| 4 | Domain controller | |
-| 5 | Existing network | |
+| 0 | Hardware | NIC model + inline HCL check; per-host specs when hostCount > 1 |
+| 1 | Existing network | |
+| 2 | Use case | |
+| 3 | ESXi version | |
+| 4 | Virtual router (VyOS) | |
+| 5 | Domain controller | |
 | 6 | Lab networks | |
 | 7 | Nested cluster | ESA/OSA vSAN; memory tiering; placement when hostCount > 1; `esxiDeployMethod` (iso/ova) chosen here |
 | 8 | Deployment placement | `PLACEMENT_STEP`; skipped via `getNextStep()`/`getPrevStep()` when hostCount === 1 |
