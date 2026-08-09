@@ -703,7 +703,29 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v1.29.0 (current — live Hardware-step RAM validator)
+### v1.30.0 (current — template selection joins the reorder flow)
+- **Reorder (Hardware → Existing network → Use case) confirmed unchanged from v1.23**; this release adds a
+  fifth stop — template selection — after Use case, without growing `TOTAL_STEPS` past the v1.24.0 10-step
+  target: it's a one-time full-page **overlay** (`#template-suggest-overlay`, styled like the existing
+  `.arch-options-overlay` architect-mode pattern), not a new numbered step.
+  - `wireNav()`'s Next handler: when leaving step 2 (Use case) and `!state._templateSuggestSeen`, shows the
+    overlay instead of advancing (sets the flag first, so it only ever fires once per session — same pattern
+    `state._optionsAnalysisSeen` already uses for architect-mode option overlays).
+  - `showTemplateSuggestOverlay()` renders the same curated template cards as the mode-select "Start from
+    template" picker (`_templatesCache`, shared — fetched once, reused here). A "Skip — I'll customise
+    manually" button and each template card both call `showStep(getNextStep(state.step))` to continue to step 3.
+  - **`applyTemplateDesignOnly(tpl)`** — new, deliberately different from `loadWizardConfig()`: only
+    `Object.assign`s the template's `answers.design` (networking/cluster/NSX/VCF) onto `state.answers.design`,
+    leaving `state.answers.hardware`/`discovery` untouched. By this point in the flow the user has already
+    answered real Hardware and Existing-network questions (steps 0-1) — `loadWizardConfig`'s full-object merge
+    would have silently overwritten those with the template's example numbers (e.g. Learn NSX's `cpuCores: 16`
+    replacing whatever the user actually has). Then calls the existing `populateFormFromState()` to sync the DOM.
+  - Verified: overlay appears after Use case with 4 template cards, picking "Learn vSAN" applies
+    `vsanEnabled`/`vsanArch` etc. while `hardware.cpuCores`/`ramGB` stay exactly as the user entered them,
+    advances to step 3, and does not reappear on a second pass through step 2 (Back then Next again). Zero
+    console errors.
+
+### v1.29.0 (live Hardware-step RAM validator)
 - **New `#hardware-validator` panel** (`public/index.html`), shown on the Hardware step directly under the
   CPU/RAM fields, hidden until `ramGB` has a value. Two parts:
   1. **Achievable tier** (`RAM_TIERS` constant, `public/wizard.js`) — same 6 thresholds as the v1.28.0 prereq

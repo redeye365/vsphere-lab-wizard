@@ -1736,7 +1736,20 @@ function wireNav() {
       document.getElementById('step-error').textContent = err;
       return;
     }
+    // After Use case (step 2), once per session, offer a template shortcut
+    // before continuing to Virtual router — see showTemplateSuggestOverlay.
+    if (state.step === 2 && !state._templateSuggestSeen) {
+      state._templateSuggestSeen = true;
+      showTemplateSuggestOverlay();
+      return;
+    }
     if (state.step < TOTAL_STEPS - 1) showStep(getNextStep(state.step));
+  });
+
+  document.getElementById('template-suggest-skip')?.addEventListener('click', () => {
+    const overlay = document.getElementById('template-suggest-overlay');
+    if (overlay) overlay.hidden = true;
+    showStep(getNextStep(state.step));
   });
 
   document.getElementById('btn-back').addEventListener('click', () => {
@@ -4214,6 +4227,65 @@ async function renderTemplatePicker() {
     btn.addEventListener('click', () => {
       if (!isValidWizardConfig(tpl) || tpl._type !== 'lab-template') return;
       enterAppWithConfig(tpl, true);
+    });
+    list.appendChild(btn);
+  });
+}
+
+// Applies only a template's `design` answers (networking, cluster, NSX, VCF,
+// etc.) — used when a template is picked mid-wizard, after the user has
+// already answered Hardware/Existing network/Use case (steps 0-2). Unlike
+// the mode-select "Start from template" flow (loadWizardConfig, which
+// overwrites everything including hardware), this deliberately leaves
+// state.answers.hardware/discovery untouched — the user already gave real
+// answers there and a template's example hardware numbers shouldn't
+// silently clobber them.
+function applyTemplateDesignOnly(tpl) {
+  const design = (tpl.answers && tpl.answers.design) || {};
+  Object.assign(state.answers.design, design);
+  if (tpl.learningMode) {
+    state.learningMode = true;
+    document.body.classList.add('learning-mode');
+  }
+  if (tpl.designRationale) Object.assign(state.designRationale, tpl.designRationale);
+  populateFormFromState();
+}
+
+// One-time "want a head start?" overlay shown after the Use case step
+// (see wireNav's Next handler) — offers the same curated templates as the
+// mode-select screen, applied via applyTemplateDesignOnly so hardware/network
+// answers already given aren't overwritten.
+async function showTemplateSuggestOverlay() {
+  const overlay = document.getElementById('template-suggest-overlay');
+  const list = document.getElementById('template-suggest-list');
+  if (!overlay || !list) { showStep(getNextStep(state.step)); return; }
+  overlay.hidden = false;
+  if (!_templatesCache) {
+    list.innerHTML = '<p class="hint">Loading templates…</p>';
+    try {
+      const res = await fetch('/api/templates');
+      _templatesCache = await res.json();
+    } catch {
+      list.innerHTML = '<p class="hint">Could not load templates — check your connection.</p>';
+      return;
+    }
+  }
+  list.innerHTML = '';
+  _templatesCache.forEach((tpl) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mode-card mode-card-template';
+    btn.innerHTML = `
+      <span class="mode-card-badge">Template</span>
+      <span class="mode-card-heading">${escHtml(tpl.name || tpl.id)}</span>
+      <span class="mode-card-desc">${escHtml(tpl.description || '')}</span>
+      <span class="mode-card-cta">Use this template &rarr;</span>
+    `;
+    btn.addEventListener('click', () => {
+      if (!isValidWizardConfig(tpl) || tpl._type !== 'lab-template') return;
+      applyTemplateDesignOnly(tpl);
+      overlay.hidden = true;
+      showStep(getNextStep(state.step));
     });
     list.appendChild(btn);
   });
