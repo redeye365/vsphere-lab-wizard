@@ -8,7 +8,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "start": "node server.js",
-    "build": "pkg . --targets node18-win-x64,node18-macos-arm64,node18-macos-x64 --output dist/zero-to-hero-lab"
+    "build": "pkg . --targets node18-win-x64,node18-macos-arm64,node18-macos-x64,node18-linux-x64 --output dist/zero-to-hero-lab"
   },
   "engines": {
     "node": ">=18"
