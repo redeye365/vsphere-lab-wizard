@@ -356,87 +356,64 @@
         <p class="arch-disc-sub">You are the consultant. A good architect understands the requirement before recommending a solution. Work through this discovery session first.</p>
       </div>
 
-      <!-- Section 1: Stakeholders -->
-      <div class="arch-disc-section">
-        <div class="arch-disc-section-label">Who are the people affected by this design?</div>
-        <div class="arch-stakeholder-grid">
-          <button type="button" class="arch-stakeholder-card" data-stakeholder="solo">
-            <span class="arch-sh-title">Just me</span>
-            <span class="arch-sh-desc">Personal lab, no other users</span>
-          </button>
-          <button type="button" class="arch-stakeholder-card" data-stakeholder="colleagues">
-            <span class="arch-sh-title">Me and colleagues</span>
-            <span class="arch-sh-desc">Team lab or shared environment</span>
-          </button>
-          <button type="button" class="arch-stakeholder-card" data-stakeholder="trainer">
-            <span class="arch-sh-title">I am training others</span>
-            <span class="arch-sh-desc">Students or trainees will use this lab</span>
-          </button>
-          <button type="button" class="arch-stakeholder-card" data-stakeholder="customer">
-            <span class="arch-sh-title">Customer environment</span>
-            <span class="arch-sh-desc">Mirroring a real customer deployment</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Section 2: Problem statement -->
+      <!-- Section 1: Problem statement + success criteria (merged) -->
       <div class="arch-disc-section">
         <label for="arch-problem-stmt" class="arch-disc-section-label">In one sentence, what problem does this lab solve?</label>
         <textarea id="arch-problem-stmt" class="arch-disc-textarea" rows="2"
           placeholder="e.g. We need a reproducible environment to validate NSX DFW policies before applying them to production."></textarea>
+        <div class="arch-success-fields">
+          <div>
+            <label for="arch-success-criteria" class="arch-disc-sublabel">What does success look like in 3 months?</label>
+            <textarea id="arch-success-criteria" class="arch-disc-textarea" rows="2"
+              placeholder="e.g. I can confidently configure NSX DFW policies, demonstrate HA failover, and explain every design decision."></textarea>
+          </div>
+          <div>
+            <label for="arch-success-measure" class="arch-disc-sublabel">How will you know this lab has achieved its purpose?</label>
+            <textarea id="arch-success-measure" class="arch-disc-textarea" rows="2"
+              placeholder="e.g. I pass the VCP-VCF Admin exam, or I can run through the customer scenario without referring to notes."></textarea>
+          </div>
+        </div>
       </div>
 
-      <!-- Section 3: MoSCoW requirements -->
+      <!-- Section 2: MoSCoW requirements (Must/Won't only) -->
       <div class="arch-disc-section">
-        <div class="arch-disc-section-label">MoSCoW requirements</div>
-        <p class="arch-disc-hint">For each technical area, assign a priority. Be honest &mdash; especially about Won't Have.</p>
+        <div class="arch-disc-section-label">What's in scope, and what's explicitly not?</div>
+        <p class="arch-disc-hint">For each technical area, mark whether it's in scope for this build. Be honest &mdash; especially about Won't Have.</p>
         <div class="arch-moscow-table">
           <div class="arch-moscow-header">
             <span></span>
             <span class="arch-moscow-col must">Must Have</span>
-            <span class="arch-moscow-col should">Should Have</span>
-            <span class="arch-moscow-col could">Could Have</span>
             <span class="arch-moscow-col wont">Won't Have</span>
           </div>
           <div class="arch-moscow-row" data-area="networking">
             <span class="arch-moscow-area">Networking (VLANs, router, segmentation)</span>
-            <label class="arch-moscow-cell must"><input type="radio" name="moscow-networking" value="must"><span></span></label>
-            <label class="arch-moscow-cell should"><input type="radio" name="moscow-networking" value="should"><span></span></label>
-            <label class="arch-moscow-cell could"><input type="radio" name="moscow-networking" value="could"><span></span></label>
+            <label class="arch-moscow-cell must"><input type="radio" name="moscow-networking" value="must" checked><span></span></label>
             <label class="arch-moscow-cell wont"><input type="radio" name="moscow-networking" value="wont"><span></span></label>
           </div>
           <div class="arch-moscow-row" data-area="compute">
             <span class="arch-moscow-area">Compute (nested ESXi, cluster sizing)</span>
             <label class="arch-moscow-cell must"><input type="radio" name="moscow-compute" value="must" checked><span></span></label>
-            <label class="arch-moscow-cell should"><input type="radio" name="moscow-compute" value="should"><span></span></label>
-            <label class="arch-moscow-cell could"><input type="radio" name="moscow-compute" value="could"><span></span></label>
             <label class="arch-moscow-cell wont"><input type="radio" name="moscow-compute" value="wont"><span></span></label>
           </div>
           <div class="arch-moscow-row" data-area="storage">
             <span class="arch-moscow-area">Storage (vSAN, local datastores)</span>
-            <label class="arch-moscow-cell must"><input type="radio" name="moscow-storage" value="must"><span></span></label>
-            <label class="arch-moscow-cell should"><input type="radio" name="moscow-storage" value="should" checked><span></span></label>
-            <label class="arch-moscow-cell could"><input type="radio" name="moscow-storage" value="could"><span></span></label>
+            <label class="arch-moscow-cell must"><input type="radio" name="moscow-storage" value="must" checked><span></span></label>
             <label class="arch-moscow-cell wont"><input type="radio" name="moscow-storage" value="wont"><span></span></label>
           </div>
           <div class="arch-moscow-row" data-area="security">
             <span class="arch-moscow-area">Security (NSX DFW, micro-segmentation)</span>
-            <label class="arch-moscow-cell must"><input type="radio" name="moscow-security" value="must"><span></span></label>
-            <label class="arch-moscow-cell should"><input type="radio" name="moscow-security" value="should" checked><span></span></label>
-            <label class="arch-moscow-cell could"><input type="radio" name="moscow-security" value="could"><span></span></label>
+            <label class="arch-moscow-cell must"><input type="radio" name="moscow-security" value="must" checked><span></span></label>
             <label class="arch-moscow-cell wont"><input type="radio" name="moscow-security" value="wont"><span></span></label>
           </div>
           <div class="arch-moscow-row" data-area="management">
             <span class="arch-moscow-area">Management (vCenter, SDDC Manager, monitoring)</span>
             <label class="arch-moscow-cell must"><input type="radio" name="moscow-management" value="must" checked><span></span></label>
-            <label class="arch-moscow-cell should"><input type="radio" name="moscow-management" value="should"><span></span></label>
-            <label class="arch-moscow-cell could"><input type="radio" name="moscow-management" value="could"><span></span></label>
             <label class="arch-moscow-cell wont"><input type="radio" name="moscow-management" value="wont"><span></span></label>
           </div>
         </div>
       </div>
 
-      <!-- Section 4: Constraints -->
+      <!-- Section 3: Constraints -->
       <div class="arch-disc-section">
         <div class="arch-disc-section-label">What are you working within?</div>
         <div class="arch-constraints-grid">
@@ -472,24 +449,7 @@
         </div>
       </div>
 
-      <!-- Section 5: Success criteria -->
-      <div class="arch-disc-section">
-        <div class="arch-disc-section-label">Success criteria</div>
-        <div class="arch-success-fields">
-          <div>
-            <label for="arch-success-criteria" class="arch-disc-sublabel">What does success look like in 3 months?</label>
-            <textarea id="arch-success-criteria" class="arch-disc-textarea" rows="2"
-              placeholder="e.g. I can confidently configure NSX DFW policies, demonstrate HA failover, and explain every design decision."></textarea>
-          </div>
-          <div>
-            <label for="arch-success-measure" class="arch-disc-sublabel">How will you know this lab has achieved its purpose?</label>
-            <textarea id="arch-success-measure" class="arch-disc-textarea" rows="2"
-              placeholder="e.g. I pass the VCP-VCF Admin exam, or I can run through the customer scenario without referring to notes."></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section 6: Initial risks -->
+      <!-- Section 4: Initial risks -->
       <div class="arch-disc-section">
         <div class="arch-disc-section-label">What are your top 3 risks before starting?</div>
         <p class="arch-disc-hint">Identifying risks before you start is what separates an architect from a technician. We will add to this register automatically as you make design decisions.</p>
@@ -500,7 +460,7 @@
         </div>
       </div>
 
-      <!-- Section 7: Design principles -->
+      <!-- Section 5: Design principles -->
       <div class="arch-disc-section">
         <div class="arch-disc-section-label">Design principles</div>
         <p class="arch-disc-hint">Agree on the principles that will guide every decision before we start designing. These will be referenced throughout.</p>

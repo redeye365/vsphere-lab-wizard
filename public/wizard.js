@@ -139,13 +139,12 @@ const state = {
   },
   architectMode: false,
   discovery: {
-    stakeholders: '',
     problemStatement: '',
     moscow: {
       networking:  'must',
       compute:     'must',
-      storage:     'should',
-      security:    'should',
+      storage:     'must',
+      security:    'must',
       management:  'must'
     },
     constraints: {
@@ -4363,15 +4362,6 @@ function wireDiscovery() {
   if (_discoveryWired) return;
   _discoveryWired = true;
   const disc = state.discovery;
-
-  // Stakeholder cards
-  document.querySelectorAll('.arch-stakeholder-card').forEach(card => {
-    card.addEventListener('click', () => {
-      document.querySelectorAll('.arch-stakeholder-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      disc.stakeholders = card.dataset.stakeholder;
-    });
-  });
 
   // Problem statement
   document.getElementById('arch-problem-stmt')?.addEventListener('input', e => {

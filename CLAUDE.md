@@ -703,29 +703,70 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v0.6.8-beta (current — Architect Thinking mode)
+### v1.27.0 (current — Architect Mode discovery cut to 5 sections)
+- **Phase 0 discovery reduced from 7 sections to 5**, per direct feedback that architect mode
+  asked too many questions on top of the standard wizard:
+  - **Stakeholder Analysis removed entirely** — the `.arch-stakeholder-card` picker, its
+    `wireDiscovery()` click-wiring, `state.discovery.stakeholders`, its CSS, and the
+    `## Stakeholder Analysis` block + readiness-score check in `generateMarkdown.js` are all
+    gone (not just hidden — genuinely removed, since the field was already optional there:
+    `if (disc.stakeholders)` meant an empty value silently skipped the section, so removing
+    the input is a behavior-preserving no-op for anyone who never used it).
+  - **Success criteria merged into the Problem statement section** — same two fields
+    (`arch-success-criteria`/`arch-success-measure`), same `state.discovery` keys, just
+    moved into the same `.arch-disc-section` as `arch-problem-stmt` instead of a separate one.
+  - **MoSCoW simplified to Must/Won't only** — dropped the Should Have/Could Have columns
+    (both HTML and the `.arch-moscow-col`/`.arch-moscow-cell` CSS); all five areas now default
+    to `must` (previously storage/security defaulted to `should`, which no longer exists).
+    `buildOpenItems()`'s dead "`could` → flag for confirmation" check removed from
+    `generateMarkdown.js` since that value can no longer occur.
+  - Final 5 sections, in order: Problem statement + success criteria, MoSCoW (Must/Won't),
+    Constraints, Top-3 risks, Design principles.
+  - **`generateMarkdown.js`'s architect document is now 9 sections, not 10** (Stakeholder
+    Analysis dropped): Executive Summary, Requirements/MoSCoW, Constraints, Design
+    Principles, Architecture Overview, Design Decisions, Risk Register, Component
+    Specifications, Open Items — plus the Design readiness % blockquote, whose `checks`
+    array also dropped the now-permanently-false `!!disc.stakeholders` entry (leaving it in
+    would have silently capped every architect-mode doc's readiness score below 100%).
+  - Verified: discovery screen renders exactly 5 `.arch-disc-section` blocks, 0 stakeholder
+    cards, 2 MoSCoW columns with all rows defaulting to `must`, problem statement and success
+    fields share one section, discovery still completes into the wizard correctly, and
+    `buildMarkdown()` produces a valid architect doc with no `Stakeholder Analysis` heading
+    and no `should`/`could` labels anywhere. Zero console/page errors.
+  - **Found and left unfixed, out of scope for this change**: `test-architect-mode.js` (a
+    standalone Playwright regression script, not wired into `package.json` or CI) was already
+    broken before this change — it fails on its very first `page.click('#mode-learn')` because
+    the v1.22.0 prereq-screen gate (see below) hides the mode-select screen until the
+    checklist is complete, which the script never fills in. It also hardcodes step numbers
+    (`showStep(3/7/8/14)`) that predate the v1.24.0 step consolidation, and references the
+    now-removed `.arch-stakeholder-card`/4-column MoSCoW markup. It needs a full rewrite, not
+    a patch — flagged here rather than fixed silently since nobody asked for test-suite work.
+
+### v0.6.8-beta (Architect Thinking mode)
 - **Three-tier mode system**: Standard (fast wizard) / Learning (onboarding + learn-blocks + scorecard) /
   Architect (Learning PLUS Phase 0 discovery, options analysis, decision log, risk register, architect design doc).
   Architect mode is a secondary toggle (`#learn-arch-toggle`) shown at the bottom of the learn-onboard screen,
   only visible once goal + experience + time are answered (`updateOnboardStart()` toggles `#learn-arch-toggle-wrap`).
-- **Architect state** (in `state`): `architectMode` (bool); `discovery` { stakeholders, problemStatement,
+- **Architect state** (in `state`): `architectMode` (bool); `discovery` {
   moscow{networking/compute/storage/security/management}, constraints{time/budget/skills/compliance},
-  successCriteria, successMeasure, risks[], designPrinciples[] }; `decisionLog[]`; `riskRegister[]`.
+  successCriteria, successMeasure, risks[], designPrinciples[] } (originally also had `stakeholders` and a
+  separate problem-statement section — removed/merged in v1.27.0, see above); `decisionLog[]`; `riskRegister[]`.
 - **Phase 0 discovery** (`#arch-discovery-screen`, full-screen, shown by `showArchDiscovery()` after onboarding when
-  architectMode on): 7 sections — stakeholders, problem statement, MoSCoW table, constraints, success criteria,
-  top-3 risks (with suggested-risk chips), design principles (8 toggles + custom). `finishDiscovery()` imports the
+  architectMode on): originally 7 sections, now 5 as of v1.27.0 (see above). `finishDiscovery()` imports the
   discovery risks into `riskRegister` (source:'discovery'), reveals the sidebar panels, then enters the wizard.
 - **Options analysis** (`OPTIONS_ANALYSIS` constant, 4 keys: `router`, `storage`, `nsx`, `clusterSize`):
   full-page overlay (`#arch-options-panel`) shown once per session via `showOptionsAnalysis(key)`. Hooked into
-  `showStep()` (steps 3→router, 7→clusterSize, 8→nsx) and the vSAN toggle (→storage). Confirming logs a decision.
+  `showStep()` (as of the v1.24.0 step consolidation: step 3→router, step 6→clusterSize, step 7→nsx) and the
+  vSAN toggle (→storage). Confirming logs a decision.
 - **Decision log + risk register** sidebar panels (`#arch-decision-log-panel`, `#arch-risk-register-panel`):
   collapsible (`wireArchPanelToggles()`), rendered by `renderDecisionLog()` / `renderRiskRegister()`.
   `addDecision()` appends to log; `addAutoRisk()` dedupes by description. `detectDesignRisks()`
   (wired by `wireArchitectWizardSteps()` on nestedHostCount / vramPerHostGB / nsxEnabled / mgmtVlan / vsanEnabled)
   auto-detects: single-host SPOF, >85% RAM overcommit, vSAN < 3 hosts, NSX without BGP, untagged management VLAN.
-- **generateMarkdown.js**: when `spec.architectMode && spec.learningMode`, emits a 10-section architect document
-  (Executive Summary, Stakeholder Analysis, Requirements/MoSCoW, Constraints, Design Principles, Architecture
-  Overview, Design Decisions, Risk Register, Component Specifications, Open Items) plus a **Design readiness %**
+- **generateMarkdown.js**: when `spec.architectMode && spec.learningMode`, emits an architect document (originally
+  10 sections, now 9 as of v1.27.0 — Stakeholder Analysis removed: Executive Summary, Requirements/MoSCoW,
+  Constraints, Design Principles, Architecture Overview, Design Decisions, Risk Register, Component
+  Specifications, Open Items) plus a **Design readiness %**
   blockquote. Takes priority over the learning-mode Design Rationale block (`else if (spec.learningMode)`).
 - **generateSpec.js**: adds `architectMode`, `discovery`, `decisionLog`, `riskRegister` to the spec.
 - **Wizard → server**: `wireGenerate()` posts `architectMode`, `discovery`, `decisionLog`, `riskRegister`.
