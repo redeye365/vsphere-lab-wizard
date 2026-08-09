@@ -33,6 +33,27 @@
       </label>
 
       <label class="prereq-item">
+        <input type="checkbox" class="prereq-check" data-prereq-id="isos">
+        <span class="prereq-item-body">
+          <span class="prereq-item-title">ISOs and OVAs downloaded</span>
+          <span class="prereq-item-desc">
+            Grab whichever of these your design needs &mdash; the wizard's File locations fields point at
+            these paths, but nothing downloads them for you.
+            <strong>ESXi ISO</strong> and <strong>vCenter Server Appliance OVA</strong> &mdash; via your Broadcom
+            account, VMware vSphere &rarr; My Downloads.
+            <strong>Nested ESXi Virtual Appliance OVA</strong> (if deploying nested ESXi via OVA) &mdash; William
+            Lam's <a href="https://williamlam.com/nested-virtualization/nested-esxi-virtual-appliance" target="_blank" rel="noopener">williamlam.com/nested-virtualization</a>,
+            free with a Broadcom account on ESXi 8.x.
+            <strong>VyOS ISO</strong> (if using the virtual router) &mdash; free LTS rolling release at
+            <a href="https://vyos.io/get-vyos/" target="_blank" rel="noopener">vyos.io/get-vyos</a>.
+            <strong>Windows Server ISO</strong> (if including a domain controller) &mdash; free 180-day
+            evaluation at
+            <a href="https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022" target="_blank" rel="noopener">Microsoft Evaluation Center</a>.
+          </span>
+        </span>
+      </label>
+
+      <label class="prereq-item">
         <input type="checkbox" class="prereq-check" data-prereq-id="powershell">
         <span class="prereq-item-body">
           <span class="prereq-item-title">PowerShell 7.2+ installed</span>
@@ -66,11 +87,32 @@
         <span class="prereq-item-body">
           <span class="prereq-item-title">VMware OVF Tool installed</span>
           <span class="prereq-item-desc">
-            Command-line OVA/OVF deployment for the VCSA and nested-ESXi appliances &mdash; useful on its own or as
-            a fallback alongside PowerCLI/govc. Download the installer for your platform from
+            Command-line OVA/OVF deployment for the VCSA and nested-ESXi appliances &mdash; a standalone option
+            if you'd rather import an OVA by hand outside the generated scripts (the scripts themselves use
+            PowerCLI and govc, not ovftool). Download the installer for your platform from
             <a href="https://support.broadcom.com" target="_blank" rel="noopener">support.broadcom.com</a>
             (VMware vSphere &rarr; Drivers &amp; Tools &rarr; search "OVF Tool"), run it, then verify with
             <code>ovftool --version</code>.
+          </span>
+        </span>
+      </label>
+
+      <label class="prereq-item">
+        <input type="checkbox" class="prereq-check" data-prereq-id="govc">
+        <span class="prereq-item-body">
+          <span class="prereq-item-title">govc installed</span>
+          <span class="prereq-item-desc">
+            <strong>Required if you deploy nested ESXi via OVA</strong> (the recommended path) &mdash;
+            <code>deploy-lab.ps1</code> uses govc for that import with no PowerCLI fallback; it's also the
+            preferred path for the vCenter appliance's own OVA deployment. Not needed if you deploy nested
+            ESXi via Kickstart/ISO instead.
+            Download the latest release for your platform from
+            <a href="https://github.com/vmware/govmomi/releases" target="_blank" rel="noopener">github.com/vmware/govmomi/releases</a>.
+            <strong>Windows:</strong> download <code>govc_windows_amd64.exe</code>, rename to
+            <code>govc.exe</code>, place it on your <code>PATH</code> &middot;
+            <strong>macOS:</strong> <code>brew install govc</code> &middot;
+            <strong>Linux:</strong> download the release binary and place it on your <code>PATH</code>.
+            Verify with <code>govc version</code>.
           </span>
         </span>
       </label>

@@ -282,7 +282,31 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.22.0 (current -- prerequisites gate before the wizard starts)
+### v1.25.0 (current -- prerequisites gate covers ISOs/OVAs and govc)
+- Expanded `#prereq-screen` (`public/index.html`) from 5 to 7 checklist items -- the gating
+  mechanism (`wirePrereqScreen()`/`updatePrereqStart()` in `public/wizard.js`) is fully
+  generic over `.prereq-check` count, so no JS changes were needed, only markup:
+  1. New **"ISOs and OVAs downloaded"** item -- lists exactly which files a lab needs and
+     where to get each: ESXi ISO + vCenter Server Appliance OVA (Broadcom portal), Nested
+     ESXi Virtual Appliance OVA (William Lam's williamlam.com/nested-virtualization, same
+     link already used at the OVA-deploy hint in the Nested cluster step), VyOS ISO
+     (vyos.io/get-vyos -- same URL `lib/generatePrerequisites.js` already uses), Windows
+     Server ISO (Microsoft Evaluation Center -- same URL `generatePrerequisites.js` uses).
+  2. New **govc** item -- was previously only name-dropped inside the OVF Tool item's
+     description with stale framing ("a fallback alongside PowerCLI/govc"); this is
+     inaccurate since v1.19.0 made govc mandatory (no PowerCLI fallback) for
+     `deploy-lab.ps1`'s OVA-based nested-ESXi import. New item states this plainly --
+     required for OVA deploys, not needed for Kickstart/ISO -- with the same
+     github.com/vmware/govmomi/releases download instructions `generatePrerequisites.js`
+     already documents.
+  - **OVF Tool item's description corrected**: dropped the "fallback alongside
+    PowerCLI/govc" claim (no longer true given the no-fallback decision); now describes
+    it as a standalone manual-deployment option, not part of the generated scripts' path.
+  - Verified with Playwright: all 7 checkboxes gate `#prereq-start-btn` correctly
+    (generic `.prereq-check` count, no hardcoded assumption), full page reload restores
+    checked state, Start reveals mode-select. Zero console/page errors.
+
+### v1.22.0 (prerequisites gate before the wizard starts)
 - **New `#prereq-screen`** (`public/index.html`), shown first on page load, before
   `#mode-select-screen` (which now starts with the `hidden` attribute instead of being
   visible by default). Five checklist items, each a `<label class="prereq-item">`
