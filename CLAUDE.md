@@ -16,7 +16,7 @@ Key files:
 - `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/:id/save`, `/api/diagram/from-spec`, `/api/ks/:sessionId/:hostIndex`, `/diagram`, troubleshoot scenario endpoints
 - `lib/scenarioLibrary.js` — scenario CRUD (loadScenarios, getScenario, saveScenario, deleteScenario, getActive, setActive)
 - `lib/templateLibrary.js` — curated `.labtemplate` list (loadTemplates); backs the public `GET /api/templates`
-- `templates/<id>.json` — pre-built lab templates offered on the "Start from template" screen (Learn NSX, Learn vSAN, VCF certification prep, Basic homelab)
+- `templates/<id>.json` — pre-built lab templates offered on the "Start from template" screen and the post-Use-case suggestion overlay (Learn NSX, Learn vSAN, VCF certification prep, Basic homelab, Advanced networking)
 - `lib/vcenterClient.js` — vSphere REST API client (createSession, listVMs, findSnapshot, revertAllToSnapshot, testConnection)
 - `lib/vcenterConfig.js` — load/save vcenter-config.json from BASE_DIR (gitignored)
 - `lib/hclData.js` — NIC HCL database: FLAGGED_NICS, KNOWN_GOOD_NICS, checkNic(model)
@@ -703,7 +703,20 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v1.30.0 (current — template selection joins the reorder flow)
+### v1.31.0 (current — 5th template: Advanced networking)
+- **`templates/advanced-networking.json`**: 2 physical hosts, NSX-T full topology (T0/T1/DFW), 2 medium edge
+  nodes, BGP with `nsxBgpRouteAdvert: 'specific'` + two `nsxBgpPrefixes` entries and all three redistribution
+  flags on — distinct from `learn-nsx` (which uses `'all'` route advertisement, 1 small edge node, single host)
+  by going deeper into route-advertisement/redistribution rather than just switching NSX on. vSAN deliberately
+  left off so the template stays focused on networking, not storage.
+  - No code changes needed — `lib/templateLibrary.js`'s `loadTemplates()` already reads every `templates/*.json`,
+    and both template-picking UIs (`renderTemplatePicker()` on mode-select, `showTemplateSuggestOverlay()` from
+    v1.30.0) already render whatever `GET /api/templates` returns.
+  - Verified: `GET /api/templates` returns 5 templates; mode-select "Start from template" screen shows 5 cards;
+    selecting Advanced networking there sets `hostCount:2` (correctly reveals the additional-hosts section on
+    the Hardware step), `nsxTopology:'full'`, `nsxEdgeCount:2`. Zero console errors.
+
+### v1.30.0 (template selection joins the reorder flow)
 - **Reorder (Hardware → Existing network → Use case) confirmed unchanged from v1.23**; this release adds a
   fifth stop — template selection — after Use case, without growing `TOTAL_STEPS` past the v1.24.0 10-step
   target: it's a one-time full-page **overlay** (`#template-suggest-overlay`, styled like the existing
