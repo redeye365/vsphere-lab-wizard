@@ -1,6 +1,6 @@
 {
   "name": "zero-to-hero-lab",
-  "version": "1.32.0",
+  "version": "1.33.0",
   "description": "Zero to Hero Lab: a local wizard for designing a nested vSphere home lab. Generates a JSON spec, a PowerCLI deployment script, and a markdown design doc.",
   "main": "server.js",
   "bin": "server.js",
@@ -8,10 +8,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "start": "node server.js",
-    "build": "pkg . --targets node18-win-x64,node18-macos-arm64,node18-macos-x64 --output dist/zero-to-hero-lab",
-    "docker:build": "docker build -t zero-to-hero .",
-    "docker:run": "docker run -p 3000:3000 -v \"$(pwd)/scenarios:/app/scenarios\" --name zero-to-hero zero-to-hero",
-    "docker:push": "./harbor-push.sh"
+    "build": "pkg . --targets node18-win-x64,node18-macos-arm64,node18-macos-x64 --output dist/zero-to-hero-lab"
   },
   "engines": {
     "node": ">=18"

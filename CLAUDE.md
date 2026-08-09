@@ -703,7 +703,31 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v1.32.0 (current — rebrand to Zero to Hero Lab)
+### v1.33.0 (current — Docker support removed)
+- **Deleted**: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `harbor-push.sh`,
+  `build-multiarch.sh`. Removed `docker:build`/`docker:run`/`docker:push` from
+  `package.json` scripts. Distribution is standalone-executable-only now (`pkg`,
+  see `npm run build`) — README's "Running with Docker" section replaced with a
+  three-step "download the exe from Releases, double-click, open localhost:3000"
+  section, and its `Dockerfile`/`docker-compose.yml`/`harbor-push.sh`/
+  `build-multiarch.sh` entries removed from the Project layout tree.
+  - Fixed two now-stale **Coding conventions** bullets that stated Docker facts as
+    ongoing truths (not historical): the `mermaid` direct-dependency rationale no
+    longer cites "works in the Docker image" (rephrased to the general packaging
+    concern that's still true — surviving `npm install --production`/the `pkg`
+    executable); the server-binding bullet's `HOST=0.0.0.0`/`ADMIN_ENABLED=false`
+    Docker exception is removed, pointing instead at the v1.20.0/v1.21.x history
+    below for anyone wondering why those env vars still exist in `server.js` (the
+    code itself was left alone — out of scope for this change, just the files/
+    scripts/docs).
+  - **Historical roadmap entries below (v1.20.0 "Docker & Harbor support", the
+    v1.21.x Docker rendering-fix entries) are deliberately left untouched** — same
+    reasoning as the v1.32.0 rebrand entry above: they describe what shipped and
+    why at the time, and rewriting them would misrepresent history.
+  - Verified: `node --check server.js` passes, server starts and serves 200 with no
+    Docker-related code paths exercised at runtime (none were touched).
+
+### v1.32.0 (rebrand to Zero to Hero Lab)
 - **Product renamed** "vSphere Lab Wizard" → **Zero to Hero Lab** (tagline: *"Build it. Break
   it. Fix it. Learn it."*), v1.31.0 → v1.32.0. Every user-facing brand string and package
   identifier was updated: `package.json`/`package-lock.json` `name` (`vsphere-lab-wizard` →
@@ -897,23 +921,20 @@ network diagram, prerequisites.
 - `mermaid` is a **direct** dependency (`package.json`), not just a transitive
   devDependency of `@mermaid-js/mermaid-cli` — it must survive `npm install
   --production` so `/vendor/mermaid.min.js` (served by `server.js`, consumed by both
-  `public/index.html`'s review-screen preview and `public/diagram.html`) works in the
-  Docker image. `mermaid-cli` itself (needed only for server-side SVG export via `mmdc`)
-  stays devDependency-only and is legitimately absent in Docker — `renderSvg()` already
-  degrades gracefully when `mmdc` isn't found.
+  `public/index.html`'s review-screen preview and `public/diagram.html`) works regardless
+  of how the app is packaged. `mermaid-cli` itself (needed only for server-side SVG export
+  via `mmdc`) stays devDependency-only — `renderSvg()` already degrades gracefully when
+  `mmdc` isn't found (e.g. inside the standalone `pkg` executable, which can't bundle it).
 - `spec.diagramOverride` (string, optional) — a hand-edited Mermaid source saved via
   `POST /api/diagram/:id/save` from `/diagram`'s edit mode. When present, it takes
   priority over `buildMermaidDiagram(spec)` everywhere a diagram is produced for that
   session (`GET /api/diagram/:id`, `POST /api/diagram/from-spec` when the override rode
   along in an uploaded spec.json, and the session's `diagram.html`/`network-diagram.svg`
   download artifacts, regenerated at save time).
-- Server binds to `127.0.0.1` by default — never `0.0.0.0` for local/native use. All
-  `/api/admin/*` routes are additionally protected by `requireLocalhost` middleware as
-  defence-in-depth. The one sanctioned exception is the Docker image: `HOST=0.0.0.0`
-  (required because `127.0.0.1` inside a container is unreachable through Docker's port
-  mapping) is paired with `ADMIN_ENABLED=false`, which removes `/api/admin/*` entirely
-  (404) rather than relying on `requireLocalhost`'s loopback check, since that check's
-  assumption breaks once the server listens on `0.0.0.0`. See `Dockerfile` / `docker-compose.yml`.
+- Server binds to `127.0.0.1` by default — never `0.0.0.0`. All `/api/admin/*` routes
+  are additionally protected by `requireLocalhost` middleware as defence-in-depth.
+  (Docker support — and the `HOST=0.0.0.0` / `ADMIN_ENABLED=false` exception it needed —
+  was removed; see the v1.20.0/v1.21.x roadmap entries below for that history.)
 - `saveScenario` and the admin-verify endpoint both validate `verifyScript` filenames
   with `^[a-zA-Z0-9-]+\.ps1$` to prevent path traversal via imported `.labscenario` files.
 - Sensitive spec fields (`rootPassword`, `esxiPassword`, `esxiLicense`, `vcenterLicense`)
