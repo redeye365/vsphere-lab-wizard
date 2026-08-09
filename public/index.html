@@ -186,6 +186,19 @@
   <input type="file" id="load-template-input" accept=".json,.labtemplate" style="display:none;">
 </div>
 
+<div id="template-picker-screen" class="mode-select-screen template-picker-screen" hidden>
+  <button type="button" id="template-picker-back" class="btn btn-ghost template-picker-back">&larr; Back</button>
+  <div class="mode-select-hero">
+    <h1 class="mode-select-title" style="font-size:30px;">Start from a template</h1>
+    <p class="mode-select-tagline">Pick the closest fit &mdash; every field stays editable in the wizard after.</p>
+  </div>
+  <div id="template-picker-list" class="mode-card-row"></div>
+  <p class="template-picker-own">
+    Have a <code>.labtemplate</code> file someone shared with you?
+    <button type="button" id="template-picker-upload-btn" class="btn-link">Upload it instead</button>
+  </p>
+</div>
+
 <div id="learn-onboard-screen" class="learn-onboard-screen" hidden>
   <div class="learn-onboard-scroll">
     <div class="learn-onboard-inner">

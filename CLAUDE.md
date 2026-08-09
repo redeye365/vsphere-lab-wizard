@@ -15,6 +15,8 @@ HTML/CSS/JS in `public/`. Server-side generation only (no client-side bundling).
 Key files:
 - `server.js` — Express app, `/api/generate`, `/api/download/:id/:kind`, `/api/diagram/:id`, `/api/diagram/:id/save`, `/api/diagram/from-spec`, `/api/ks/:sessionId/:hostIndex`, `/diagram`, troubleshoot scenario endpoints
 - `lib/scenarioLibrary.js` — scenario CRUD (loadScenarios, getScenario, saveScenario, deleteScenario, getActive, setActive)
+- `lib/templateLibrary.js` — curated `.labtemplate` list (loadTemplates); backs the public `GET /api/templates`
+- `templates/<id>.json` — pre-built lab templates offered on the "Start from template" screen (Learn NSX, Learn vSAN, VCF certification prep, Basic homelab)
 - `lib/vcenterClient.js` — vSphere REST API client (createSession, listVMs, findSnapshot, revertAllToSnapshot, testConnection)
 - `lib/vcenterConfig.js` — load/save vcenter-config.json from BASE_DIR (gitignored)
 - `lib/hclData.js` — NIC HCL database: FLAGGED_NICS, KNOWN_GOOD_NICS, checkNic(model)
@@ -282,7 +284,38 @@ network diagram, prerequisites.
   - Enhanced debrief: why it happened / what made it hard / learning point / prevention / methodology scorecard + pattern summary
   - Design rationale connection: if a learning-mode spec is loaded, debrief links back to the relevant design decisions
 
-### v1.25.0 (current -- prerequisites gate covers ISOs/OVAs and govc)
+### v1.26.0 (current -- pre-built lab templates)
+- **New "Start from template" flow**: clicking the existing `#mode-template` card on the
+  mode-select screen no longer opens a file picker directly -- it now shows
+  `#template-picker-screen` (`public/index.html`), a card grid (reusing the `.mode-card`
+  styling already used for the four mode-select cards) rendered from `GET /api/templates`.
+  Each card is one of the four curated templates; clicking it runs the exact same
+  `isValidWizardConfig()` -> `enterAppWithConfig()` path a manually-uploaded `.labtemplate`
+  file already used -- no changes needed to that pipeline, since `loadWizardConfig()`'s
+  `Object.assign` merge onto the default `state.answers.{discovery,hardware,design}` means
+  a template only needs to specify the fields it wants to override, not the full schema.
+  A "Have a `.labtemplate` file someone shared with you? Upload it instead" link at the
+  bottom still opens the pre-existing `#load-template-input` file picker, and a Back
+  button returns to the four original mode-select cards.
+- **`lib/templateLibrary.js`** (`loadTemplates()`) mirrors the existing `scenarioLibrary.js`
+  read pattern -- reads every `templates/*.json`, sorts by name. Backs a new **public**
+  `GET /api/templates` endpoint in `server.js` (deliberately not under the
+  `requireLocalhost`-gated `/api/admin/*` prefix, since these files ship read-only with the
+  app and contain no secrets by construction).
+- **Four starter templates** (`templates/<id>.json`, each a `_type: 'lab-template'` envelope
+  with a partial `answers` object -- only the fields that differ from the wizard's defaults):
+  `learn-nsx` (3 hosts, NSX-T full topology + BGP-peered VyOS), `learn-vsan` (3 hosts, vSAN
+  ESA pre-wired with storage-pool disks), `vcf-cert-prep` (4 hosts, vSAN + NSX + VCF Bring-up
+  switched on -- VCF-specific IP fields deliberately left blank for the user to fill in),
+  `basic-homelab` (1 host, everything optional switched off). The first three set
+  `learningMode: true` and a matching `designRationale.techFocus`/`learningGoal` so the
+  learn-blocks and onboarding tie-ins are consistent with picking a "Learn X" template.
+- Verified with Playwright: all 4 templates list correctly, selecting one lands in the
+  wizard at step 0 with the right fields pre-filled (spot-checked `nsxEnabled`/`vyosEnabled`/
+  `cpuCores` for Learn NSX), Back and "upload your own file" both still work, normal step
+  navigation (Next/Back) is unaffected after loading a template. Zero console/page errors.
+
+### v1.25.0 (prerequisites gate covers ISOs/OVAs and govc)
 - Expanded `#prereq-screen` (`public/index.html`) from 5 to 7 checklist items -- the gating
   mechanism (`wirePrereqScreen()`/`updatePrereqStart()` in `public/wizard.js`) is fully
   generic over `.prereq-check` count, so no JS changes were needed, only markup:

@@ -4060,7 +4060,57 @@ function wireModeSelect() {
   });
 
   document.getElementById('mode-template')?.addEventListener('click', () => {
+    if (screen) screen.hidden = true;
+    const picker = document.getElementById('template-picker-screen');
+    if (picker) picker.hidden = false;
+    renderTemplatePicker();
+  });
+
+  document.getElementById('template-picker-back')?.addEventListener('click', () => {
+    const picker = document.getElementById('template-picker-screen');
+    if (picker) picker.hidden = true;
+    if (screen) screen.hidden = false;
+  });
+
+  document.getElementById('template-picker-upload-btn')?.addEventListener('click', () => {
     document.getElementById('load-template-input')?.click();
+  });
+}
+
+// Curated .labtemplate files shipped with the app (templates/*.json), offered
+// on the "Start from template" screen alongside the option to upload a
+// custom one. Fetched once and cached — the list is small and static per session.
+let _templatesCache = null;
+
+async function renderTemplatePicker() {
+  const list = document.getElementById('template-picker-list');
+  if (!list) return;
+  if (!_templatesCache) {
+    list.innerHTML = '<p class="hint">Loading templates…</p>';
+    try {
+      const res = await fetch('/api/templates');
+      _templatesCache = await res.json();
+    } catch {
+      list.innerHTML = '<p class="hint">Could not load templates — check your connection and try again.</p>';
+      return;
+    }
+  }
+  list.innerHTML = '';
+  _templatesCache.forEach((tpl) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mode-card mode-card-template';
+    btn.innerHTML = `
+      <span class="mode-card-badge">Template</span>
+      <span class="mode-card-heading">${escHtml(tpl.name || tpl.id)}</span>
+      <span class="mode-card-desc">${escHtml(tpl.description || '')}</span>
+      <span class="mode-card-cta">Use this template &rarr;</span>
+    `;
+    btn.addEventListener('click', () => {
+      if (!isValidWizardConfig(tpl) || tpl._type !== 'lab-template') return;
+      enterAppWithConfig(tpl, true);
+    });
+    list.appendChild(btn);
   });
 }
 

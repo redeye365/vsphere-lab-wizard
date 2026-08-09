@@ -98,6 +98,7 @@ const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
 const { evaluateSizing } = require('./lib/sizing');
 const { loadScenarios, getScenario, saveScenario, deleteScenario, getVerifyScript, saveVerifyScript, getActive, setActive, nameToId } = require('./lib/scenarioLibrary');
+const { loadTemplates } = require('./lib/templateLibrary');
 const { validateAnswers } = require('./lib/validateAnswers');
 const { revertAllToSnapshot, createSnapshotsOnAllVMs, testConnection: vcenterTestConnection } = require('./lib/vcenterClient');
 const vcenterConfig = require('./lib/vcenterConfig');
@@ -356,6 +357,13 @@ app.get('/api/download/:id/:kind', (req, res) => {
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
 
   res.download(filePath, filename);
+});
+
+// GET /api/templates — pre-built lab templates offered on the "Start from
+// template" mode-select screen. Public (no requireLocalhost gate) since the
+// files ship read-only with the app and contain no secrets by construction.
+app.get('/api/templates', (req, res) => {
+  res.json(loadTemplates());
 });
 
 // ── Diagram endpoints ──────────────────────────────────────────────────────

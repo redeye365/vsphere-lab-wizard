@@ -2424,6 +2424,16 @@ select:focus {
 
 .mode-card-file-status { font-size: 12px; color: var(--danger); margin: 0; min-height: 1.1em; }
 
+.template-picker-screen { position: relative; }
+.template-picker-back { position: absolute; top: 24px; left: 24px; }
+.template-picker-own { font-size: 14px; color: var(--text-dim); }
+.btn-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent-text); font-size: 14px; font-weight: 600;
+  text-decoration: underline; font-family: var(--sans);
+}
+.btn-link:hover { color: var(--accent); }
+
 /* Autosave resume banner */
 .autosave-banner {
   display: flex;
