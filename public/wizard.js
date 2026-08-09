@@ -2933,7 +2933,7 @@ async function tsLibSave() {
     snapshotName:     document.getElementById('ts-snapshot-name')?.value.trim() || '',
     hints,
     fixSteps:         fixLines,
-    author:           'vSphere Lab Wizard',
+    author:           'Zero to Hero Lab',
     created:          new Date().toISOString().slice(0, 10)
   };
 

@@ -41,7 +41,7 @@
     "Remove duplicate or incorrect entries from /etc/hosts without disrupting vCenter services",
     "Verify consistent hostname resolution after correcting /etc/hosts"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-1"

@@ -46,6 +46,6 @@
     "Safely remove stale rotated log archives without touching active log files",
     "Verify the health warning clears in vSphere Client after remediation"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

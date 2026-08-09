@@ -1,4 +1,6 @@
-# vSphere Lab Wizard
+# Zero to Hero Lab
+
+*Build it. Break it. Fix it. Learn it.*
 
 A local wizard that guides you through designing a nested vSphere home lab, then generates a complete set of personalised PowerCLI scripts, a written design document, a step-by-step build guide, and a network topology diagram.
 
@@ -82,7 +84,7 @@ The Mermaid diagram source for your lab topology is **always included** in `buil
 
 **If running from source** (`npm start`): mmdc is already in devDependencies and is installed by `npm install` automatically.
 
-**If running the standalone executable** (`dist/vsphere-lab-wizard-*`): mmdc cannot be bundled into the executable. It uses Puppeteer which requires a headless Chromium binary (~170 MB per platform) — too large and platform-specific to embed. Install it separately if you want SVG export:
+**If running the standalone executable** (`dist/zero-to-hero-lab-*`): mmdc cannot be bundled into the executable. It uses Puppeteer which requires a headless Chromium binary (~170 MB per platform) — too large and platform-specific to embed. Install it separately if you want SVG export:
 
 ```sh
 npm install -g @mermaid-js/mermaid-cli
@@ -163,8 +165,8 @@ C:\Lab\                 (Windows) — or ~/Lab/ on macOS/Linux
 ## Running the wizard
 
 ```
-git clone https://github.com/redeye365/vsphere-lab-wizard.git
-cd vsphere-lab-wizard
+git clone https://github.com/redeye365/zero-to-hero-lab.git
+cd zero-to-hero-lab
 npm install
 npm start
 ```
@@ -175,12 +177,12 @@ The wizard runs entirely locally. No data leaves your machine.
 
 ### Getting started on Windows (standalone .exe)
 
-`npm run build` produces a standalone Windows executable (`dist/vsphere-lab-wizard.exe`, via `pkg`) that doesn't require Node.js to be installed on the target machine. Two one-time PowerShell steps clear up the most common first-run issues on Windows Server 2025:
+`npm run build` produces a standalone Windows executable (`dist/zero-to-hero-lab.exe`, via `pkg`) that doesn't require Node.js to be installed on the target machine. Two one-time PowerShell steps clear up the most common first-run issues on Windows Server 2025:
 
 **1. Allow the port through Windows Firewall.** The wizard binds to `127.0.0.1` only, so this is usually unnecessary for local-only use, but if Windows Firewall is prompting or blocking anyway, allow it from an elevated PowerShell prompt:
 
 ```powershell
-New-NetFirewallRule -DisplayName "vSphere Lab Wizard" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "Zero to Hero Lab" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
 ```
 
 If the wizard fell back to port 3001 or 3002 because 3000 was already in use, repeat the command with `-LocalPort 3001` (or `3002`) — the console output (and the browser window it opens) tells you which port it landed on.
@@ -194,7 +196,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 If the `.exe` itself won't launch because Windows SmartScreen flagged it as downloaded from the internet, unblock it first:
 
 ```powershell
-Unblock-File -Path .\vsphere-lab-wizard.exe
+Unblock-File -Path .\zero-to-hero-lab.exe
 ```
 
 If the wizard still fails to start, a message box now describes the error instead of the window just disappearing — full details are written to `crash.log` next to the `.exe`.
@@ -374,7 +376,7 @@ Non-commercial community license — see [LICENSE](LICENSE) for the full terms.
   for paid consulting/training, or white-labelling it — **requires written permission**
   from the author. Contact [CloudITBlog.com](https://CloudITBlog.com) to request it.
 - **Attribution required**: credit CloudITBlog.com and link back to
-  [the original repository](https://github.com/redeye365/vsphere-lab-wizard) in any use
+  [the original repository](https://github.com/redeye365/zero-to-hero-lab) in any use
   or redistribution.
 - **Forks**: welcome for personal/non-commercial use (attribution preserved); forks for
   commercial use are prohibited without permission.

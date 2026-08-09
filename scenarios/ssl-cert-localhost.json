@@ -41,7 +41,7 @@
     "Use the VCSA certificate-manager utility to replace the Machine SSL certificate with a correctly-named one",
     "Verify certificate renewal by inspecting the updated SAN in a browser after vCenter services restart"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-1",

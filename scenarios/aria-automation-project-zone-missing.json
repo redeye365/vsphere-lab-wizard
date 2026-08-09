@@ -47,6 +47,6 @@
     "Assign a cloud zone to a project via Infrastructure > Projects",
     "Verify the fix by confirming a deployment request proceeds past the scheduling stage"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

@@ -1,6 +1,6 @@
 // server.js
 //
-// Local-only server for the vSphere Lab Wizard. Run with `npm start`,
+// Local-only server for Zero to Hero Lab. Run with `npm start`,
 // then open http://localhost:3000
 
 const express = require('express');
@@ -65,7 +65,7 @@ function fatalError(err) {
   console.error('Fatal error during startup:', message);
   logCrash(message);
   showWindowsErrorBox(
-    'vSphere Lab Wizard — Startup Error',
+    'Zero to Hero Lab — Startup Error',
     `The wizard failed to start.\n\n${message}\n\nDetails were written to:\n${path.join(BASE_DIR, 'crash.log')}`
   );
   process.exit(1);
@@ -647,7 +647,7 @@ app.post('/api/admin/scenario-capture', async (req, res) => {
     }
 
     try {
-      const { created, errors } = await createSnapshotsOnAllVMs(cfg, snapshotName, `vSphere Lab Wizard — ${scenario.name}`);
+      const { created, errors } = await createSnapshotsOnAllVMs(cfg, snapshotName, `Zero to Hero Lab — ${scenario.name}`);
       scenario.snapshotName = snapshotName;
       saveScenario(scenario);
       res.json({ ok: true, snapshotName, created, errors });
@@ -783,7 +783,7 @@ function startServer(ports, index) {
   const port = ports[index];
   const server = app.listen(port, HOST, () => {
     const url = `http://localhost:${port}`;
-    console.log(`vSphere Lab Wizard running at ${url} — open this URL in your browser`);
+    console.log(`Zero to Hero Lab running at ${url} — open this URL in your browser`);
     if (port !== ports[0]) {
       console.log(`(Port ${ports[0]} was already in use — landed on ${port} instead.)`);
     }

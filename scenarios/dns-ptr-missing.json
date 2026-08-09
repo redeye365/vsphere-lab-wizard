@@ -39,7 +39,7 @@
     "Create a reverse lookup zone and PTR records on a Windows DNS server",
     "Verify vCenter performance recovery after DNS PTR records are restored"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-1",

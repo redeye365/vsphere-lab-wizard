@@ -38,7 +38,7 @@
     "Re-enable SSH by correcting the startup policy and starting the service via vCenter or PowerCLI",
     "Understand the security trade-off between disabling SSH by default and operational access requirements"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-1"

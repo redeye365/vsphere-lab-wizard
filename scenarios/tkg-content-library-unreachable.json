@@ -52,6 +52,6 @@
     "Update content library subscription settings including URL and SSL thumbprint",
     "Verify the fix by triggering a manual sync before retrying a TKG cluster deployment"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

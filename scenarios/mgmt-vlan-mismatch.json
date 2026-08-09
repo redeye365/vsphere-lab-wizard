@@ -38,7 +38,7 @@
     "Inspect and correct management port group VLAN settings using esxcli",
     "Confirm host reconnection to vCenter after management VLAN is restored"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-2"

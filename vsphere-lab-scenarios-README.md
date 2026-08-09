@@ -1,6 +1,6 @@
 # vsphere-lab-scenarios
 
-Community-contributed scenario library for [vsphere-lab-wizard](https://github.com/redeye365/vsphere-lab-wizard).
+Community-contributed scenario library for [zero-to-hero-lab](https://github.com/redeye365/zero-to-hero-lab).
 
 Each scenario is a pre-built lab fault that a vSphere engineer must diagnose and fix. When loaded via the Admin panel the lab automatically reverts to a saved vCenter snapshot — the troubleshooter sees only a support ticket, investigates the live environment, and fixes it for real. No walkthroughs, no safety net.
 
@@ -8,7 +8,7 @@ Each scenario is a pre-built lab fault that a vSphere engineer must diagnose and
 
 ## How scenarios work
 
-1. The **lab admin** loads a scenario from the Admin panel in `vsphere-lab-wizard`
+1. The **lab admin** loads a scenario from the Admin panel in `zero-to-hero-lab`
 2. The wizard reverts all lab VMs to the named vCenter snapshot (the faulted state)
 3. The **troubleshooter** opens the Troubleshooter tab and accepts the scenario
 4. They receive a fictional support ticket — everything else they have to find themselves
@@ -21,7 +21,7 @@ Each scenario is a pre-built lab fault that a vSphere engineer must diagnose and
 ### Import a single scenario
 
 1. Download the `.labscenario` file for the scenario you want
-2. Open `vsphere-lab-wizard` → Troubleshooting tab → Admin → Scenario Library
+2. Open `zero-to-hero-lab` → Troubleshooting tab → Admin → Scenario Library
 3. Click **Import .labscenario** and select the file
 4. Click **Capture** to create a vCenter snapshot in the faulted state (follow the scenario's setup notes)
 5. The scenario is ready to load
@@ -38,7 +38,7 @@ Copy any `.labscenario` files you want into your wizard's import flow, or use th
 
 ## Starter scenarios
 
-Ten scenarios ship with vsphere-lab-wizard. They are reproduced here as a baseline and reference for contributors.
+Ten scenarios ship with zero-to-hero-lab. They are reproduced here as a baseline and reference for contributors.
 
 | ID | Name | Difficulty | Topics | Requires |
 |----|------|-----------|--------|---------|
@@ -115,7 +115,7 @@ scenarios/
 | `certRelevance` | yes | Array of current Broadcom cert IDs this scenario maps to (see values below). Every scenario must have at least one. |
 | `learningObjectives` | yes | Array of 2–4 short strings describing what the learner practises. Shown on the scenario card. |
 | `topics` | yes | Kebab-case tags. Used for filtering in the library. |
-| `author` | yes | Your GitHub handle or `"vSphere Lab Wizard starter library"` |
+| `author` | yes | Your GitHub handle or `"Zero to Hero Lab starter library"` |
 | `created` | yes | ISO date `YYYY-MM-DD` |
 | `labRequirements` | yes | See requirements list below |
 | `customerScenario` | yes | Ticket text. Stay in character — this is the user's call. |
@@ -175,7 +175,7 @@ Use these standard tags. PRs with new tags will be reviewed.
 | `nested-cluster-min-3` | At least 3 nested ESXi hosts (minimum for vSAN) |
 | `vsan` | vSAN cluster healthy before fault injection |
 | `active-directory` | Domain controller deployed and joined |
-| `vcenter` | vCenter deployed (always true for vsphere-lab-wizard labs, but call it out if the fault affects vCenter itself) |
+| `vcenter` | vCenter deployed (always true for zero-to-hero-lab labs, but call it out if the fault affects vCenter itself) |
 
 ---
 
@@ -233,7 +233,7 @@ try {
 
 ## .labscenario bundle format
 
-When you export a scenario from vsphere-lab-wizard it produces a `.labscenario` file. This is a plain JSON envelope:
+When you export a scenario from zero-to-hero-lab it produces a `.labscenario` file. This is a plain JSON envelope:
 
 ```json
 {
@@ -251,7 +251,7 @@ If you're contributing to this repo, submit the source files (`scenario.json` + 
 
 ### Before you start
 
-- Test your scenario end-to-end in a real vsphere-lab-wizard lab
+- Test your scenario end-to-end in a real zero-to-hero-lab lab
 - The fault must be something a **vSphere engineer** would realistically encounter in production
 - The verify script must return `FAULT_RESOLVED` reliably after the correct fix and `FAULT_PRESENT` reliably before it
 - The five hints must graduate — hint 1 should not give away anything hint 3 would

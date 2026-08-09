@@ -40,7 +40,7 @@
     "Configure a consistent NTP source hierarchy with the domain controller as the internal NTP master",
     "Force an NTP resync and verify clock alignment before retrying SSO or VCF bringup"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-1",

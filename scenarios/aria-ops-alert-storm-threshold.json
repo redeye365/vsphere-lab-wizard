@@ -51,6 +51,6 @@
     "Diagnose an incorrectly set metric threshold that causes widespread false-positive alerts",
     "Edit a symptom definition threshold and understand that alerts self-cancel when conditions no longer match"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

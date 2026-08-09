@@ -50,6 +50,6 @@
     "Assign a VM class to a vSphere namespace via Workload Management > Namespaces",
     "Compare namespace configuration between a working and failing namespace to identify configuration gaps"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

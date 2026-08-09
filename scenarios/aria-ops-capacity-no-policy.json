@@ -50,6 +50,6 @@
     "Assign a capacity policy to a project via Capacity > Capacity Projects",
     "Verify the fix by confirming recommendations appear after the next calculation cycle"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

@@ -55,6 +55,6 @@
     "Test connectivity from an ESXi host to NSX Manager using nc and identify blocked ports",
     "Re-trigger NSX host preparation after resolving the network connectivity issue"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

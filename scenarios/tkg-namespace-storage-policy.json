@@ -50,6 +50,6 @@
     "Assign a storage policy to a vSphere namespace via Workload Management",
     "Verify that TKG cluster provisioning resumes automatically after the storage policy is applied"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

@@ -50,6 +50,6 @@
     "Apply a vSphere tag to a cluster to satisfy an Aria Automation compute constraint",
     "Trigger a data collection to refresh Aria Automation's view of vCenter tags before re-deploying"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

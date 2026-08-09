@@ -52,6 +52,6 @@
     "Configure an NTP server and enable the NTP daemon on a freshly deployed ESXi host",
     "Verify time synchronisation before retrying host commission in SDDC Manager"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

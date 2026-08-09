@@ -50,6 +50,6 @@
     "Renew a VMCA-signed machine SSL certificate via the VCSA VAMI or certificate-manager CLI",
     "Verify the renewal and understand that vCenter services restart automatically as part of the process"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }

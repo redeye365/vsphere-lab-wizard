@@ -42,7 +42,7 @@
     "Create a local VMFS datastore and redirect the scratch partition to persistent storage",
     "Validate that all cluster hosts meet vSAN prerequisites after rebooting"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-3",

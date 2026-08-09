@@ -39,7 +39,7 @@
     "Understand how BGP session state (Active / Idle / Established) maps to north-south routing health",
     "Correct a BGP peer configuration mismatch to restore external connectivity"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nsx",

@@ -39,7 +39,7 @@
     "Add missing advanced VM configuration parameters via the vCenter Edit Settings dialog",
     "Verify nested ESXi VMs power on successfully after configuration parameters are applied"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-1"

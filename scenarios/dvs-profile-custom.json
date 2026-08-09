@@ -42,7 +42,7 @@
     "Navigate the DVS port group teaming and failover settings in vCenter",
     "Restore vSAN latency to baseline by correcting the load balancing algorithm"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-26",
   "labRequirements": [
     "nested-cluster-min-3",

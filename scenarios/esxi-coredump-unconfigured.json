@@ -44,6 +44,6 @@
     "Distinguish between local partition and network coredump collector options",
     "Understand why coredump configuration is a prerequisite for VMware support escalation"
   ],
-  "author": "vSphere Lab Wizard starter library",
+  "author": "Zero to Hero Lab starter library",
   "created": "2026-06-29"
 }
