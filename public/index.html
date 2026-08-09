@@ -515,42 +515,25 @@
     </div>
   </div>
 
-  <div id="template-suggest-overlay" class="arch-options-overlay" hidden>
-    <div class="arch-options-inner">
-      <div class="arch-options-hdr">
-        <div class="arch-options-eyebrow">Optional</div>
-        <h2 class="arch-options-title">Want a head start?</h2>
-        <p class="arch-options-context">
-          Based on what you've told us so far, one of these pre-built templates might save you
-          some clicks. Picking one fills in the networking, cluster, and feature settings below
-          &mdash; your hardware and network answers so far are kept as-is, and everything stays
-          editable afterward.
-        </p>
-      </div>
-      <div id="template-suggest-list" class="mode-card-row"></div>
-      <div class="arch-options-actions">
-        <button type="button" id="template-suggest-skip" class="btn btn-ghost">Skip &mdash; I'll customise manually</button>
-      </div>
-    </div>
-  </div>
-
   <aside class="rail">
     <div class="rail-brand">
       <span class="rail-brand-name">Zero to Hero Lab</span>
       <span class="rail-brand-tag">v1 &middot; vSphere only, no VCF</span>
     </div>
     <ol class="rail-steps" id="rail-steps">
-      <li data-step="0"><span class="rail-num">01</span><span>Hardware</span></li>
-      <li data-step="1"><span class="rail-num">02</span><span>Existing network</span></li>
-      <li data-step="2"><span class="rail-num">03</span><span>Use case</span></li>
-      <li data-step="3"><span class="rail-num">04</span><span>Virtual router</span></li>
-      <li data-step="4"><span class="rail-num">05</span><span>Domain controller</span></li>
-      <li data-step="5"><span class="rail-num">06</span><span>Lab networks</span></li>
-      <li data-step="6"><span class="rail-num">07</span><span>Nested cluster</span></li>
-      <li data-step="7"><span class="rail-num">08</span><span>NSX-T</span></li>
-      <li data-step="8"><span class="rail-num">09</span><span>Workload VMs</span></li>
-      <li data-step="9"><span class="rail-num">10</span><span>Review &amp; generate</span></li>
-      <li data-step="10" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
+      <li data-step="0"><span class="rail-num">01</span><span>Physical host</span></li>
+      <li data-step="1"><span class="rail-num">02</span><span>Home network</span></li>
+      <li data-step="2"><span class="rail-num">03</span><span>Storage</span></li>
+      <li data-step="3"><span class="rail-num">04</span><span>Use case</span></li>
+      <li data-step="4"><span class="rail-num">05</span><span>Template</span></li>
+      <li data-step="5"><span class="rail-num">06</span><span>Virtual router</span></li>
+      <li data-step="6"><span class="rail-num">07</span><span>Domain controller</span></li>
+      <li data-step="7"><span class="rail-num">08</span><span>Lab networks</span></li>
+      <li data-step="8"><span class="rail-num">09</span><span>Nested cluster</span></li>
+      <li data-step="9"><span class="rail-num">10</span><span>NSX-T</span></li>
+      <li data-step="10"><span class="rail-num">11</span><span>Workload VMs</span></li>
+      <li data-step="11"><span class="rail-num">12</span><span>Review &amp; generate</span></li>
+      <li data-step="12" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
     </ol>
     <div class="rail-footer">
       <a href="/diagram" target="_blank" rel="noopener" class="rail-diagram-btn" id="rail-diagram-btn">&#x1F5A7; View Diagram</a>
@@ -629,13 +612,6 @@
             <summary>Show the RAM math</summary>
             <div id="hw-validator-breakdown"></div>
           </details>
-        </div>
-
-        <div class="field">
-          <label>Storage devices (per host)</label>
-          <p class="hint">One entry per physical disk or disk group &mdash; drives sizing checks and script comments. Add as many as you have.</p>
-          <div id="storage-device-list"></div>
-          <button type="button" id="add-storage-device" class="btn btn-secondary" style="margin-top:4px;font-size:12.5px;padding:7px 12px;">+ Add device</button>
         </div>
 
         <div class="field-row">
@@ -781,8 +757,20 @@
         </div>
       </section>
 
-      <!-- Step 2: Use case -->
+      <!-- Step 2: Storage -->
       <section class="step" data-step="2">
+        <h1>What storage do you have?</h1>
+        <p class="step-intro">One entry per physical disk or disk group on the host from step 1 &mdash; drives sizing checks and script comments.</p>
+
+        <div class="field">
+          <label>Storage devices (per host)</label>
+          <div id="storage-device-list"></div>
+          <button type="button" id="add-storage-device" class="btn btn-secondary" style="margin-top:4px;font-size:12.5px;padding:7px 12px;">+ Add device</button>
+        </div>
+      </section>
+
+      <!-- Step 3: Use case -->
+      <section class="step" data-step="3">
         <h1>What's this lab for?</h1>
         <p class="step-intro">This shapes the defaults for cluster size and sizing checks later. You can override anything.</p>
 
@@ -817,12 +805,25 @@
         </div>
       </section>
 
-      <!-- Step 3: VyOS virtual router -->
-      <section class="step" data-step="3">
+      <!-- Step 4: Recommended template -->
+      <section class="step" data-step="4">
+        <h1>Want a head start?</h1>
+        <p class="step-intro">
+          Based on what you've told us so far, one of these pre-built templates might save
+          some clicks. Picking one fills in the networking, cluster, and feature settings on
+          the steps that follow &mdash; your hardware and network answers so far are kept
+          as-is, and everything stays editable afterward. Or just click Next below to
+          customise everything yourself.
+        </p>
+        <div id="template-step-list" class="mode-card-row"></div>
+      </section>
+
+      <!-- Step 5: VyOS virtual router -->
+      <section class="step" data-step="5">
         <h1>Top-of-rack virtual router?</h1>
         <p class="step-intro">A VyOS VM acts as the lab's router and firewall — gives nested hosts a routable path and provides NAT, DHCP, and DNS forwarding.</p>
 
-        <div class="learn-block" data-learn-step="3">
+        <div class="learn-block" data-learn-step="5">
           <div class="learn-context">
             <p>Your virtual router choice shapes your networking options throughout the lab. Consider the trade-offs before deciding:</p>
             <div class="learn-comparison">
@@ -864,8 +865,8 @@
         </div>
       </section>
 
-      <!-- Step 4: Domain controller -->
-      <section class="step" data-step="4">
+      <!-- Step 6: Domain controller -->
+      <section class="step" data-step="6">
         <h1>Domain controller?</h1>
         <p class="step-intro">A Windows DC gives the lab DNS, NTP, and Active Directory &mdash; required before vCenter is deployed if you want valid FQDNs and certificates. Choose how much you want on this VM.</p>
 
@@ -941,13 +942,13 @@
         </div>
       </section>
 
-      <!-- Step 5: Lab networks -->
-      <section class="step" data-step="5">
+      <!-- Step 7: Lab networks -->
+      <section class="step" data-step="7">
 
         <h1>Lay out the lab's networks</h1>
         <p class="step-intro">All of these ride a single VLAN trunk port group on the physical host &mdash; VyOS is the only thing that routes between them.</p>
 
-        <div class="learn-block" data-learn-step="5">
+        <div class="learn-block" data-learn-step="7">
           <div class="learn-context">
             <p>Network segmentation is one of the most important design decisions in any VMware environment. We are going to design separate VLANs for different traffic types &mdash; here is why each one matters:</p>
             <div class="learn-traffic-types">
@@ -1089,12 +1090,12 @@
         </div>
       </section>
 
-      <!-- Step 6: Nested cluster (mega-step: also absorbs Deployment placement, Nested disks, Bundle depot, VCF Bring-up) -->
-      <section class="step" data-step="6">
+      <!-- Step 8: Nested cluster (mega-step: also absorbs Deployment placement, Nested disks, Bundle depot, VCF Bring-up) -->
+      <section class="step" data-step="8">
         <h1>Size the nested cluster</h1>
         <p class="step-intro">The wizard checks this against the physical RAM and CPU from step 2.</p>
 
-        <div class="learn-block" data-learn-step="6">
+        <div class="learn-block" data-learn-step="8">
           <div class="learn-context">
             <p>Cluster design involves balancing three things that often conflict: <strong>availability</strong> (more hosts = more resilience), <strong>resource headroom</strong> (more VMs need more capacity), and <strong>cost</strong> (more hosts = more hardware). There is no universally right answer &mdash; it depends on your use case.</p>
             <div id="learn-ram-headroom" class="learn-insight" hidden></div>
@@ -1406,12 +1407,12 @@
         </div>
       </section>
 
-      <!-- Step 7: NSX-T (standalone — not merged with anything, by explicit decision) -->
-      <section class="step" data-step="7">
+      <!-- Step 9: NSX-T (standalone — not merged with anything, by explicit decision) -->
+      <section class="step" data-step="9">
         <h1>Add NSX-T to this lab?</h1>
         <p class="step-intro">NSX-T adds software-defined networking, micro-segmentation, and optional BGP routing on top of the vSphere cluster. Deployment is after the cluster is healthy.</p>
 
-        <div class="learn-block" data-learn-step="7">
+        <div class="learn-block" data-learn-step="9">
           <div class="learn-context">
             <p>NSX adds significant capability &mdash; micro-segmentation, overlay networking, distributed routing &mdash; but also significant complexity and resource overhead. Before choosing NSX, be clear on why you need it.</p>
             <div class="learn-reasons">
@@ -1517,8 +1518,8 @@
         </div>
       </section>
 
-      <!-- Step 8: Workload VMs -->
-      <section class="step" data-step="8">
+      <!-- Step 10: Workload VMs -->
+      <section class="step" data-step="10">
         <h1>Deploy test workload VMs?</h1>
         <p class="step-intro">Blank VM shells on the cluster for practising vMotion, DRS, and HA — no OS required, but you can install one later.</p>
 
@@ -1545,8 +1546,8 @@
         </div>
       </section>
 
-      <!-- Step 9: Review & generate -->
-      <section class="step" data-step="9">
+      <!-- Step 11: Review & generate -->
+      <section class="step" data-step="11">
         <h1>Review and generate</h1>
         <p class="step-intro">Checks out? Generate the spec, deployment scripts, and the design doc.</p>
 
@@ -1569,7 +1570,7 @@
           <div class="review-placement-body"></div>
         </div>
 
-        <div class="learn-block" data-learn-step="9">
+        <div class="learn-block" data-learn-step="11">
           <div class="learn-scorecard-wrap">
             <h2 class="learn-scorecard-title">Architecture Review</h2>
             <p class="learn-scorecard-intro">Your design rationale will be included in your design document &mdash; this is what separates a spec from a proper design.</p>
@@ -1601,8 +1602,8 @@
         </div>
       </section>
 
-      <!-- Step 10: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
-      <section class="step" data-step="10">
+      <!-- Step 12: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
+      <section class="step" data-step="12">
         <h1>Troubleshooting Lab</h1>
 
         <!-- Mode tabs -->

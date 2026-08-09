@@ -47,23 +47,25 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 
 ---
 
-## Step numbering (as of v1.24 — consolidated to 10 visible steps + hidden Troubleshooting)
+## Step numbering (as of v1.34 — Storage split out, Template promoted to a real step)
 
 | # | Step name | Notes |
 |---|-----------|-------|
-| 0 | Hardware | NIC model + inline HCL check; per-host specs when hostCount > 1; absorbs old ESXi-version field and old File-locations fields (now an always-visible "software library" subsection — no longer conditionally gated, since the gating fields (`esxiDeployMethod`/`vyosEnabled`/`dcProfile`) are answered in later steps and all five path fields are optional anyway) |
-| 1 | Existing network | |
-| 2 | Use case | |
-| 3 | Virtual router (VyOS) | |
-| 4 | Domain controller | |
-| 5 | Lab networks | absorbs old Security & access step (`isolateLab`, `firewallPolicy`, `internetAccess`, `remoteAccessMethod`, `vpnType`, `vcenterSize`) |
-| 6 | Nested cluster | mega-step; ESA/OSA vSAN; memory tiering; `esxiDeployMethod` (iso/ova) chosen here; absorbs old Deployment placement (shown inline when hostCount > 1, via `renderDeploymentPlacement()` called on step entry — `placementStepVisible()`'s dependency (`hostCount`) is set on the earlier Hardware step so on-entry computation is still correct), old Nested disks, old Bundle depot (`#nested-cluster-depot-section`, visibility now live-toggled by `updateDepotVisibility()` — called from the shared `onChange` closure in `wireForm()`, from the `vsanEnabled` change handler, and on step entry — because `vsanEnabled` and `nestedDisks` now live on the same step as the depot section itself, unlike the old separate-page arrangement), and old VCF Bring-up (self-contained, own `vcfEnabled` checkbox toggle, unaffected by the move) |
-| 7 | NSX-T | Edge node count/size; BGP route advert mode; redistribution checkboxes; deliberately kept standalone (not merged with anything) |
-| 8 | Workload VMs | |
-| 9 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
-| 10 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
+| 0 | Physical host | CPU/RAM/NIC/hostCount; NIC model + inline HCL check; per-host specs when hostCount > 1; absorbs old ESXi-version field and old File-locations fields (now an always-visible "software library" subsection — no longer conditionally gated, since the gating fields (`esxiDeployMethod`/`vyosEnabled`/`dcProfile`) are answered in later steps and all five path fields are optional anyway). Storage devices moved OUT to their own step (2) as of v1.34 |
+| 1 | Home network | |
+| 2 | Storage | Split out of the old combined Hardware step in v1.34 — just `storageDevices` (`#storage-device-list`/`add-storage-device`), nothing else |
+| 3 | Use case | |
+| 4 | Recommended template | New in v1.34 — was previously a one-time overlay shown after Use case (`showTemplateSuggestOverlay`, v1.30.0); now a real numbered step (`renderTemplateStep()`) with its own rail entry, reachable via normal Back/Next like any other step, no "once per session" gating needed since revisiting it behaves like any other step (picking a card just re-applies `applyTemplateDesignOnly`) |
+| 5 | Virtual router (VyOS) | |
+| 6 | Domain controller | |
+| 7 | Lab networks | absorbs old Security & access step (`isolateLab`, `firewallPolicy`, `internetAccess`, `remoteAccessMethod`, `vpnType`, `vcenterSize`) |
+| 8 | Nested cluster | mega-step; ESA/OSA vSAN; memory tiering; `esxiDeployMethod` (iso/ova) chosen here; absorbs old Deployment placement (shown inline when hostCount > 1, via `renderDeploymentPlacement()` called on step entry — `placementStepVisible()`'s dependency (`hostCount`) is set on the earlier Physical host step so on-entry computation is still correct), old Nested disks, old Bundle depot (`#nested-cluster-depot-section`, visibility live-toggled by `updateDepotVisibility()`), and old VCF Bring-up (self-contained, own `vcfEnabled` checkbox toggle) |
+| 9 | NSX-T | Edge node count/size; BGP route advert mode; redistribution checkboxes; deliberately kept standalone (not merged with anything) |
+| 10 | Workload VMs | |
+| 11 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
+| 12 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
 
-`TOTAL_STEPS = 11`, `NSX_STEP = 7`, `TROUBLESHOOT_STEP = 10`. `PLACEMENT_STEP`/`DEPOT_STEP`/`VCF_STEP`/`FILE_LOCATIONS_STEP` no longer exist as constants — their content are inline subsections of step 0 or step 6 now, not separate pages, so `getNextStep`/`getPrevStep` are back to plain `n±1` with no skip logic.
+`TOTAL_STEPS = 13`, `NSX_STEP = 9`, `TROUBLESHOOT_STEP = 12`. `PLACEMENT_STEP`/`DEPOT_STEP`/`VCF_STEP`/`FILE_LOCATIONS_STEP` no longer exist as constants — their content are inline subsections of step 0 or step 8, not separate pages, so `getNextStep`/`getPrevStep` are plain `n±1` with no skip logic. Note this reopens the "max 10 steps" constraint from v1.24 — the later explicit ask (split Storage out, promote Template to a real step) superseded that earlier constraint.
 
 ---
 
@@ -703,7 +705,51 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v1.33.0 (current — Docker support removed)
+### v1.34.0 (current — Storage split into its own step; Template promoted to a real step)
+- **New front-of-wizard sequence, superseding v1.23's reorder**: Physical host (0) → Home
+  network (1) → **Storage (2, new)** → Use case (3) → **Recommended template (4, new — was
+  an overlay)** → Virtual router (5) → ... existing steps continue, all shifted +2. See the
+  Step numbering table above for the full new layout.
+- **Storage split out of the old combined "Hardware" step**: `storageDevices` (the
+  `#storage-device-list`/`add-storage-device` UI, `renderStorageDevices()`) moved into a new
+  standalone step 2, between Home network and Use case. Its `validateStep` check (device
+  count + type/capacity per device) moved with it into a new `case 2`; the old combined
+  `case 0` no longer validates storage, only CPU/RAM/hostCount/additionalHosts/esxiVersion.
+  Per-additional-host fields (`renderAdditionalHosts()`) stayed on step 0 unchanged — that
+  section only ever exposed CPU/RAM overrides, never a separate storage-device editor (extra
+  hosts' storage/NIC always inherit host 1's via `sameAsFirst`), so there was nothing to move.
+- **"Recommended template" promoted from a one-time overlay to a real numbered step (4)**:
+  the v1.30.0 `#template-suggest-overlay` (shown once, intercepted in `wireNav`'s Next
+  handler) is removed entirely — its markup becomes a normal `<section class="step"
+  data-step="4">`, its card-rendering logic becomes `renderTemplateStep()` (triggered by
+  `if (n === 4) renderTemplateStep();` in `showStep()`, same pattern as every other step's
+  render-on-entry call), and picking a card still calls the same `applyTemplateDesignOnly()`
+  from v1.30.0 unchanged (design-only merge, hardware/network preserved) — it just no longer
+  auto-advances or needs a "once per session" flag, since revisiting a normal step via
+  Back/rail-click is expected behavior, not a special case to guard against. `state.
+  _templateSuggestSeen` and the `#template-suggest-skip` button are both gone; the existing
+  Next button is enough (`case 4` in `validateStep` returns null unconditionally — picking a
+  template is optional).
+- **Every literal step-number reference updated**: `TOTAL_STEPS` 11→13, `NSX_STEP` 7→9,
+  `TROUBLESHOOT_STEP` 10→12, the `analysisMap` in architect mode (`{5:'router',
+  8:'clusterSize', 9:'nsx'}`), the `sectionHint` map in `wireGenerate()` (Physical host and
+  Storage are now two separate entries instead of one combined "Hardware" entry), `STEP_
+  LABELS` (12 entries, was 10), the rail `<li data-step>` list (13 entries, relabeled
+  "Physical host"/"Home network"/"Storage"/"Template" for the new/renamed ones), all
+  `data-learn-step` attributes, and two user-facing warning strings that named a step number
+  in prose ("Enable the DC (step 6)", "Change the SSO domain in Nested cluster (step 8)").
+- **This explicitly reopens the "max 10 visible steps" constraint from v1.24.0** — that was
+  a real, deliberate goal at the time, but this later, more specific instruction (split
+  Storage out, make Template a full step) takes precedence over it. Visible step count is
+  now 12 (+ hidden Troubleshooting), up from 10.
+- Verified end-to-end with Playwright: all 13 sections render with correct H1s in the right
+  order, rail shows 13 correctly-labelled entries, Storage step validates independently of
+  Physical host, the Template step lists all 5 templates and preserves hardware/network
+  answers when applied, and a full walkthrough through to `/api/generate` succeeds and
+  produces the same output files as before (`design-doc.md`, `deploy-lab.ps1`,
+  `vcf-bringup.json`, etc.). Zero console/page errors throughout.
+
+### v1.33.0 (Docker support removed)
 - **Deleted**: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `harbor-push.sh`,
   `build-multiarch.sh`. Removed `docker:build`/`docker:run`/`docker:push` from
   `package.json` scripts. Distribution is standalone-executable-only now (`pkg`,

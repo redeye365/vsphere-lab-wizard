@@ -34,9 +34,9 @@ function isValidSpecStructure(obj) {
   return required.every((k) => k in obj);
 }
 
-const TOTAL_STEPS = 11;
-const NSX_STEP = 7;           // always shown
-const TROUBLESHOOT_STEP = 10; // only reachable when troubleshooting mode is active
+const TOTAL_STEPS = 13;
+const NSX_STEP = 9;           // always shown
+const TROUBLESHOOT_STEP = 12; // only reachable when troubleshooting mode is active
 
 const USE_CASE_LABELS = {
   certification: 'Certification study',
@@ -1103,7 +1103,7 @@ function wireForm() {
     onChange();
   });
 
-  // Workload VMs (step 8)
+  // Workload VMs (step 10)
   const wlCheckbox = document.getElementById('workloadVmsEnabled');
   wlCheckbox.addEventListener('change', () => {
     g.workloadVmsEnabled = wlCheckbox.checked;
@@ -1559,14 +1559,9 @@ function validateStep(n) {
 
   switch (n) {
     case 0: {
-      // Hardware — also absorbs old step 3 (ESXi version)
+      // Physical host specs — also absorbs old ESXi version + Software library
       if (!h.cpuCores || !h.ramGB) {
         return 'CPU cores and RAM are needed to size the nested cluster.';
-      }
-      const devs = h.storageDevices || [];
-      if (devs.length === 0) return 'Add at least one storage device.';
-      if (devs.some((d) => !d.type || !d.capacityGB)) {
-        return 'Each storage device needs a type and capacity before continuing.';
       }
       if ((h.hostCount || 1) > 1) {
         const addl = h.additionalHosts || [];
@@ -1574,26 +1569,37 @@ function validateStep(n) {
           if (!addl[i].ipAddress) return `Enter an IP address for physical host ${i + 2}.`;
         }
       }
-      // Merged from old step 3: ESXi version
       if (!g.esxiVersion) return 'Select an ESXi version to continue.';
       return null;
     }
-    case 2:
-      return d.useCase ? null : 'Pick a use case to continue.';
+    case 2: {
+      // Storage — split out of the old combined Hardware step
+      const devs = h.storageDevices || [];
+      if (devs.length === 0) return 'Add at least one storage device.';
+      if (devs.some((d) => !d.type || !d.capacityGB)) {
+        return 'Each storage device needs a type and capacity before continuing.';
+      }
+      return null;
+    }
     case 3:
+      return d.useCase ? null : 'Pick a use case to continue.';
+    case 4:
+      // Recommended template — optional, no required fields
+      return null;
+    case 5:
       // VyOS
       if (g.vyosEnabled && !g.vyosNetworkMode) {
         return 'Select a VyOS network mode.';
       }
       return null;
-    case 4:
+    case 6:
       // DC
       if (g.dcProfile !== 'none') {
         if (!g.dcDomainName) return 'Enter a domain name for the DC.';
         if (!g.dcIpAddress) return 'Enter an IP address for the DC.';
       }
       return null;
-    case 5:
+    case 7:
       // Lab networks — also absorbs old step 14 (Security & access)
       if (!g.mgmtCidr) return 'Management CIDR is needed at minimum.';
       if (g.mgmtVlanMode === 'tagged' && !g.mgmtVlan) return 'Tagged mode requires a management VLAN ID.';
@@ -1602,7 +1608,7 @@ function validateStep(n) {
         return 'Select a VPN type (WireGuard or VyOS site-to-site) to continue.';
       }
       return null;
-    case 6: {
+    case 8: {
       // Nested cluster (mega-step) — also absorbs old step 8 (Deployment
       // placement), old step 10 (VCF Bring-up), old step 11 (Nested disks),
       // old step 12 (Bundle depot)
@@ -1643,10 +1649,10 @@ function validateStep(n) {
       // Merged from old step 12: Bundle depot — only relevant when depotStepVisible(); no required fields (no-op)
       return null;
     }
-    case 7:
+    case 9:
       // NSX-T — no required fields (nsxEnabled is optional)
       return null;
-    case 8:
+    case 10:
       // Workload VMs
       if (g.workloadVmsEnabled) {
         if (!g.workloadVmCount || g.workloadVmCount < 1) return 'Enter the number of workload VMs.';
@@ -1683,7 +1689,8 @@ function showStep(n) {
   if (n === reviewStep) renderReviewPlacement();
   if (n === TROUBLESHOOT_STEP) initTroubleshootStep();
   if (n === 0) renderHardwareValidator();
-  if (n === 6) {
+  if (n === 4) renderTemplateStep();
+  if (n === 8) {
     // Nested cluster (mega-step): sizing/resource helpers plus the
     // Deployment placement subsection (renderDeploymentPlacement) and the
     // Bundle depot subsection's live-visibility toggle (updateDepotVisibility).
@@ -1704,13 +1711,13 @@ function showStep(n) {
   });
   if (state.learningMode) {
     if (n === 0) updateLearnRamContext();
-    if (n === 6) updateLearnRamHeadroom();
+    if (n === 8) updateLearnRamHeadroom();
     if (n === reviewStep) renderScorecard();
   }
 
   // In architect mode, show options analysis before certain steps (once per session)
   if (state.architectMode) {
-    const analysisMap = { 3: 'router', 6: 'clusterSize', 7: 'nsx' };
+    const analysisMap = { 5: 'router', 8: 'clusterSize', 9: 'nsx' };
     const key = analysisMap[n];
     const alreadySeen = state._optionsAnalysisSeen || {};
     if (key && !alreadySeen[key]) {
@@ -1736,20 +1743,7 @@ function wireNav() {
       document.getElementById('step-error').textContent = err;
       return;
     }
-    // After Use case (step 2), once per session, offer a template shortcut
-    // before continuing to Virtual router — see showTemplateSuggestOverlay.
-    if (state.step === 2 && !state._templateSuggestSeen) {
-      state._templateSuggestSeen = true;
-      showTemplateSuggestOverlay();
-      return;
-    }
     if (state.step < TOTAL_STEPS - 1) showStep(getNextStep(state.step));
-  });
-
-  document.getElementById('template-suggest-skip')?.addEventListener('click', () => {
-    const overlay = document.getElementById('template-suggest-overlay');
-    if (overlay) overlay.hidden = true;
-    showStep(getNextStep(state.step));
   });
 
   document.getElementById('btn-back').addEventListener('click', () => {
@@ -2115,7 +2109,7 @@ function renderReview() {
   if (g.depotEnabled && g.depotMode === 'iis' && g.dcProfile === 'none') {
     const warn = document.createElement('div');
     warn.className = 'review-warn';
-    warn.textContent = '⚠ Bundle depot is set to IIS mode but no domain controller is included. Enable the DC (step 4) or switch to Linux/nginx mode.';
+    warn.textContent = '⚠ Bundle depot is set to IIS mode but no domain controller is included. Enable the DC (step 6) or switch to Linux/nginx mode.';
     container.appendChild(warn);
   }
 
@@ -2125,7 +2119,7 @@ function renderReview() {
     if (sso && ad && sso === ad) {
       const warn = document.createElement('div');
       warn.className = 'review-warn';
-      warn.textContent = `⚠ SSO domain "${g.ssoDomain}" matches the AD domain "${g.dcDomainName}" — this causes VCF bring-up failures. Change the SSO domain in Nested cluster (step 6) to a subdomain, e.g. vsphere.${g.dcDomainName}.`;
+      warn.textContent = `⚠ SSO domain "${g.ssoDomain}" matches the AD domain "${g.dcDomainName}" — this causes VCF bring-up failures. Change the SSO domain in Nested cluster (step 8) to a subdomain, e.g. vsphere.${g.dcDomainName}.`;
       container.appendChild(warn);
     }
     const nestedCount = Number(g.nestedHostCount) || 0;
@@ -3762,17 +3756,18 @@ function wireGenerate() {
           // step: data-step value (0-indexed); railNum: user-visible step number shown in rail
           const sectionHint = (msg) => {
             const map = [
-              [/^(cpuCores|ramGB|nicCount|nicSpeed|nicModel|hostCount|storageDevice)/,  {label: 'Hardware',          step: 0,  railNum: 1}],
-              [/^(mgmtCidr|mgmtVlan|vmotionCidr|vmotionVlan|vsanCidr|vsanVlan|vmCidr|vmVlan)/, {label: 'Lab networks',     step: 5,  railNum: 6}],
-              [/^(dcIpAddress|dcDomainName)/,                                  {label: 'Domain controller', step: 4,  railNum: 5}],
-              [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 3,  railNum: 4}],
-              [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering|nestedEsxiPassword)/, {label: 'Nested cluster',    step: 6,  railNum: 7}],
-              [/^(nsxSize|nsxTopology|nsxEdge|nsxIpAddress|nsxBgp|nsxRedist)/,   {label: 'NSX-T',             step: 7,  railNum: 8}],
-              [/^vcf/,                                                          {label: 'VCF Bring-up',      step: 6,  railNum: 7}],
-              [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 6,  railNum: 7}],
-              [/^depot/,                                                        {label: 'Bundle depot',      step: 6,  railNum: 7}],
-              [/^workloadVm/,                                                   {label: 'Workload VMs',      step: 8,  railNum: 9}],
-              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            {label: 'Security & access', step: 5,  railNum: 6}],
+              [/^(cpuCores|ramGB|nicCount|nicSpeed|nicModel|hostCount)/,        {label: 'Physical host',     step: 0,  railNum: 1}],
+              [/^storageDevice/,                                                {label: 'Storage',           step: 2,  railNum: 3}],
+              [/^(mgmtCidr|mgmtVlan|vmotionCidr|vmotionVlan|vsanCidr|vsanVlan|vmCidr|vmVlan)/, {label: 'Lab networks',     step: 7,  railNum: 8}],
+              [/^(dcIpAddress|dcDomainName)/,                                  {label: 'Domain controller', step: 6,  railNum: 7}],
+              [/^(vyosNetworkMode)/,                                            {label: 'Virtual router',    step: 5,  railNum: 6}],
+              [/^(nestedHostCount|vcpuPerHost|vramPerHostGB|vsanArch|clusterName|datacenterName|ssoDomain|nvmeSizeGB|Memory tiering|nestedEsxiPassword)/, {label: 'Nested cluster',    step: 8,  railNum: 9}],
+              [/^(nsxSize|nsxTopology|nsxEdge|nsxIpAddress|nsxBgp|nsxRedist)/,   {label: 'NSX-T',             step: 9,  railNum: 10}],
+              [/^vcf/,                                                          {label: 'VCF Bring-up',      step: 8,  railNum: 9}],
+              [/^nestedDisk/,                                                   {label: 'Nested disks',      step: 8,  railNum: 9}],
+              [/^depot/,                                                        {label: 'Bundle depot',      step: 8,  railNum: 9}],
+              [/^workloadVm/,                                                   {label: 'Workload VMs',      step: 10, railNum: 11}],
+              [/^(firewallPolicy|remoteAccess|vpnType|vcenterSize)/,            {label: 'Security & access', step: 7,  railNum: 8}],
             ];
             for (const [re, hint] of map) {
               if (re.test(msg)) return hint;
@@ -4251,15 +4246,15 @@ function applyTemplateDesignOnly(tpl) {
   populateFormFromState();
 }
 
-// One-time "want a head start?" overlay shown after the Use case step
-// (see wireNav's Next handler) — offers the same curated templates as the
-// mode-select screen, applied via applyTemplateDesignOnly so hardware/network
-// answers already given aren't overwritten.
-async function showTemplateSuggestOverlay() {
-  const overlay = document.getElementById('template-suggest-overlay');
-  const list = document.getElementById('template-suggest-list');
-  if (!overlay || !list) { showStep(getNextStep(state.step)); return; }
-  overlay.hidden = false;
+// Renders the "Recommended template" step (step 4, right after Use case) —
+// offers the same curated templates as the mode-select screen, applied via
+// applyTemplateDesignOnly so the hardware/network/use-case answers already
+// given on the preceding steps aren't overwritten. Picking a card just
+// applies it in place; the user still clicks the normal Next button to
+// continue (or clicks Next without picking anything to customise manually).
+async function renderTemplateStep() {
+  const list = document.getElementById('template-step-list');
+  if (!list) return;
   if (!_templatesCache) {
     list.innerHTML = '<p class="hint">Loading templates…</p>';
     try {
@@ -4284,8 +4279,8 @@ async function showTemplateSuggestOverlay() {
     btn.addEventListener('click', () => {
       if (!isValidWizardConfig(tpl) || tpl._type !== 'lab-template') return;
       applyTemplateDesignOnly(tpl);
-      overlay.hidden = true;
-      showStep(getNextStep(state.step));
+      document.querySelectorAll('#template-step-list .mode-card').forEach((c) => c.classList.remove('selected'));
+      btn.classList.add('selected');
     });
     list.appendChild(btn);
   });
@@ -5002,7 +4997,7 @@ function showOptionsAnalysis(key, onComplete) {
 // ── Save / Resume ──────────────────────────────────────────────────────────
 
 const AUTOSAVE_KEY = 'vsphere-wizard-autosave';
-const STEP_LABELS  = ['Hardware', 'Existing network', 'Use case', 'Virtual router', 'Domain controller', 'Lab networks', 'Nested cluster', 'NSX-T', 'Workload VMs', 'Review & generate'];
+const STEP_LABELS  = ['Physical host', 'Home network', 'Storage', 'Use case', 'Recommended template', 'Virtual router', 'Domain controller', 'Lab networks', 'Nested cluster', 'NSX-T', 'Workload VMs', 'Review & generate'];
 
 function buildWizardSave(asTemplate = false) {
   const answers = JSON.parse(JSON.stringify(state.answers));

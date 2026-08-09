@@ -2450,6 +2450,7 @@ select:focus {
 .mode-card-template:hover { border-color: #9b73d2; }
 .mode-card-template .mode-card-badge { background: rgba(155,115,210,.12); color: #9b73d2; }
 .mode-card-template .mode-card-cta   { color: #9b73d2; }
+.mode-card-template.selected { border-color: #9b73d2; box-shadow: 0 0 0 1px #9b73d2; }
 
 .mode-card-file-status { font-size: 12px; color: var(--danger); margin: 0; min-height: 1.1em; }
 
