@@ -703,7 +703,18 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v1.27.0 (current — Architect Mode discovery cut to 5 sections)
+### v1.28.0 (current — prereq screen shows the RAM capability tiers)
+- **Hardware checklist item rewritten** (`public/index.html`, `data-prereq-id="hardware"`): replaced the flat
+  "64GB min, 128GB+ recommended" line with a 6-tier RAM table (`.prereq-ram-table`): 64GB vSphere basics (1-2
+  hosts) / 128GB +vSAN (3 hosts) / 192GB +NSX (3-4 hosts) / 256GB +basic VCF / 384GB+ Full VCF recommended /
+  512GB+ Full VCF + workload domains. Static HTML, since the prereq screen runs before any wizard field exists
+  to compute from — the next release (v1.29.0) reuses these exact same thresholds in a live, RAM-driven version
+  on the Hardware step itself (`RAM_TIERS` in `public/wizard.js`). No JS changes needed here — `wirePrereqScreen()`/
+  `updatePrereqStart()` are generic over `.prereq-check` count and don't care about item content.
+- Verified: table renders (6 rows), checklist still 7 items, Start button still gates on all-checked. Zero
+  console/page errors.
+
+### v1.27.0 (Architect Mode discovery cut to 5 sections)
 - **Phase 0 discovery reduced from 7 sections to 5**, per direct feedback that architect mode
   asked too many questions on top of the standard wizard:
   - **Stakeholder Analysis removed entirely** — the `.arch-stakeholder-card` picker, its

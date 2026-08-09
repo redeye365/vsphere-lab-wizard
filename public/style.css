@@ -2308,6 +2308,9 @@ select:focus {
   font-family: var(--mono, monospace);
 }
 .prereq-item-desc a { color: var(--accent-text); }
+.prereq-ram-table { border-collapse: collapse; margin: 8px 0; font-size: 12.5px; }
+.prereq-ram-table td { padding: 3px 12px 3px 0; }
+.prereq-ram-table td:first-child { font-weight: 600; color: var(--text); white-space: nowrap; }
 
 .prereq-actions { text-align: center; }
 .prereq-start-btn { min-width: 240px; font-size: 15px; padding: 12px 24px; }

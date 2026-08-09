@@ -122,7 +122,16 @@
         <span class="prereq-item-body">
           <span class="prereq-item-title">Physical host meets the minimum spec</span>
           <span class="prereq-item-desc">
-            <strong>Minimum 64&nbsp;GB RAM &mdash; 128&nbsp;GB+ recommended.</strong>
+            <strong>64&nbsp;GB RAM is the floor</strong> &mdash; how much more depends on what you want to build.
+            The wizard shows this same table live once you enter your RAM on the Hardware step:
+            <table class="prereq-ram-table">
+              <tr><td>64&nbsp;GB</td><td>vSphere basics &mdash; 1&ndash;2 hosts only</td></tr>
+              <tr><td>128&nbsp;GB</td><td>vSphere + vSAN &mdash; 3 hosts</td></tr>
+              <tr><td>192&nbsp;GB</td><td>vSphere + NSX &mdash; 3&ndash;4 hosts</td></tr>
+              <tr><td>256&nbsp;GB</td><td>vSphere + NSX + basic VCF</td></tr>
+              <tr><td>384&nbsp;GB+</td><td>Full VCF recommended</td></tr>
+              <tr><td>512&nbsp;GB+</td><td>Full VCF + workload domains</td></tr>
+            </table>
             Also: 8+ CPU cores (16&ndash;32 recommended), 500&nbsp;GB+ NVMe or SSD storage, and
             <strong>nested virtualization enabled</strong> in BIOS/UEFI &mdash; the deploy scripts require
             promiscuous mode, forged transmits, and MAC address changes on the port groups they create.
