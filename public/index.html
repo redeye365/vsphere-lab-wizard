@@ -500,21 +500,14 @@
       <li data-step="0"><span class="rail-num">01</span><span>Hardware</span></li>
       <li data-step="1"><span class="rail-num">02</span><span>Existing network</span></li>
       <li data-step="2"><span class="rail-num">03</span><span>Use case</span></li>
-      <li data-step="3"><span class="rail-num">04</span><span>ESXi version</span></li>
-      <li data-step="4"><span class="rail-num">05</span><span>Virtual router</span></li>
-      <li data-step="5"><span class="rail-num">06</span><span>Domain controller</span></li>
-      <li data-step="6"><span class="rail-num">07</span><span>Lab networks</span></li>
-      <li data-step="7"><span class="rail-num">08</span><span>Nested cluster</span></li>
-      <li data-step="8"><span class="rail-num">09</span><span>Deployment placement</span></li>
-      <li data-step="9"><span class="rail-num">10</span><span>NSX-T</span></li>
-      <li data-step="10"><span class="rail-num">11</span><span>VCF Bring-up</span></li>
-      <li data-step="11"><span class="rail-num">12</span><span>Nested disks</span></li>
-      <li data-step="12"><span class="rail-num">13</span><span>Bundle depot</span></li>
-      <li data-step="13"><span class="rail-num">14</span><span>Workload VMs</span></li>
-      <li data-step="14"><span class="rail-num">15</span><span>Security &amp; access</span></li>
-      <li data-step="15"><span class="rail-num">16</span><span>File locations</span></li>
-      <li data-step="16"><span class="rail-num">17</span><span>Review &amp; generate</span></li>
-      <li data-step="17" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
+      <li data-step="3"><span class="rail-num">04</span><span>Virtual router</span></li>
+      <li data-step="4"><span class="rail-num">05</span><span>Domain controller</span></li>
+      <li data-step="5"><span class="rail-num">06</span><span>Lab networks</span></li>
+      <li data-step="6"><span class="rail-num">07</span><span>Nested cluster</span></li>
+      <li data-step="7"><span class="rail-num">08</span><span>NSX-T</span></li>
+      <li data-step="8"><span class="rail-num">09</span><span>Workload VMs</span></li>
+      <li data-step="9"><span class="rail-num">10</span><span>Review &amp; generate</span></li>
+      <li data-step="10" hidden><span class="rail-num">⚙</span><span>Troubleshooting</span></li>
     </ol>
     <div class="rail-footer">
       <a href="/diagram" target="_blank" rel="noopener" class="rail-diagram-btn" id="rail-diagram-btn">&#x1F5A7; View Diagram</a>
@@ -620,6 +613,80 @@
           <h3 style="font-size:14px;margin-bottom:12px;color:var(--text-muted);">Additional physical hosts</h3>
           <div id="additional-hosts-list"></div>
         </div>
+
+        <!-- Merged from old step 3: ESXi version -->
+        <hr style="margin:18px 0;border-color:var(--border);">
+        <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">ESXi version</h3>
+
+        <div class="field">
+          <label for="esxiVersion">ESXi / vSphere version</label>
+          <select id="esxiVersion">
+            <option value="">Select&hellip;</option>
+            <option value="9.1">ESXi 9.1 (latest)</option>
+            <option value="9.0u2">ESXi 9.0 Update 2</option>
+            <option value="9.0u1">ESXi 9.0 Update 1</option>
+            <option value="9.0">ESXi 9.0</option>
+            <option value="8.0u3">ESXi 8.0 Update 3</option>
+            <option value="8.0u2">ESXi 8.0 Update 2</option>
+            <option value="8.0u1">ESXi 8.0 Update 1</option>
+          </select>
+          <p class="hint">ESXi 8.x and 9.x all require at least 8GB vRAM per nested host. The wizard warns if the nested host sizing falls below the minimum. ESXi 9.x requires a VCF/VVF subscription to download.</p>
+        </div>
+
+        <div id="esxi9-notices" style="margin-top:12px;" hidden>
+          <div class="notice-block notice-warning">
+            <strong>CPU compatibility:</strong> ESXi 9.0+ dropped support for Intel Skylake, Kaby Lake-S, Broadwell-EP/DE, and 1st-Gen Xeon Scalable (Platinum 8100, Gold 6100/5100, Silver 4100, Bronze 3100). These require <code>allowLegacyCPU=true</code> to install &mdash; the wizard enables it in the nested cluster step by default.
+          </div>
+          <div class="notice-block notice-info" style="margin-top:8px;">
+            AMD Ryzen (Zen 4/5): known high CPU utilisation at boot due to slow entropy generation &mdash; a workaround command is included in the generated build guide. NVMe memory tiering now works inside nested VMs in ESXi 9.1 using <code>sched.mem.enableNestedTiering&nbsp;=&nbsp;true</code> on each nested host.
+          </div>
+          <div class="notice-block notice-info" style="margin-top:8px;">
+            ESXi 9.x requires an active <strong>VVF or VCF subscription</strong> to download from Broadcom. ESXi 8.x is available for free with a Broadcom account.
+          </div>
+        </div>
+
+        <!-- Merged from old step 15: File locations (now always visible — the wizard order
+             changed and hostCount/vyos/dc/esxiDeployMethod answers now come after this step) -->
+        <hr style="margin:18px 0;border-color:var(--border);">
+        <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">Software library</h3>
+        <p class="hint" style="margin-bottom:14px;">
+          Point the wizard at the ISO/OVA files on this machine. These are written into
+          <code>lab-config.json</code> alongside the generated scripts — every script reads its
+          file path from there, so you won't be prompted for it again when you run them.
+          All five are optional — leave any of them blank now and fill them in later by editing
+          <code>lab-config.json</code> directly. (Not every design needs every file — e.g. skip the
+          VyOS ISO if you don't enable a virtual router later.)
+        </p>
+
+        <div class="field" id="file-loc-vcenter-ova">
+          <label for="vCenterOvaPath">vCenter Server Appliance (VCSA) OVA path</label>
+          <input type="text" id="vCenterOvaPath" placeholder="C:\Lab\ISOs\vcsa\vcsa.ova">
+          <p class="hint">Extract this from the downloaded <code>VMware-VCSA-all-*.iso</code> bundle first — see PREREQUISITES.md.</p>
+        </div>
+
+        <div class="field" id="file-loc-esxi-iso">
+          <label for="esxiIsoPath">ESXi install ISO path</label>
+          <input type="text" id="esxiIsoPath" placeholder="C:\Lab\ISOs\VMware-VMvisor-Installer-9.0.iso">
+          <p class="hint">Uploaded to the datastore automatically on first run. Only needed if you choose the ISO deploy method in the Nested cluster step.</p>
+        </div>
+
+        <div class="field" id="file-loc-esxi-ova">
+          <label for="nestedEsxiOvaPath">Nested ESXi appliance OVA path</label>
+          <input type="text" id="nestedEsxiOvaPath" placeholder="C:\Lab\ISOs\Nested_ESXi_Appliance.ova">
+          <p class="hint">William Lam's Nested ESXi Virtual Appliance — read directly from this path during import. Only needed if you choose the OVA deploy method in the Nested cluster step.</p>
+        </div>
+
+        <div class="field" id="file-loc-vyos">
+          <label for="vyosIsoPath">VyOS ISO path</label>
+          <input type="text" id="vyosIsoPath" placeholder="C:\Lab\ISOs\vyos-rolling.iso">
+          <p class="hint">Uploaded to the datastore automatically on first run. Only needed if you enable a VyOS virtual router later.</p>
+        </div>
+
+        <div class="field" id="file-loc-windows">
+          <label for="windowsServerIsoPath">Windows Server ISO path</label>
+          <input type="text" id="windowsServerIsoPath" placeholder="C:\Lab\ISOs\WinServer2022-eval.iso">
+          <p class="hint">Uploaded to the datastore automatically on first run. Only needed if you deploy a domain controller later.</p>
+        </div>
       </section>
 
       <!-- Step 1: Existing network -->
@@ -697,45 +764,12 @@
         </div>
       </section>
 
-      <!-- Step 3: ESXi version -->
+      <!-- Step 3: VyOS virtual router -->
       <section class="step" data-step="3">
-        <h1>Which ESXi version are you deploying?</h1>
-        <p class="step-intro">Sets the GuestId in the generated scripts and triggers version-specific minimum resource checks.</p>
-
-        <div class="field">
-          <label for="esxiVersion">ESXi / vSphere version</label>
-          <select id="esxiVersion">
-            <option value="">Select&hellip;</option>
-            <option value="9.1">ESXi 9.1 (latest)</option>
-            <option value="9.0u2">ESXi 9.0 Update 2</option>
-            <option value="9.0u1">ESXi 9.0 Update 1</option>
-            <option value="9.0">ESXi 9.0</option>
-            <option value="8.0u3">ESXi 8.0 Update 3</option>
-            <option value="8.0u2">ESXi 8.0 Update 2</option>
-            <option value="8.0u1">ESXi 8.0 Update 1</option>
-          </select>
-          <p class="hint">ESXi 8.x and 9.x all require at least 8GB vRAM per nested host. The wizard warns if the nested host sizing falls below the minimum. ESXi 9.x requires a VCF/VVF subscription to download.</p>
-        </div>
-
-        <div id="esxi9-notices" style="margin-top:12px;" hidden>
-          <div class="notice-block notice-warning">
-            <strong>CPU compatibility:</strong> ESXi 9.0+ dropped support for Intel Skylake, Kaby Lake-S, Broadwell-EP/DE, and 1st-Gen Xeon Scalable (Platinum 8100, Gold 6100/5100, Silver 4100, Bronze 3100). These require <code>allowLegacyCPU=true</code> to install &mdash; the wizard enables it in the nested cluster step by default.
-          </div>
-          <div class="notice-block notice-info" style="margin-top:8px;">
-            AMD Ryzen (Zen 4/5): known high CPU utilisation at boot due to slow entropy generation &mdash; a workaround command is included in the generated build guide. NVMe memory tiering now works inside nested VMs in ESXi 9.1 using <code>sched.mem.enableNestedTiering&nbsp;=&nbsp;true</code> on each nested host.
-          </div>
-          <div class="notice-block notice-info" style="margin-top:8px;">
-            ESXi 9.x requires an active <strong>VVF or VCF subscription</strong> to download from Broadcom. ESXi 8.x is available for free with a Broadcom account.
-          </div>
-        </div>
-      </section>
-
-      <!-- Step 4: VyOS virtual router -->
-      <section class="step" data-step="4">
         <h1>Top-of-rack virtual router?</h1>
         <p class="step-intro">A VyOS VM acts as the lab's router and firewall — gives nested hosts a routable path and provides NAT, DHCP, and DNS forwarding.</p>
 
-        <div class="learn-block" data-learn-step="4">
+        <div class="learn-block" data-learn-step="3">
           <div class="learn-context">
             <p>Your virtual router choice shapes your networking options throughout the lab. Consider the trade-offs before deciding:</p>
             <div class="learn-comparison">
@@ -777,8 +811,8 @@
         </div>
       </section>
 
-      <!-- Step 5: Domain controller -->
-      <section class="step" data-step="5">
+      <!-- Step 4: Domain controller -->
+      <section class="step" data-step="4">
         <h1>Domain controller?</h1>
         <p class="step-intro">A Windows DC gives the lab DNS, NTP, and Active Directory &mdash; required before vCenter is deployed if you want valid FQDNs and certificates. Choose how much you want on this VM.</p>
 
@@ -831,7 +865,7 @@
               <label class="radio-row"><input type="radio" name="dcNetworkPlacement" value="lab" checked><span>Lab management network (Nested-Trunk)</span></label>
               <label class="radio-row"><input type="radio" name="dcNetworkPlacement" value="physical"><span>Physical/home network (VM Network)</span></label>
             </div>
-            <p class="hint" id="dc-network-placement-hint-lab">DC connects to Nested-Trunk, the same internal lab network as everything else. Its IP must fall inside the management CIDR (set in step 6).</p>
+            <p class="hint" id="dc-network-placement-hint-lab">DC connects to Nested-Trunk, the same internal lab network as everything else. Its IP must fall inside the management CIDR (set in step 5).</p>
             <p class="hint" id="dc-network-placement-hint-physical" hidden>DC connects directly to the WAN port group instead of the lab network &mdash; its IP address below should be on your physical/home network, not the lab management CIDR. Every script that references the DC for DNS/NTP will use this home-network IP.</p>
           </div>
           <div class="field-row">
@@ -854,13 +888,13 @@
         </div>
       </section>
 
-      <!-- Step 6: Lab networks -->
-      <section class="step" data-step="6">
+      <!-- Step 5: Lab networks -->
+      <section class="step" data-step="5">
 
         <h1>Lay out the lab's networks</h1>
         <p class="step-intro">All of these ride a single VLAN trunk port group on the physical host &mdash; VyOS is the only thing that routes between them.</p>
 
-        <div class="learn-block" data-learn-step="6">
+        <div class="learn-block" data-learn-step="5">
           <div class="learn-context">
             <p>Network segmentation is one of the most important design decisions in any VMware environment. We are going to design separate VLANs for different traffic types &mdash; here is why each one matters:</p>
             <div class="learn-traffic-types">
@@ -950,14 +984,64 @@
           </div>
         </div>
         <p class="hint" id="vsan-network-hint" hidden>vSAN network appears here because it&rsquo;s switched on in the next step.</p>
+
+        <!-- Merged from old step 14: Security & access -->
+        <hr style="margin:18px 0;border-color:var(--border);">
+        <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">Security and remote access</h3>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="isolateLab"><span>Isolate the lab on its own segment</span></label>
+        </div>
+
+        <div class="field">
+          <label>Firewall policy</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="allow_all"><span>Allow all</span></label>
+            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="restricted"><span>Restrict to needed ports</span></label>
+            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="isolated"><span>Fully isolated</span></label>
+          </div>
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="internetAccess"><span>Nested VMs need outbound internet access</span></label>
+        </div>
+
+        <div class="field">
+          <label for="remoteAccessMethod">Remote access method</label>
+          <select id="remoteAccessMethod">
+            <option value="">Select&hellip;</option>
+            <option value="vpn">VPN into the home network</option>
+            <option value="ssh_jump">SSH jump host</option>
+            <option value="none">Local only, no remote access</option>
+            <option value="reverse_proxy">Reverse proxy</option>
+          </select>
+        </div>
+
+        <div class="field" id="vpn-type-field" hidden>
+          <label>VPN type</label>
+          <div class="choice-row">
+            <label class="choice-pill"><input type="radio" name="vpnType" value="wireguard"><span>WireGuard server VM</span></label>
+            <label class="choice-pill"><input type="radio" name="vpnType" value="vyos_site_to_site"><span>VyOS site-to-site</span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="vcenterSize">vCenter deployment size</label>
+          <select id="vcenterSize">
+            <option value="">Select&hellip;</option>
+            <option value="tiny">Tiny &mdash; up to 10 VMs</option>
+            <option value="small">Small &mdash; up to 100 VMs</option>
+            <option value="medium">Medium &mdash; up to 400 VMs</option>
+          </select>
+        </div>
       </section>
 
-      <!-- Step 7: Nested cluster -->
-      <section class="step" data-step="7">
+      <!-- Step 6: Nested cluster (mega-step: also absorbs Deployment placement, Nested disks, Bundle depot, VCF Bring-up) -->
+      <section class="step" data-step="6">
         <h1>Size the nested cluster</h1>
         <p class="step-intro">The wizard checks this against the physical RAM and CPU from step 2.</p>
 
-        <div class="learn-block" data-learn-step="7">
+        <div class="learn-block" data-learn-step="6">
           <div class="learn-context">
             <p>Cluster design involves balancing three things that often conflict: <strong>availability</strong> (more hosts = more resilience), <strong>resource headroom</strong> (more VMs need more capacity), and <strong>cost</strong> (more hosts = more hardware). There is no universally right answer &mdash; it depends on your use case.</p>
             <div id="learn-ram-headroom" class="learn-insight" hidden></div>
@@ -1088,12 +1172,11 @@
           </div>
           <div id="resource-tips-list"></div>
         </div>
-      </section>
 
-      <!-- Step 8: Deployment placement -->
-      <section class="step" data-step="8">
-        <h1>Deployment placement</h1>
-        <p class="step-intro">Assign each VM to a physical host. Only relevant when you have two or more physical ESXi hosts &mdash; with a single host everything deploys to it automatically.</p>
+        <!-- Merged from old step 8: Deployment placement -->
+        <hr style="margin:18px 0;border-color:var(--border);">
+        <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">Deployment placement</h3>
+        <p class="hint" style="margin-bottom:14px;">Assign each VM to a physical host. Only relevant when you have two or more physical ESXi hosts &mdash; with a single host everything deploys to it automatically.</p>
 
         <div id="placement-singlehost-notice" hidden>
           <p class="hint">You have a single physical host &mdash; all VMs will deploy to it automatically. Continue to the next step.</p>
@@ -1108,7 +1191,6 @@
             </div>
           </div>
 
-          <!-- Nested host placement (moved from step 7) -->
           <div id="placement-section" hidden>
             <div class="field">
               <label>Nested ESXi hosts</label>
@@ -1128,14 +1210,155 @@
           <p class="hint">vCenter deploys onto nested-esxi-01 after that host is running &mdash; no physical host selection needed for it.</p>
 
         </div>
+
+        <!-- Merged from old step 11: Nested host disk layout -->
+        <hr style="margin:18px 0;border-color:var(--border);">
+        <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">Nested host disk layout</h3>
+        <p class="hint" style="margin-bottom:14px;">Virtual disks added to each nested ESXi host VM on top of the boot disk. Purpose options adapt to the vSAN architecture chosen above.</p>
+
+        <p id="vsan-esa-nvme-warn" class="hint" style="color:var(--warn);margin-bottom:14px;" hidden>
+          vSAN ESA requires NVMe-backed storage — no NVMe device found in your hardware inventory. Go back to Hardware (step 1) to add one, or switch to OSA above, which supports any disk type.
+        </p>
+
+        <div class="field">
+          <p class="hint">Add one entry per disk role. vSAN disks are added to every nested host; the local datastore disk goes to host 1 only. Leave blank if your nested hosts only need a boot disk.</p>
+          <div id="nested-disk-list"></div>
+          <button type="button" id="add-nested-disk" class="btn btn-secondary" style="margin-top:4px;font-size:12.5px;padding:7px 12px;">+ Add disk</button>
+        </div>
+
+        <!-- Merged from old step 12: Bundle depot (conditional — shown only when vSAN + local datastore both configured; toggled live by updateDepotVisibility()) -->
+        <div id="nested-cluster-depot-section" hidden>
+          <hr style="margin:18px 0;border-color:var(--border);">
+          <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">VCF bundle depot?</h3>
+          <p class="hint" style="margin-bottom:14px;">A local HTTPS file server hosting VCF bundles on your LAN. During VCF bring-up, SDDC Manager downloads bundles from Broadcom's CDN — a local depot gives LAN-speed downloads instead and enables air-gapped deployments.</p>
+
+          <div class="field checkbox-field">
+            <label class="checkbox-row"><input type="checkbox" id="depotEnabled"><span>Deploy a local bundle depot for VCF offline deployments</span></label>
+            <p class="hint hint-info">This sets up the depot server infrastructure only. Downloading the actual VCF bundles from Broadcom's portal and populating the depot is a manual step covered in <code>depot-instructions.md</code>. VCF bring-up itself is out of scope for v1 of this wizard.</p>
+          </div>
+
+          <div id="depot-fields" hidden>
+            <div class="field">
+              <label>Deployment option</label>
+              <div class="radio-group">
+                <label class="radio-row"><input type="radio" name="depotMode" value="linux" checked><span>Dedicated Linux VM with nginx (recommended)</span></label>
+                <label class="radio-row"><input type="radio" name="depotMode" value="iis"><span>Use the existing DC with IIS (saves a VM — requires domain controller)</span></label>
+              </div>
+              <p class="hint" id="depot-linux-hint">Small Ubuntu VM: 2 vCPU / 4GB RAM / 100GB disk on host 1's local datastore. nginx serves bundles over HTTPS with a self-signed cert. Generates <code>depot-deploy.ps1</code> and <code>depot-configure.sh</code>.</p>
+              <p class="hint" id="depot-iis-hint" hidden>Installs IIS on the existing domain controller and configures HTTPS using a Windows self-signed cert. No extra VM needed. Generates <code>depot-iis.ps1</code>.</p>
+              <p class="hint hint-warning" id="depot-iis-no-dc-warning" hidden>IIS mode requires a domain controller — enable the DC in step 4 or switch to Linux/nginx mode.</p>
+            </div>
+
+            <div class="field">
+              <label for="depotIpAddress">Depot IP address</label>
+              <input type="text" id="depotIpAddress" placeholder="e.g. 192.168.10.20">
+              <p class="hint">Must be in the management network range. Used in the depot URL: <code>https://&lt;ip&gt;/depot/</code></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Merged from old step 10: VCF Bring-up -->
+        <hr style="margin:18px 0;border-color:var(--border);">
+        <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">VCF bring-up spec</h3>
+        <p class="hint" style="margin-bottom:14px;">VMware Cloud Foundation uses a Cloud Builder appliance to orchestrate the full management domain deployment &mdash; vCenter, NSX-T, and SDDC Manager all installed and configured from a single JSON file. Enable this to generate that file alongside the standard lab scripts.</p>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-row"><input type="checkbox" id="vcfEnabled"><span>Generate VCF bring-up JSON for Cloud Builder</span></label>
+          <p class="hint">This produces <code>vcf-bringup.json</code> ready to upload to Cloud Builder. The standard deploy scripts are still generated alongside it &mdash; use whichever path suits your goals.</p>
+        </div>
+
+        <div id="vcf-fields" hidden>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfSddcMgrIp">SDDC Manager IP <span class="info-icon">i<span class="info-tooltip">The static IP address Cloud Builder will assign to SDDC Manager during bring-up. Must be in the management network range and not already in use.</span></span></label>
+              <input type="text" id="vcfSddcMgrIp" placeholder="e.g. 192.168.10.6">
+            </div>
+            <div class="field">
+              <label for="vcfSddcMgrHostname">SDDC Manager hostname</label>
+              <input type="text" id="vcfSddcMgrHostname" value="sddcmgr" placeholder="sddcmgr">
+              <p class="hint">Short hostname, not FQDN. Cloud Builder appends the domain automatically.</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfVcenterIp">vCenter IP <span class="info-icon">i<span class="info-tooltip">Static IP VCF will assign to vCenter Server during bring-up. Must be pre-allocated in your management network and not already in use. VCF deploys vCenter itself &mdash; you do not run the vcenter-deploy.ps1 script in VCF mode.</span></span></label>
+              <input type="text" id="vcfVcenterIp" placeholder="e.g. 192.168.10.40">
+            </div>
+          </div>
+
+          <hr style="margin:18px 0;border-color:var(--border);">
+          <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">VCF-specific networks</h3>
+          <p class="hint" style="margin-bottom:14px;">These networks are required by VCF and are separate from the lab networks defined in step 5. Add them to your physical switch trunk and define CIDRs that do not overlap with any of your existing ranges.</p>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfVtepCidr">NSX VTEP CIDR <span class="info-icon">i<span class="info-tooltip">The Tunnel Endpoint (TEP) network carries NSX overlay traffic (Geneve encapsulation) between hosts. VCF assigns one or two TEP IPs per host from this range. Recommend /24, MTU 9000.</span></span></label>
+              <input type="text" id="vcfVtepCidr" placeholder="192.168.13.0/24">
+            </div>
+            <div class="field">
+              <label for="vcfVtepVlan">NSX VTEP VLAN ID</label>
+              <input type="number" id="vcfVtepVlan" min="1" max="4094" placeholder="e.g. 13">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfEdgeUplink1Cidr">NSX Edge Uplink 1 CIDR <span class="info-icon">i<span class="info-tooltip">The primary uplink network for NSX Edge nodes. North-south routed traffic between NSX T0 and the physical network (VyOS) flows over this VLAN. Standard MTU (1500) unless your upstream supports jumbo frames.</span></span></label>
+              <input type="text" id="vcfEdgeUplink1Cidr" placeholder="192.168.14.0/24">
+            </div>
+            <div class="field">
+              <label for="vcfEdgeUplink1Vlan">Edge Uplink 1 VLAN ID</label>
+              <input type="number" id="vcfEdgeUplink1Vlan" min="1" max="4094" placeholder="e.g. 14">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfEdgeUplink2Cidr">NSX Edge Uplink 2 CIDR <span class="hint-inline" style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span> <span class="info-icon">i<span class="info-tooltip">Secondary uplink for Edge HA. Required if you want both Edge nodes to have independent north-south paths. Leave blank for a single uplink lab design.</span></span></label>
+              <input type="text" id="vcfEdgeUplink2Cidr" placeholder="192.168.15.0/24">
+            </div>
+            <div class="field">
+              <label for="vcfEdgeUplink2Vlan">Edge Uplink 2 VLAN ID <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
+              <input type="number" id="vcfEdgeUplink2Vlan" min="1" max="4094" placeholder="e.g. 15">
+            </div>
+          </div>
+
+          <hr style="margin:18px 0;border-color:var(--border);">
+          <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">Credentials &amp; licenses</h3>
+
+          <div class="field">
+            <label for="vcfEsxiPassword">ESXi host root password</label>
+            <input type="password" id="vcfEsxiPassword" placeholder="Temporary bring-up password">
+            <p class="hint hint-warning">This password appears in plaintext in <code>vcf-bringup.json</code>. Use a temporary password and rotate it immediately after Cloud Builder completes.</p>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="vcfEsxiLicense">ESXi license key <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
+              <input type="text" id="vcfEsxiLicense" placeholder="Leave blank for 60-day eval">
+              <p class="hint">VCF/VVF subscription key, or leave blank for evaluation mode.</p>
+            </div>
+            <div class="field">
+              <label for="vcfVcenterLicense">vCenter license key <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
+              <input type="text" id="vcfVcenterLicense" placeholder="Leave blank for 60-day eval">
+            </div>
+          </div>
+
+          <div class="notice-block notice-info" style="margin-top:8px;">
+            <strong>VCF vs standard scripts:</strong> In VCF mode, Cloud Builder deploys vCenter, NSX-T, and SDDC Manager. Do not run <code>vcenter-deploy.ps1</code>, <code>vsan-cluster.ps1</code>, or <code>nsx-deploy.ps1</code> — VCF handles all of that. Run <code>deploy-lab.ps1</code> first to create the nested ESXi VMs, then hand off to Cloud Builder.
+          </div>
+
+        </div>
       </section>
 
-      <!-- Step 9: NSX-T -->
-      <section class="step" data-step="9">
+      <!-- Step 7: NSX-T (standalone — not merged with anything, by explicit decision) -->
+      <section class="step" data-step="7">
         <h1>Add NSX-T to this lab?</h1>
         <p class="step-intro">NSX-T adds software-defined networking, micro-segmentation, and optional BGP routing on top of the vSphere cluster. Deployment is after the cluster is healthy.</p>
 
-        <div class="learn-block" data-learn-step="9">
+        <div class="learn-block" data-learn-step="7">
           <div class="learn-context">
             <p>NSX adds significant capability &mdash; micro-segmentation, overlay networking, distributed routing &mdash; but also significant complexity and resource overhead. Before choosing NSX, be clear on why you need it.</p>
             <div class="learn-reasons">
@@ -1241,150 +1464,8 @@
         </div>
       </section>
 
-      <!-- Step 10: VCF Bring-up -->
-      <section class="step" data-step="10">
-        <h1>VCF bring-up spec</h1>
-        <p class="step-intro">VMware Cloud Foundation uses a Cloud Builder appliance to orchestrate the full management domain deployment &mdash; vCenter, NSX-T, and SDDC Manager all installed and configured from a single JSON file. Enable this to generate that file alongside the standard lab scripts.</p>
-
-        <div class="field checkbox-field">
-          <label class="checkbox-row"><input type="checkbox" id="vcfEnabled"><span>Generate VCF bring-up JSON for Cloud Builder</span></label>
-          <p class="hint">This produces <code>vcf-bringup.json</code> ready to upload to Cloud Builder. The standard deploy scripts are still generated alongside it &mdash; use whichever path suits your goals.</p>
-        </div>
-
-        <div id="vcf-fields" hidden>
-
-          <div class="field-row">
-            <div class="field">
-              <label for="vcfSddcMgrIp">SDDC Manager IP <span class="info-icon">i<span class="info-tooltip">The static IP address Cloud Builder will assign to SDDC Manager during bring-up. Must be in the management network range and not already in use.</span></span></label>
-              <input type="text" id="vcfSddcMgrIp" placeholder="e.g. 192.168.10.6">
-            </div>
-            <div class="field">
-              <label for="vcfSddcMgrHostname">SDDC Manager hostname</label>
-              <input type="text" id="vcfSddcMgrHostname" value="sddcmgr" placeholder="sddcmgr">
-              <p class="hint">Short hostname, not FQDN. Cloud Builder appends the domain automatically.</p>
-            </div>
-          </div>
-
-          <div class="field-row">
-            <div class="field">
-              <label for="vcfVcenterIp">vCenter IP <span class="info-icon">i<span class="info-tooltip">Static IP VCF will assign to vCenter Server during bring-up. Must be pre-allocated in your management network and not already in use. VCF deploys vCenter itself &mdash; you do not run the vcenter-deploy.ps1 script in VCF mode.</span></span></label>
-              <input type="text" id="vcfVcenterIp" placeholder="e.g. 192.168.10.40">
-            </div>
-          </div>
-
-          <hr style="margin:18px 0;border-color:var(--border);">
-          <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">VCF-specific networks</h3>
-          <p class="hint" style="margin-bottom:14px;">These networks are required by VCF and are separate from the lab networks defined in step 6. Add them to your physical switch trunk and define CIDRs that do not overlap with any of your existing ranges.</p>
-
-          <div class="field-row">
-            <div class="field">
-              <label for="vcfVtepCidr">NSX VTEP CIDR <span class="info-icon">i<span class="info-tooltip">The Tunnel Endpoint (TEP) network carries NSX overlay traffic (Geneve encapsulation) between hosts. VCF assigns one or two TEP IPs per host from this range. Recommend /24, MTU 9000.</span></span></label>
-              <input type="text" id="vcfVtepCidr" placeholder="192.168.13.0/24">
-            </div>
-            <div class="field">
-              <label for="vcfVtepVlan">NSX VTEP VLAN ID</label>
-              <input type="number" id="vcfVtepVlan" min="1" max="4094" placeholder="e.g. 13">
-            </div>
-          </div>
-
-          <div class="field-row">
-            <div class="field">
-              <label for="vcfEdgeUplink1Cidr">NSX Edge Uplink 1 CIDR <span class="info-icon">i<span class="info-tooltip">The primary uplink network for NSX Edge nodes. North-south routed traffic between NSX T0 and the physical network (VyOS) flows over this VLAN. Standard MTU (1500) unless your upstream supports jumbo frames.</span></span></label>
-              <input type="text" id="vcfEdgeUplink1Cidr" placeholder="192.168.14.0/24">
-            </div>
-            <div class="field">
-              <label for="vcfEdgeUplink1Vlan">Edge Uplink 1 VLAN ID</label>
-              <input type="number" id="vcfEdgeUplink1Vlan" min="1" max="4094" placeholder="e.g. 14">
-            </div>
-          </div>
-
-          <div class="field-row">
-            <div class="field">
-              <label for="vcfEdgeUplink2Cidr">NSX Edge Uplink 2 CIDR <span class="hint-inline" style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span> <span class="info-icon">i<span class="info-tooltip">Secondary uplink for Edge HA. Required if you want both Edge nodes to have independent north-south paths. Leave blank for a single uplink lab design.</span></span></label>
-              <input type="text" id="vcfEdgeUplink2Cidr" placeholder="192.168.15.0/24">
-            </div>
-            <div class="field">
-              <label for="vcfEdgeUplink2Vlan">Edge Uplink 2 VLAN ID <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
-              <input type="number" id="vcfEdgeUplink2Vlan" min="1" max="4094" placeholder="e.g. 15">
-            </div>
-          </div>
-
-          <hr style="margin:18px 0;border-color:var(--border);">
-          <h3 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">Credentials &amp; licenses</h3>
-
-          <div class="field">
-            <label for="vcfEsxiPassword">ESXi host root password</label>
-            <input type="password" id="vcfEsxiPassword" placeholder="Temporary bring-up password">
-            <p class="hint hint-warning">This password appears in plaintext in <code>vcf-bringup.json</code>. Use a temporary password and rotate it immediately after Cloud Builder completes.</p>
-          </div>
-
-          <div class="field-row">
-            <div class="field">
-              <label for="vcfEsxiLicense">ESXi license key <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
-              <input type="text" id="vcfEsxiLicense" placeholder="Leave blank for 60-day eval">
-              <p class="hint">VCF/VVF subscription key, or leave blank for evaluation mode.</p>
-            </div>
-            <div class="field">
-              <label for="vcfVcenterLicense">vCenter license key <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(optional)</span></label>
-              <input type="text" id="vcfVcenterLicense" placeholder="Leave blank for 60-day eval">
-            </div>
-          </div>
-
-          <div class="notice-block notice-info" style="margin-top:8px;">
-            <strong>VCF vs standard scripts:</strong> In VCF mode, Cloud Builder deploys vCenter, NSX-T, and SDDC Manager. Do not run <code>vcenter-deploy.ps1</code>, <code>vsan-cluster.ps1</code>, or <code>nsx-deploy.ps1</code> — VCF handles all of that. Run <code>deploy-lab.ps1</code> first to create the nested ESXi VMs, then hand off to Cloud Builder.
-          </div>
-
-        </div>
-      </section>
-
-      <!-- Step 11: Nested host disk layout -->
-      <section class="step" data-step="11">
-        <h1>Nested host disk layout</h1>
-        <p class="step-intro">Virtual disks added to each nested ESXi host VM on top of the boot disk. Purpose options adapt to the vSAN architecture chosen in the previous step.</p>
-
-        <p id="vsan-esa-nvme-warn" class="hint" style="color:var(--warn);margin-bottom:14px;" hidden>
-          vSAN ESA requires NVMe-backed storage — no NVMe device found in your hardware inventory. Go back to Physical host (step 3) to add one, or switch to OSA in Nested cluster (step 7) which supports any disk type.
-        </p>
-
-        <div class="field">
-          <p class="hint">Add one entry per disk role. vSAN disks are added to every nested host; the local datastore disk goes to host 1 only. Leave blank if your nested hosts only need a boot disk.</p>
-          <div id="nested-disk-list"></div>
-          <button type="button" id="add-nested-disk" class="btn btn-secondary" style="margin-top:4px;font-size:12.5px;padding:7px 12px;">+ Add disk</button>
-        </div>
-      </section>
-
-      <!-- Step 12: Bundle depot (conditional — shown only when vSAN + local datastore both configured) -->
-      <section class="step" data-step="12">
-        <h1>VCF bundle depot?</h1>
-        <p class="step-intro">A local HTTPS file server hosting VCF bundles on your LAN. During VCF bring-up, SDDC Manager downloads bundles from Broadcom's CDN — a local depot gives LAN-speed downloads instead and enables air-gapped deployments.</p>
-
-        <div class="field checkbox-field">
-          <label class="checkbox-row"><input type="checkbox" id="depotEnabled"><span>Deploy a local bundle depot for VCF offline deployments</span></label>
-          <p class="hint hint-info">This sets up the depot server infrastructure only. Downloading the actual VCF bundles from Broadcom's portal and populating the depot is a manual step covered in <code>depot-instructions.md</code>. VCF bring-up itself is out of scope for v1 of this wizard.</p>
-        </div>
-
-        <div id="depot-fields" hidden>
-          <div class="field">
-            <label>Deployment option</label>
-            <div class="radio-group">
-              <label class="radio-row"><input type="radio" name="depotMode" value="linux" checked><span>Dedicated Linux VM with nginx (recommended)</span></label>
-              <label class="radio-row"><input type="radio" name="depotMode" value="iis"><span>Use the existing DC with IIS (saves a VM — requires domain controller)</span></label>
-            </div>
-            <p class="hint" id="depot-linux-hint">Small Ubuntu VM: 2 vCPU / 4GB RAM / 100GB disk on host 1's local datastore. nginx serves bundles over HTTPS with a self-signed cert. Generates <code>depot-deploy.ps1</code> and <code>depot-configure.sh</code>.</p>
-            <p class="hint" id="depot-iis-hint" hidden>Installs IIS on the existing domain controller and configures HTTPS using a Windows self-signed cert. No extra VM needed. Generates <code>depot-iis.ps1</code>.</p>
-            <p class="hint hint-warning" id="depot-iis-no-dc-warning" hidden>IIS mode requires a domain controller — enable the DC in step 5 or switch to Linux/nginx mode.</p>
-          </div>
-
-          <div class="field">
-            <label for="depotIpAddress">Depot IP address</label>
-            <input type="text" id="depotIpAddress" placeholder="e.g. 192.168.10.20">
-            <p class="hint">Must be in the management network range. Used in the depot URL: <code>https://&lt;ip&gt;/depot/</code></p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Step 13: Workload VMs -->
-      <section class="step" data-step="13">
+      <!-- Step 8: Workload VMs -->
+      <section class="step" data-step="8">
         <h1>Deploy test workload VMs?</h1>
         <p class="step-intro">Blank VM shells on the cluster for practising vMotion, DRS, and HA — no OS required, but you can install one later.</p>
 
@@ -1411,101 +1492,8 @@
         </div>
       </section>
 
-      <!-- Step 14: Security & access -->
-      <section class="step" data-step="14">
-        <h1>Security and remote access</h1>
-
-        <div class="field checkbox-field">
-          <label class="checkbox-row"><input type="checkbox" id="isolateLab"><span>Isolate the lab on its own segment</span></label>
-        </div>
-
-        <div class="field">
-          <label>Firewall policy</label>
-          <div class="choice-row">
-            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="allow_all"><span>Allow all</span></label>
-            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="restricted"><span>Restrict to needed ports</span></label>
-            <label class="choice-pill"><input type="radio" name="firewallPolicy" value="isolated"><span>Fully isolated</span></label>
-          </div>
-        </div>
-
-        <div class="field checkbox-field">
-          <label class="checkbox-row"><input type="checkbox" id="internetAccess"><span>Nested VMs need outbound internet access</span></label>
-        </div>
-
-        <div class="field">
-          <label for="remoteAccessMethod">Remote access method</label>
-          <select id="remoteAccessMethod">
-            <option value="">Select&hellip;</option>
-            <option value="vpn">VPN into the home network</option>
-            <option value="ssh_jump">SSH jump host</option>
-            <option value="none">Local only, no remote access</option>
-            <option value="reverse_proxy">Reverse proxy</option>
-          </select>
-        </div>
-
-        <div class="field" id="vpn-type-field" hidden>
-          <label>VPN type</label>
-          <div class="choice-row">
-            <label class="choice-pill"><input type="radio" name="vpnType" value="wireguard"><span>WireGuard server VM</span></label>
-            <label class="choice-pill"><input type="radio" name="vpnType" value="vyos_site_to_site"><span>VyOS site-to-site</span></label>
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="vcenterSize">vCenter deployment size</label>
-          <select id="vcenterSize">
-            <option value="">Select&hellip;</option>
-            <option value="tiny">Tiny &mdash; up to 10 VMs</option>
-            <option value="small">Small &mdash; up to 100 VMs</option>
-            <option value="medium">Medium &mdash; up to 400 VMs</option>
-          </select>
-        </div>
-      </section>
-
-      <!-- Step 15: File locations -->
-      <section class="step" data-step="15">
-        <h1>File locations</h1>
-        <p class="step-intro">
-          Point the wizard at the ISO/OVA files on this machine. These are written into
-          <code>lab-config.json</code> alongside the generated scripts — every script reads its
-          file path from there, so you won't be prompted for it again when you run them.
-          Leave any of these blank now and fill them in later by editing
-          <code>lab-config.json</code> directly.
-        </p>
-
-        <div class="field" id="file-loc-vcenter-ova">
-          <label for="vCenterOvaPath">vCenter Server Appliance (VCSA) OVA path</label>
-          <input type="text" id="vCenterOvaPath" placeholder="C:\Lab\ISOs\vcsa\vcsa.ova">
-          <p class="hint">Extract this from the downloaded <code>VMware-VCSA-all-*.iso</code> bundle first — see PREREQUISITES.md.</p>
-        </div>
-
-        <div class="field" id="file-loc-esxi-iso">
-          <label for="esxiIsoPath">ESXi install ISO path</label>
-          <input type="text" id="esxiIsoPath" placeholder="C:\Lab\ISOs\VMware-VMvisor-Installer-9.0.iso">
-          <p class="hint">Uploaded to the datastore automatically on first run.</p>
-        </div>
-
-        <div class="field" id="file-loc-esxi-ova">
-          <label for="nestedEsxiOvaPath">Nested ESXi appliance OVA path</label>
-          <input type="text" id="nestedEsxiOvaPath" placeholder="C:\Lab\ISOs\Nested_ESXi_Appliance.ova">
-          <p class="hint">William Lam's Nested ESXi Virtual Appliance — read directly from this path during import.</p>
-        </div>
-
-        <div class="field" id="file-loc-vyos">
-          <label for="vyosIsoPath">VyOS ISO path</label>
-          <input type="text" id="vyosIsoPath" placeholder="C:\Lab\ISOs\vyos-rolling.iso">
-          <p class="hint">Uploaded to the datastore automatically on first run.</p>
-        </div>
-
-        <div class="field" id="file-loc-windows">
-          <label for="windowsServerIsoPath">Windows Server ISO path</label>
-          <input type="text" id="windowsServerIsoPath" placeholder="C:\Lab\ISOs\WinServer2022-eval.iso">
-          <p class="hint">Uploaded to the datastore automatically on first run.</p>
-        </div>
-      </section>
-
-      <!-- Step 16: Review & generate -->
-      <section class="step" data-step="16">
+      <!-- Step 9: Review & generate -->
+      <section class="step" data-step="9">
         <h1>Review and generate</h1>
         <p class="step-intro">Checks out? Generate the spec, deployment scripts, and the design doc.</p>
 
@@ -1528,7 +1516,7 @@
           <div class="review-placement-body"></div>
         </div>
 
-        <div class="learn-block" data-learn-step="16">
+        <div class="learn-block" data-learn-step="9">
           <div class="learn-scorecard-wrap">
             <h2 class="learn-scorecard-title">Architecture Review</h2>
             <p class="learn-scorecard-intro">Your design rationale will be included in your design document &mdash; this is what separates a spec from a proper design.</p>
@@ -1560,8 +1548,8 @@
         </div>
       </section>
 
-      <!-- Step 17: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
-      <section class="step" data-step="17">
+      <!-- Step 10: Troubleshooting Lab (hidden — activate with Cmd+Shift+X / Ctrl+Shift+X) -->
+      <section class="step" data-step="10">
         <h1>Troubleshooting Lab</h1>
 
         <!-- Mode tabs -->

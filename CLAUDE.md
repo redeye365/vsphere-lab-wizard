@@ -45,30 +45,23 @@ output goes to `BASE_DIR` (next to the binary), never `__dirname` (read-only sna
 
 ---
 
-## Step numbering (as of v1.23 — reordered so hardware/network are gathered before goals)
+## Step numbering (as of v1.24 — consolidated to 10 visible steps + hidden Troubleshooting)
 
 | # | Step name | Notes |
 |---|-----------|-------|
-| 0 | Hardware | NIC model + inline HCL check; per-host specs when hostCount > 1 |
+| 0 | Hardware | NIC model + inline HCL check; per-host specs when hostCount > 1; absorbs old ESXi-version field and old File-locations fields (now an always-visible "software library" subsection — no longer conditionally gated, since the gating fields (`esxiDeployMethod`/`vyosEnabled`/`dcProfile`) are answered in later steps and all five path fields are optional anyway) |
 | 1 | Existing network | |
 | 2 | Use case | |
-| 3 | ESXi version | |
-| 4 | Virtual router (VyOS) | |
-| 5 | Domain controller | |
-| 6 | Lab networks | |
-| 7 | Nested cluster | ESA/OSA vSAN; memory tiering; placement when hostCount > 1; `esxiDeployMethod` (iso/ova) chosen here |
-| 8 | Deployment placement | `PLACEMENT_STEP`; skipped via `getNextStep()`/`getPrevStep()` when hostCount === 1 |
-| 9 | NSX-T | Edge node count/size; BGP route advert mode; redistribution checkboxes |
-| 10 | VCF Bring-up | Shown always; generates vcf-bringup.json + vcf-prep.ps1 when vcfEnabled |
-| 11 | Nested disks | |
-| 12 | Bundle depot | `DEPOT_STEP`; skipped via `getNextStep()`/`getPrevStep()` when `depotStepVisible()` is false |
-| 13 | Workload VMs | |
-| 14 | Security & access | |
-| 15 | File locations | `FILE_LOCATIONS_STEP`; always shown, per-field visibility gated by `renderFileLocationsVisibility()` |
-| 16 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
-| 17 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
+| 3 | Virtual router (VyOS) | |
+| 4 | Domain controller | |
+| 5 | Lab networks | absorbs old Security & access step (`isolateLab`, `firewallPolicy`, `internetAccess`, `remoteAccessMethod`, `vpnType`, `vcenterSize`) |
+| 6 | Nested cluster | mega-step; ESA/OSA vSAN; memory tiering; `esxiDeployMethod` (iso/ova) chosen here; absorbs old Deployment placement (shown inline when hostCount > 1, via `renderDeploymentPlacement()` called on step entry — `placementStepVisible()`'s dependency (`hostCount`) is set on the earlier Hardware step so on-entry computation is still correct), old Nested disks, old Bundle depot (`#nested-cluster-depot-section`, visibility now live-toggled by `updateDepotVisibility()` — called from the shared `onChange` closure in `wireForm()`, from the `vsanEnabled` change handler, and on step entry — because `vsanEnabled` and `nestedDisks` now live on the same step as the depot section itself, unlike the old separate-page arrangement), and old VCF Bring-up (self-contained, own `vcfEnabled` checkbox toggle, unaffected by the move) |
+| 7 | NSX-T | Edge node count/size; BGP route advert mode; redistribution checkboxes; deliberately kept standalone (not merged with anything) |
+| 8 | Workload VMs | |
+| 9 | Review & generate | Live Mermaid diagram preview; `TOTAL_STEPS - 2` |
+| 10 | Troubleshooting | Hidden; activated via Ctrl+Shift+X / Cmd+Shift+X |
 
-`TOTAL_STEPS = 18`, `PLACEMENT_STEP = 8`, `DEPOT_STEP = 12`, `NSX_STEP = 9`, `VCF_STEP = 10`, `FILE_LOCATIONS_STEP = 15`, `TROUBLESHOOT_STEP = 17`
+`TOTAL_STEPS = 11`, `NSX_STEP = 7`, `TROUBLESHOOT_STEP = 10`. `PLACEMENT_STEP`/`DEPOT_STEP`/`VCF_STEP`/`FILE_LOCATIONS_STEP` no longer exist as constants — their content are inline subsections of step 0 or step 6 now, not separate pages, so `getNextStep`/`getPrevStep` are back to plain `n±1` with no skip logic.
 
 ---
 
