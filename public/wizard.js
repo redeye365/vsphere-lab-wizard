@@ -77,6 +77,18 @@ const DC_RAM_GB_BY_PROFILE = { 'none': 0, 'dc-only': 4, 'dc-jumpbox': 8, 'dc-jum
 const VYOS_RAM_GB_SIZING = 1;
 const ESXI_OVERHEAD_GB = 4;
 
+// RAM thresholds -> what's realistically achievable at that physical RAM size.
+// Shared reference point between the prereq checklist (static copy) and the
+// live Hardware-step validator (renderHardwareValidator) below.
+const RAM_TIERS = [
+  { ramGB: 64,  label: 'vSphere basics',            detail: '1–2 hosts only' },
+  { ramGB: 128, label: 'vSphere + vSAN',             detail: '3 hosts' },
+  { ramGB: 192, label: 'vSphere + NSX',              detail: '3–4 hosts' },
+  { ramGB: 256, label: 'vSphere + NSX + basic VCF',  detail: '' },
+  { ramGB: 384, label: 'Full VCF recommended',       detail: '' },
+  { ramGB: 512, label: 'Full VCF + workload domains', detail: '' }
+];
+
 const NET_COLORS = {
   management: '#4fb3a4',
   vMotion: '#5b8fd9',
@@ -473,6 +485,98 @@ function updateVramWarning() {
   }
 }
 
+// Hardware step "validator": shows what's achievable at the entered RAM,
+// a live RAM budget breakdown, and a warning if the current (or a
+// representative example) deployment exceeds the physical RAM. Called on
+// RAM/CPU input on the Hardware step, from the shared onChange closure (so
+// it stays live as later-step choices like nestedHostCount/nsxEnabled
+// change), and once on step-0 entry.
+function renderHardwareValidator() {
+  const h = state.answers.hardware;
+  const g = state.answers.design;
+  const panel = document.getElementById('hardware-validator');
+  if (!panel) return;
+  const physRam = Number(h.ramGB) || 0;
+  if (!physRam) { panel.hidden = true; return; }
+  panel.hidden = false;
+
+  // Achievable tier: highest threshold at or below the entered RAM.
+  let achieved = null, next = null;
+  for (const tier of RAM_TIERS) {
+    if (physRam >= tier.ramGB) achieved = tier;
+    else { next = tier; break; }
+  }
+
+  const tierEl = document.getElementById('hw-validator-tier');
+  if (tierEl) {
+    let html;
+    if (achieved) {
+      html = `<strong>${physRam} GB</strong> gets you: <strong>${escHtml(achieved.label)}</strong>` +
+        (achieved.detail ? ` (${escHtml(achieved.detail)})` : '');
+      if (next) {
+        html += `<br><span class="hw-validator-next">+${next.ramGB - physRam} GB more (${next.ramGB} GB total) unlocks ${escHtml(next.label)}${next.detail ? ' — ' + escHtml(next.detail) : ''}.</span>`;
+      }
+    } else {
+      const first = RAM_TIERS[0];
+      html = `<strong>${physRam} GB</strong> is below the ${first.ramGB} GB minimum for a vSphere lab. ` +
+        `Add ${first.ramGB - physRam} GB more to reach "${escHtml(first.label)}" (${escHtml(first.detail)}).`;
+    }
+    tierEl.innerHTML = html;
+  }
+
+  // RAM math breakdown — nestedHostCount/vramPerHostGB carry real defaults
+  // (3 hosts / 16 GB) from state init, not null, so this always reflects the
+  // wizard's current nested-cluster plan (defaults included) rather than a
+  // separate guess — same numbers the Nested cluster step itself would show.
+  const hosts = Number(g.nestedHostCount) || 1;
+  const perHost = Number(g.vramPerHostGB) || (ESXI_MIN_VRAM[g.esxiVersion] || 8);
+  const nestedTotal = hosts * perHost;
+  const overhead = hosts * ESXI_OVERHEAD_GB;
+  const dcRam = DC_RAM_GB_BY_PROFILE[g.dcProfile] || 0;
+  const vyosRam = g.vyosEnabled ? VYOS_RAM_GB_SIZING : 0;
+  const nsxRam = g.nsxEnabled ? 12 : 0; // small edge size — matches sizing.js NSX_SMALL_VRAM_GB
+  const fixedTotal = VCENTER_TINY_RAM_GB + dcRam + vyosRam + nsxRam + overhead;
+  const grandTotal = nestedTotal + fixedTotal;
+  const remaining = physRam - grandTotal;
+
+  const breakdown = document.getElementById('hw-validator-breakdown');
+  if (breakdown) {
+    const rows = [
+      [`${hosts} nested ESXi host${hosts === 1 ? '' : 's'} × ${perHost} GB`, nestedTotal],
+      [`ESXi overhead (${ESXI_OVERHEAD_GB} GB × ${hosts} host${hosts === 1 ? '' : 's'})`, overhead],
+      ['vCenter Server Appliance (Tiny)', VCENTER_TINY_RAM_GB]
+    ];
+    if (vyosRam) rows.push(['VyOS virtual router', vyosRam]);
+    if (dcRam) rows.push(['Domain controller' + (g.dcProfile && g.dcProfile !== 'dc-only' ? ' + jumpbox' : ''), dcRam]);
+    if (nsxRam) rows.push(['NSX Manager (small)', nsxRam]);
+
+    const cpuCores = Number(h.cpuCores) || 0;
+    const assumedVcpu = Number(g.vcpuPerHost) || 4;
+    const maxHostsByCpu = cpuCores ? Math.floor((cpuCores * 4) / assumedVcpu) : null;
+
+    breakdown.innerHTML = `
+      <p class="hint">Based on the nested cluster's current settings (${hosts} host${hosts === 1 ? '' : 's'} × ${perHost} GB — defaults until you change them on the Nested cluster step):</p>
+      <table class="hw-validator-table">
+        ${rows.map(([label, val]) => `<tr><td>${escHtml(label)}</td><td>${val} GB</td></tr>`).join('')}
+        <tr class="hw-validator-total"><td>Total needed</td><td>${grandTotal} GB</td></tr>
+        <tr class="hw-validator-total"><td>Physical RAM</td><td>${physRam} GB</td></tr>
+      </table>
+      ${maxHostsByCpu !== null ? `<p class="hint">CPU: ${cpuCores} cores supports up to ~${maxHostsByCpu} nested hosts at ${assumedVcpu} vCPU each before oversubscription gets uncomfortable (4:1 ratio).</p>` : ''}
+    `;
+  }
+
+  const warnEl = document.getElementById('hw-validator-warning');
+  if (warnEl) {
+    if (remaining < 0) {
+      warnEl.hidden = false;
+      warnEl.textContent = `The current nested cluster plan needs ${grandTotal} GB but you only have ${physRam} GB — over by ${Math.abs(remaining)} GB. ` +
+        `Reduce nested host count or RAM per host on the Nested cluster step, or add more physical RAM.`;
+    } else {
+      warnEl.hidden = true;
+    }
+  }
+}
+
 function calcHostTiers(physRamGB, esxiVer) {
   const g = state.answers.design;
   const perHostMin = ESXI_MIN_VRAM[esxiVer] || 8;
@@ -662,6 +766,7 @@ function wireForm() {
     renderSizingRecommendations();
     renderResourceTips();
     updateVramWarning();
+    renderHardwareValidator();
     renderInfraPlacement(onChange);
     renderPlacementRamSummary();
     updateDepotVisibility();
@@ -1577,6 +1682,7 @@ function showStep(n) {
   if (n === reviewStep) renderReview();
   if (n === reviewStep) renderReviewPlacement();
   if (n === TROUBLESHOOT_STEP) initTroubleshootStep();
+  if (n === 0) renderHardwareValidator();
   if (n === 6) {
     // Nested cluster (mega-step): sizing/resource helpers plus the
     // Deployment placement subsection (renderDeploymentPlacement) and the

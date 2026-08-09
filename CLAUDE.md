@@ -703,7 +703,38 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v1.28.0 (current — prereq screen shows the RAM capability tiers)
+### v1.29.0 (current — live Hardware-step RAM validator)
+- **New `#hardware-validator` panel** (`public/index.html`), shown on the Hardware step directly under the
+  CPU/RAM fields, hidden until `ramGB` has a value. Two parts:
+  1. **Achievable tier** (`RAM_TIERS` constant, `public/wizard.js`) — same 6 thresholds as the v1.28.0 prereq
+     checklist table, now computed live from whatever the user just typed: "128 GB gets you: vSphere + vSAN (3
+     hosts)" plus a "+64 GB more unlocks..." hint for the next tier up. Below the first tier (64GB) it shows how
+     much more RAM is needed to reach it instead.
+  2. **RAM math breakdown** (`<details>` — no JS needed for the toggle), reusing the *actual* current
+     `state.answers.design.nestedHostCount`/`vramPerHostGB` (which carry real non-null defaults — 3 hosts / 16GB
+     — from state init, not placeholders) plus `ESXI_OVERHEAD_GB`/`VCENTER_TINY_RAM_GB`/`DC_RAM_GB_BY_PROFILE`/
+     `VYOS_RAM_GB_SIZING` (all pre-existing constants, already used by `calcHostTiers`) to show a per-component
+     GB table, a live over-commit warning if the total exceeds the entered physical RAM, and a one-line CPU note
+     (max nested hosts by vCPU oversubscription).
+  - **`renderHardwareValidator()`** is called from three places so it stays live regardless of which step the
+    triggering field lives on: the shared `onChange` closure in `wireForm()` (fires on nearly every field change
+    already, including `nestedHostCount`/`vramPerHostGB`/`nsxEnabled`/`vyosEnabled`/`dcProfile` — all bound
+    through the same closure), the RAM/CPU inputs directly (same `onChange` path via `bindNumber`), and once on
+    `showStep(0)` entry so returning to Hardware after changing later-step answers refreshes the numbers.
+  - **Deliberately does not distinguish "default" from "user-set" values** for `nestedHostCount`/`vramPerHostGB`
+    — an earlier draft tried to label untouched defaults as "a representative example," but since those defaults
+    are real, meaningful values already used everywhere else in the app (3 hosts/16GB is what actually ships in
+    the generated scripts if the user changes nothing), pretending they're a hypothetical was actively
+    misleading — e.g. it produced a breakdown assuming 3 hosts on a 64GB box (the "vSphere basics, 1-2 hosts"
+    tier) with no indication that the 3-host figure came from an unrelated global default, not the achieved
+    tier. Fixed by always describing the breakdown as "the nested cluster's current settings (defaults until you
+    change them)" — honest either way, and the over-commit warning it produces (74GB needed vs 64GB physical, if
+    the user never visits the Nested cluster step) is correct and useful, not a false positive.
+  - Verified: tier text and next-tier hint correct at 64/128/192/256 GB; over-commit warning shows at 64GB
+    (default 3×16GB cluster doesn't fit) and correctly hides at 256GB; breakdown updates live after changing
+    `nestedHostCount`/`vramPerHostGB` on the Nested cluster step and returning to Hardware. Zero console errors.
+
+### v1.28.0 (prereq screen shows the RAM capability tiers)
 - **Hardware checklist item rewritten** (`public/index.html`, `data-prereq-id="hardware"`): replaced the flat
   "64GB min, 128GB+ recommended" line with a 6-tier RAM table (`.prereq-ram-table`): 64GB vSphere basics (1-2
   hosts) / 128GB +vSAN (3 hosts) / 192GB +NSX (3-4 hosts) / 256GB +basic VCF / 384GB+ Full VCF recommended /
