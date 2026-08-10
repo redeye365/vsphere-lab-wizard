@@ -128,7 +128,8 @@ const SCRIPT_LABELS = {
   'depot-instructions': 'depot-instructions.md',
   'nsx-deploy':     'nsx-deploy.ps1',
   'nsx-configure':  'nsx-configure.ps1',
-  'nsx-bgp':        'nsx-bgp.ps1'
+  'nsx-bgp':        'nsx-bgp.ps1',
+  'vis-deploy':     'vis-deploy.ps1'
 };
 
 const state = {
@@ -209,6 +210,7 @@ const state = {
       esxiDeployMethod: 'ova',
       vyosEnabled: false, vyosNetworkMode: null,
       dcProfile: 'none', dcDomainName: null, dcIpAddress: null, dcStorageDiskGB: 200, dcNetworkPlacement: 'lab',
+      visIpAddress: null,
       mgmtCidr: null, mgmtVlan: null, mgmtVlanMode: 'untagged',
       vmotionCidr: null, vmotionVlan: null,
       vmCidr: null, vmVlan: null,
@@ -238,7 +240,7 @@ const state = {
       deployVyosHostIdx: 0, deployDcHostIdx: 0,
       isolateLab: false, firewallPolicy: null, internetAccess: false,
       remoteAccessMethod: null, vpnType: null, vcenterSize: null,
-      vyosIso: null, windowsServerIso: null, esxiIso: null, nestedEsxiOva: null, vCenterOva: null
+      vyosIso: null, windowsServerIso: null, esxiIso: null, nestedEsxiOva: null, vCenterOva: null, visOva: null
     }
   },
   generated: null
@@ -389,6 +391,7 @@ function wireInlineValidation() {
 
   // Domain controller
   addIpValidation('dcIpAddress', 'DC IP address');
+  addIpValidation('visIpAddress', 'VIS appliance IP address');
 
   // Networks
   ['mgmtCidr', 'vmotionCidr', 'vsanCidr', 'vmCidr'].forEach((id) => {
@@ -847,8 +850,10 @@ function wireForm() {
   document.querySelectorAll('input[name="dcProfile"]').forEach(radio => {
     radio.addEventListener('change', () => {
       g.dcProfile = radio.value;
-      const dcEnabled = g.dcProfile !== 'none';
+      const dcEnabled = g.dcProfile !== 'none' && g.dcProfile !== 'vis';
       document.getElementById('dc-fields').hidden = !dcEnabled;
+      const visFields = document.getElementById('vis-fields');
+      if (visFields) visFields.hidden = g.dcProfile !== 'vis';
       const storageDiskField = document.getElementById('dc-storage-disk-field');
       if (storageDiskField) storageDiskField.hidden = g.dcProfile !== 'dc-jumpbox-fileserver';
       onChange();
@@ -862,6 +867,8 @@ function wireForm() {
   bindText('dcDomainName', g, 'dcDomainName', () => { checkSsoCollision(); onChange(); });
   bindText('dcIpAddress', g, 'dcIpAddress', onChange);
   bindRadio('dcNetworkPlacement', g, 'dcNetworkPlacement', onChange);
+  bindText('visIpAddress', g, 'visIpAddress', onChange);
+  bindText('visOvaPath', g, 'visOva', onChange);
 
   bindRadio('networkType', d, 'networkType', onChange);
   bindRadio('vlanCapable', d, 'vlanCapable', onChange, (v) => (v === 'yes' ? true : v === 'no' ? false : null));
@@ -1152,7 +1159,7 @@ function wireForm() {
         const isIis = el.value === 'iis';
         document.getElementById('depot-linux-hint').hidden = isIis;
         document.getElementById('depot-iis-hint').hidden = !isIis;
-        document.getElementById('depot-iis-no-dc-warning').hidden = !(isIis && g.dcProfile === 'none');
+        document.getElementById('depot-iis-no-dc-warning').hidden = !(isIis && (g.dcProfile === 'none' || g.dcProfile === 'vis'));
         onChange();
       }
     });
@@ -1593,8 +1600,10 @@ function validateStep(n) {
       }
       return null;
     case 6:
-      // DC
-      if (g.dcProfile !== 'none') {
+      // DC / VIS
+      if (g.dcProfile === 'vis') {
+        if (!g.visIpAddress) return 'Enter an IP address for the VIS appliance.';
+      } else if (g.dcProfile !== 'none') {
         if (!g.dcDomainName) return 'Enter a domain name for the DC.';
         if (!g.dcIpAddress) return 'Enter an IP address for the DC.';
       }
@@ -1821,7 +1830,12 @@ function renderTopology() {
     a.textContent = `vyos${g.vyosNetworkMode === 'bgp' ? ' (BGP)' : ''}`;
     appliancesEl.appendChild(a);
   }
-  if (g.dcProfile !== 'none') {
+  if (g.dcProfile === 'vis') {
+    const a = document.createElement('div');
+    a.className = 'topo-appliance';
+    a.textContent = `vis${g.visIpAddress ? ' · ' + g.visIpAddress : ''}`;
+    appliancesEl.appendChild(a);
+  } else if (g.dcProfile !== 'none') {
     const a = document.createElement('div');
     a.className = 'topo-appliance';
     const profileSuffix = g.dcProfile === 'dc-jumpbox' ? ' + jumpbox' : g.dcProfile === 'dc-jumpbox-fileserver' ? ' + jumpbox + files' : '';
@@ -1954,9 +1968,12 @@ function renderReview() {
   if (g.vyosEnabled && g.vyosNetworkMode) {
     infraComponents.push(['VyOS mode', g.vyosNetworkMode === 'bgp' ? 'Basic + BGP' : 'Basic (NAT, DHCP, DNS)']);
   }
-  const dcProfileLabels = { 'none': 'No', 'dc-only': 'DC only', 'dc-jumpbox': 'DC + Jumpbox', 'dc-jumpbox-fileserver': 'DC + Jumpbox + File Server' };
+  const dcProfileLabels = { 'none': 'No', 'dc-only': 'DC only', 'dc-jumpbox': 'DC + Jumpbox', 'dc-jumpbox-fileserver': 'DC + Jumpbox + File Server', 'vis': 'No (using VIS instead)' };
   infraComponents.push(['Domain controller', dcProfileLabels[g.dcProfile] || 'No']);
-  if (g.dcProfile !== 'none') {
+  if (g.dcProfile === 'vis') {
+    infraComponents.push(['VIS appliance', "William Lam's VCF Infrastructure Services Appliance"]);
+    infraComponents.push(['VIS IP', val(g.visIpAddress)]);
+  } else if (g.dcProfile !== 'none') {
     infraComponents.push(['DC domain', val(g.dcDomainName)]);
     infraComponents.push(['DC IP', val(g.dcIpAddress)]);
     infraComponents.push(['DC network', g.dcNetworkPlacement === 'physical' ? 'Physical/home network (VM Network)' : 'Lab management network (Nested-Trunk)']);
@@ -2106,10 +2123,10 @@ function renderReview() {
     }
   }
 
-  if (g.depotEnabled && g.depotMode === 'iis' && g.dcProfile === 'none') {
+  if (g.depotEnabled && g.depotMode === 'iis' && (g.dcProfile === 'none' || g.dcProfile === 'vis')) {
     const warn = document.createElement('div');
     warn.className = 'review-warn';
-    warn.textContent = '⚠ Bundle depot is set to IIS mode but no domain controller is included. Enable the DC (step 6) or switch to Linux/nginx mode.';
+    warn.textContent = '⚠ Bundle depot is set to IIS mode but no Windows domain controller is included (VIS is a Linux appliance and cannot host IIS). Enable a Windows DC (step 6) or switch to Linux/nginx mode.';
     container.appendChild(warn);
   }
 
@@ -2264,7 +2281,8 @@ function buildReviewSpec() {
     physicalHosts,
     esxiVersion: { label: ESXI_VERSION_LABELS[g.esxiVersion] || 'ESXi' },
     vyos: { enabled: !!g.vyosEnabled, networkMode: g.vyosNetworkMode || 'basic' },
-    domainController: { enabled: g.dcProfile !== 'none', profile: g.dcProfile || 'none', domainName: g.dcDomainName || null, ipAddress: g.dcIpAddress || null, storageDiskGB: g.dcStorageDiskGB || 200, networkPlacement: g.dcNetworkPlacement || 'lab' },
+    domainController: { enabled: g.dcProfile !== 'none' && g.dcProfile !== 'vis', profile: g.dcProfile || 'none', domainName: g.dcDomainName || null, ipAddress: g.dcIpAddress || null, storageDiskGB: g.dcStorageDiskGB || 200, networkPlacement: g.dcNetworkPlacement || 'lab' },
+    vis: { enabled: g.dcProfile === 'vis', ipAddress: g.visIpAddress || null },
     networks: {
       management: { cidr: g.mgmtCidr || null, vlanId: g.mgmtVlan != null ? Number(g.mgmtVlan) : null, mode: g.mgmtVlanMode || 'untagged' },
       vMotion: { cidr: g.vmotionCidr || null, vlanId: g.vmotionVlan != null ? Number(g.vmotionVlan) : null },
@@ -2355,9 +2373,18 @@ function loadSpecIntoState(spec) {
     // Sync radio UI
     const profileRadio = document.querySelector(`input[name="dcProfile"][value="${g.dcProfile}"]`);
     if (profileRadio) profileRadio.checked = true;
-    document.getElementById('dc-fields').hidden = g.dcProfile === 'none';
+    document.getElementById('dc-fields').hidden = g.dcProfile === 'none' || g.dcProfile === 'vis';
     const storageDiskField = document.getElementById('dc-storage-disk-field');
     if (storageDiskField) storageDiskField.hidden = g.dcProfile !== 'dc-jumpbox-fileserver';
+  }
+  if (spec.vis && spec.vis.enabled) {
+    g.dcProfile = 'vis';
+    g.visIpAddress = spec.vis.ipAddress || null;
+    const profileRadio = document.querySelector('input[name="dcProfile"][value="vis"]');
+    if (profileRadio) profileRadio.checked = true;
+    document.getElementById('dc-fields').hidden = true;
+    const visFields = document.getElementById('vis-fields');
+    if (visFields) visFields.hidden = false;
   }
   if (spec.networks) {
     const nets = spec.networks;
@@ -5134,13 +5161,17 @@ function populateFormFromState() {
   // Step 4
   setRadio('dcProfile', g.dcProfile || 'none');
   const dcFields = document.getElementById('dc-fields');
-  if (dcFields) dcFields.hidden = (g.dcProfile || 'none') === 'none';
+  if (dcFields) dcFields.hidden = (g.dcProfile || 'none') === 'none' || g.dcProfile === 'vis';
+  const visFieldsEl = document.getElementById('vis-fields');
+  if (visFieldsEl) visFieldsEl.hidden = g.dcProfile !== 'vis';
   const storageDiskField = document.getElementById('dc-storage-disk-field');
   if (storageDiskField) storageDiskField.hidden = g.dcProfile !== 'dc-jumpbox-fileserver';
   setVal('dcDomainName', g.dcDomainName);
   setVal('dcIpAddress', g.dcIpAddress);
   setVal('dcStorageDiskGB', g.dcStorageDiskGB || 200);
   setRadio('dcNetworkPlacement', g.dcNetworkPlacement || 'lab');
+  setVal('visIpAddress', g.visIpAddress);
+  setVal('visOvaPath', g.visOva);
 
   // Step 5
   setRadio('networkType', d.networkType);

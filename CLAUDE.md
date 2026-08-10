@@ -31,7 +31,8 @@ Key files:
 - `lib/validateAnswers.js` — server-side input validation
 - `lib/generatePowerShell.js` — main script generator
 - `lib/generateNsx.js` — NSX-T deploy/configure/BGP scripts
-- `lib/generateVcf.js` — VCF bring-up JSON (Cloud Builder workbook) + vcf-prep.ps1
+- `lib/generateVcf.js` — VCF bring-up JSON (Cloud Builder workbook) + vcf-prep.ps1; also exports `firstHostInCidr`/`cidrToMask` for reuse
+- `lib/generateVis.js` — vis-deploy.ps1 (William Lam's VIS Appliance, deployed via OVF Tool)
 - `lib/generateBuildGuide.js` — step-by-step human build guide
 - `lib/generateMarkdown.js` — design-doc.md
 - `lib/generateNetworkDiagram.js` — Mermaid flowchart
@@ -705,7 +706,58 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v1.34.0 (current — Storage split into its own step; Template promoted to a real step)
+### v1.35.0 (current — VIS Appliance as a 5th Domain controller/infra option)
+- **New `dcProfile` value `'vis'`** — William Lam's VCF Infrastructure Services Appliance, a 5th card on the
+  Domain controller step (`.dc-profile-card[data-profile="vis"]`) alongside the four existing Windows-DC
+  profiles. Recommended-for-VCF badge (`.dc-profile-recommended`), description, and a link to
+  https://lamw.github.io/vcf-infrastructure-service-appliance/ per the appliance's own docs (verified: 2 vCPU /
+  4GB RAM / 30GB disk minimum — matches exactly).
+- **New `#vis-fields` block** (separate from `#dc-fields`, which stays Windows-DC-only) — just one field,
+  `visIpAddress` (IP validated like `dcIpAddress`), since VIS has no AD domain to name. New Software-library
+  field `visOvaPath` → `design.visOva` → `lab-config.json`'s `localPaths.visOva`, same pattern as the other
+  OVA paths.
+- **`domainController.enabled` is now `profile !== 'none' && profile !== 'vis'`** — VIS is deliberately NOT
+  represented as a domain controller in the spec; it gets its own top-level **`vis: { enabled, ipAddress, ova }`**
+  spec section (`generateSpec.js`), mutually exclusive with `domainController` via the same `dcProfile` radio.
+  `dc.enabled` in `lib/sizing.js` stays `true` for `vis` (RAM/CPU accounting is correct — VIS consumes resources
+  like any other appliance, `DC_VCPU_BY_PROFILE.vis = 2` / `DC_VRAM_GB_BY_PROFILE.vis = 4` reuse the same
+  profile-keyed lookup maps DC already used), but three DC-specific checks needed a new `windowsDcEnabled =
+  dcEnabled && !visEnabled` flag to stay correct for VIS: the NTP-fallback warning (now also fires for VIS,
+  checking `visIpAddress` instead of `dcIpAddress`), the "IIS depot needs a DC" warning (VIS is Linux, can't
+  host IIS either), and the appliance-breakdown label (now says "VIS" instead of falling through to "DC").
+  `VIS_DISK_GB = 30` folds into the existing physical-storage-overcommit check the same way
+  `dcStorageDiskGB` does for the file-server DC profile.
+- **`lib/generateVis.js`** (new) — `buildVisDeploy(spec)`, returns `null` when `!spec.vis.enabled` (same gating
+  pattern as `buildRdpFile`). Generates `vis-deploy.ps1` using **OVF Tool (`ovftool`)** specifically, not
+  govc/PowerCLI like the other OVA deploys — reads `localPaths.visOva` via the same `lab-config.json` loader,
+  shells out to `ovftool` with `--prop:VIS_FQDN/VIS_IP/VIS_NETMASK/VIS_GATEWAY/VIS_DNS_SERVER/VIS_DNS_DOMAIN/
+  VIS_NTP_SERVER/VIS_ROOT_PASSWORD` (the exact variable names William Lam's own `deploy_vis_esx.sh` reference
+  documents — the literal OVF property IDs aren't published anywhere, so the script's header comment tells the
+  user to run `ovftool "<path>"` alone first to confirm/adjust property names if ovftool rejects any of them).
+  Gateway/netmask default from the management CIDR via `firstHostInCidr`/`cidrToMask` (now exported from
+  `generateVcf.js` for reuse, alongside `buildVcfFiles`). Wired into `server.js` (`SCRIPT_KINDS['vis-deploy']`,
+  written with the same BOM-safe `writeGeneratedFile` every other `.ps1` uses) and `SCRIPT_LABELS` in
+  `wizard.js` for the downloads list.
+- **`generateMarkdown.js`** (design-doc.md): a VIS design-rationale paragraph parallel to the existing DC one,
+  a "Lab components" entry (2 vCPU/4GB/30GB, IP, deploy method), a DNS records table (VIS/vCenter/VyOS/each
+  nested host, generated conditionally on what's actually enabled), and the requested attribution line.
+- **`generateBuildGuide.js`**: a "Deploy the VIS Appliance" + "Enable VIS services" step pair (parallel to but
+  much shorter than the Windows DC promotion flow, since VIS ships pre-built), explicitly stating VIS replaces
+  the need for a separate DC for DNS/NTP/DHCP in VCF deployments, plus the attribution line and a
+  certification-mode skills-list entry.
+- **`generateNetworkDiagram.js`**: VIS renders as a node in the management-network "direct VMs" subgraph
+  (reusing the `dc` Mermaid classDef color — same conceptual role), with a `VyOS -> VIS` NAT/DHCP/DNS edge and
+  a dashed `VIS -> nested ESXi hosts` DNS/NTP/DHCP edge, mirroring the existing DC edges exactly.
+  `hasDirect`/`style DIRECT` conditions extended to include `vis.enabled` so the subgraph still renders when
+  VIS is the only direct-VM appliance present (no DC, no jumpbox).
+- Verified end-to-end with Playwright + the real generate pipeline: DC step shows 5 cards, selecting VIS hides
+  `#dc-fields` and shows `#vis-fields`, validation requires the VIS IP before continuing, a full `/api/generate`
+  run produces a BOM-prefixed `vis-deploy.ps1` that parses cleanly under PowerShell's own parser
+  (`[System.Management.Automation.Language.Parser]::ParseFile`), `lab-config.json` carries the `visOva` key,
+  and `design-doc.md`/`build-guide.md`/the embedded Mermaid diagram all correctly reference VIS. Zero
+  console/page errors.
+
+### v1.34.0 (Storage split into its own step; Template promoted to a real step)
 - **New front-of-wizard sequence, superseding v1.23's reorder**: Physical host (0) → Home
   network (1) → **Storage (2, new)** → Use case (3) → **Recommended template (4, new — was
   an overlay)** → Virtual router (5) → ... existing steps continue, all shifted +2. See the

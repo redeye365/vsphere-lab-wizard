@@ -93,6 +93,7 @@ const { buildPrerequisites } = require('./lib/generatePrerequisites');
 const { buildDepotFiles } = require('./lib/generateDepot');
 const { buildNsxScripts } = require('./lib/generateNsx');
 const { buildVcfFiles }  = require('./lib/generateVcf');
+const { buildVisDeploy } = require('./lib/generateVis');
 const { buildKickstartFiles, buildKickstartForHost } = require('./lib/generateKickstart');
 const { buildMermaidDiagram } = require('./lib/generateNetworkDiagram');
 const { buildDiagramHtml } = require('./lib/generateDiagramHtml');
@@ -212,7 +213,8 @@ const SCRIPT_KINDS = {
   'depot-instructions':  'depot-instructions.md',
   'nsx-deploy':          'nsx-deploy.ps1',
   'nsx-configure':       'nsx-configure.ps1',
-  'nsx-bgp':             'nsx-bgp.ps1'
+  'nsx-bgp':             'nsx-bgp.ps1',
+  'vis-deploy':          'vis-deploy.ps1'
 };
 
 const ALL_OUTPUT_FILES = { ...FIXED_OUTPUT_FILES, ...SCRIPT_KINDS };
@@ -291,6 +293,13 @@ app.post('/api/generate', (req, res) => {
     const rdpContent = buildRdpFile(spec.domainController);
     if (rdpContent) {
       fs.writeFileSync(path.join(dir, 'lab-dc.rdp'), rdpContent);
+    }
+
+    // VIS appliance deploy script (only when the VIS Appliance DC/infra option is selected)
+    const visDeployContent = buildVisDeploy(spec);
+    if (visDeployContent) {
+      writeGeneratedFile(dir, 'vis-deploy.ps1', visDeployContent);
+      generatedScripts.push('vis-deploy');
     }
 
     // Strip sensitive fields before returning spec to browser — rootPassword and

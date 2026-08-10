@@ -398,6 +398,20 @@ select:focus {
   letter-spacing: 0.01em;
 }
 .dc-profile-card-specs-none { color: var(--text-faint); font-weight: 400; }
+.dc-profile-recommended {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border-radius: 99px;
+  padding: 2px 7px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.dc-profile-card-desc a { color: var(--accent-text); }
 
 /* checkboxes */
 

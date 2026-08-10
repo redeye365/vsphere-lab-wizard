@@ -716,6 +716,12 @@
           <input type="text" id="windowsServerIsoPath" placeholder="C:\Lab\ISOs\WinServer2022-eval.iso">
           <p class="hint">Uploaded to the datastore automatically on first run. Only needed if you deploy a domain controller later.</p>
         </div>
+
+        <div class="field" id="file-loc-vis-ova">
+          <label for="visOvaPath">VIS appliance OVA path</label>
+          <input type="text" id="visOvaPath" placeholder="C:\Lab\ISOs\vcf-infrastructure-services-appliance-1.0.3.ova">
+          <p class="hint">William Lam's VCF Infrastructure Services Appliance — read directly from this path via OVF Tool. Only needed if you choose the VIS Appliance option in the Domain controller step. <a href="https://lamw.github.io/vcf-infrastructure-service-appliance/" target="_blank" rel="noopener">lamw.github.io/vcf-infrastructure-service-appliance</a></p>
+        </div>
       </section>
 
       <!-- Step 1: Existing network -->
@@ -909,6 +915,23 @@
               </div>
             </label>
 
+            <label class="dc-profile-card" data-profile="vis">
+              <input type="radio" name="dcProfile" value="vis">
+              <div class="dc-profile-card-body">
+                <div class="dc-profile-card-title">William Lam's VIS Appliance <span class="dc-profile-recommended">Recommended for VCF</span></div>
+                <div class="dc-profile-card-desc">Pre-built Ubuntu appliance providing DNS, NTP, DHCP, depot and container registry. Recommended for VCF lab deployments. No licence required. <a href="https://lamw.github.io/vcf-infrastructure-service-appliance/" target="_blank" rel="noopener">lamw.github.io/vcf-infrastructure-service-appliance</a></div>
+                <div class="dc-profile-card-specs">2 vCPU &middot; 4 GB RAM &middot; 30 GB disk</div>
+              </div>
+            </label>
+
+          </div>
+        </div>
+
+        <div id="vis-fields" hidden>
+          <div class="field">
+            <label for="visIpAddress">VIS appliance IP address</label>
+            <input type="text" id="visIpAddress" placeholder="e.g. 192.168.10.6">
+            <p class="hint">Used for the DNS/NTP/DHCP service references generated throughout the design doc and build guide. Attribution: William Lam (williamlam.com) &mdash; VCF Infrastructure Services Appliance.</p>
           </div>
         </div>
 
