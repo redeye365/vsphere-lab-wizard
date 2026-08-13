@@ -223,6 +223,22 @@ If the wizard still fails to start, a message box now describes the error instea
 Download the exe from [Releases](../../releases), double-click it, then open your browser
 at `http://localhost:3000`.
 
+### macOS security warning (unsigned binary)
+
+The macOS builds (`zero-to-hero-lab-macos-arm64`, `zero-to-hero-lab-macos-x64`) aren't
+code-signed, so Gatekeeper will show a security warning the first time you run one.
+
+**To open it:** right-click the file → **Open** → **Open**.
+
+**Or from Terminal:**
+
+```sh
+xattr -d com.apple.quarantine zero-to-hero-lab-macos-arm64
+```
+
+(substitute `zero-to-hero-lab-macos-x64` if you downloaded the Intel build). You only need
+to do this once per download.
+
 ---
 
 ## Known limitations (v1)

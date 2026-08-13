@@ -706,7 +706,23 @@ network diagram, prerequisites.
   - `tsGetCompleted()` / `tsSetCompleted(id, done)` — localStorage helpers
   - Tab button: `#ts-tab-studyplan` (`data-mode="studyplan"`)
 
-### v1.35.0 (current — VIS Appliance as a 5th Domain controller/infra option)
+### v1.36.0 (current — prereq checklist: two-column layout on desktop)
+- **`.prereq-list` restructured into two `.prereq-col` groups** (`public/index.html`): left column is
+  hardware/files (`hardware`, `isos`), right column is software/accounts (`powershell`, `powercli`, `ovftool`,
+  `govc`, `broadcom-account`). No JS changes needed — `wirePrereqScreen()`/`updatePrereqStart()` already select
+  `.prereq-check` globally regardless of DOM nesting.
+- **`@media (min-width: 760px)`** (`public/style.css`): `.prereq-list` switches from a stacked flex column to a
+  side-by-side flex row (`.prereq-col { flex: 1 1 0 }`), and `.prereq-panel` widens from 720px to 980px so the
+  two columns have room. Below 760px, unchanged single-column stack (mobile-first default).
+- Also added macOS Gatekeeper instructions to README's "Running the standalone executable" section (right-click
+  → Open, or `xattr -d com.apple.quarantine <binary>`), using the current binary naming
+  (`zero-to-hero-lab-macos-arm64`/`-macos-x64`) rather than the pre-rebrand filename.
+- Verified with Playwright at two viewports: 1280px shows both columns at the same Y (true side-by-side, not
+  wrapped), correct 2/5 item split with correct titles; 390px shows the right column stacked below the left.
+  Checkbox gating (`#prereq-start-btn` disabled until all 7 checked) still works across both columns. Zero
+  console errors.
+
+### v1.35.0 (VIS Appliance as a 5th Domain controller/infra option)
 - **New `dcProfile` value `'vis'`** — William Lam's VCF Infrastructure Services Appliance, a 5th card on the
   Domain controller step (`.dc-profile-card[data-profile="vis"]`) alongside the four existing Windows-DC
   profiles. Recommended-for-VCF badge (`.dc-profile-recommended`), description, and a link to

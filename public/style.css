@@ -2307,11 +2307,29 @@ select:focus {
 }
 .prereq-sub { font-size: 14.5px; color: var(--text-dim); margin: 0; }
 
+/* Single column (mobile default): two stacked groups, same visual rhythm as before. */
 .prereq-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 24px;
   margin-bottom: 28px;
+}
+.prereq-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Two columns side by side once there's room -- left: hardware/ISOs,
+   right: software/accounts -- so the whole checklist fits without scrolling. */
+@media (min-width: 760px) {
+  .prereq-panel { max-width: 980px; }
+  .prereq-list {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 20px;
+  }
+  .prereq-col { flex: 1 1 0; min-width: 0; }
 }
 .prereq-item {
   display: flex;
