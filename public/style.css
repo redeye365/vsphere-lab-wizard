@@ -2283,14 +2283,13 @@ select:focus {
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 40px 24px;
   background: radial-gradient(circle at 50% 30%, #161d24 0%, var(--bg) 70%);
   z-index: 51;
   overflow-y: auto;
 }
 .prereq-panel {
+  margin: auto;
   width: 100%;
   max-width: 720px;
   background: var(--surface-raised);

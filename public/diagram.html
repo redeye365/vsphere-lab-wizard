@@ -562,11 +562,15 @@
 <script>
 'use strict';
 
+// htmlLabels: false -- keeps multi-line node labels as SVG <tspan> line breaks
+// instead of an HTML <br> inside a foreignObject, so the SVG stays valid XML
+// (matters for Download SVG / opening network-diagram.svg directly in a browser,
+// which parses .svg with a strict XML parser).
 mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
   securityLevel: 'antiscript',
-  flowchart: { curve: 'basis' }
+  flowchart: { curve: 'basis', htmlLabels: false }
 });
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -632,6 +636,17 @@ function showToast(msg) {
 
 // ── Render ─────────────────────────────────────────────────────────────────
 
+// Self-close any bare void HTML tag (<br>, <img>, <hr>, <input>, <meta>, <link>) left in
+// a Mermaid-rendered SVG string. Mermaid's HTML labels can leave these unclosed -- valid
+// loose HTML, invalid XML -- and Download SVG / opening the file directly parses it with
+// a strict XML parser, so a malformed file fails to render at all. Idempotent.
+function fixSvgVoidTags(svgStr) {
+  return svgStr.replace(/<(br|img|hr|input|meta|link)((?:\s[^>]*)?)\/?>/gi, (m, tag, attrs) => {
+    const cleanAttrs = attrs.replace(/\/\s*$/, '');
+    return `<${tag}${cleanAttrs}/>`;
+  });
+}
+
 async function renderDiagram(mermaidSrc, spec) {
   currentMermaid = mermaidSrc;
   currentSpec = spec;
@@ -648,7 +663,8 @@ async function renderDiagram(mermaidSrc, spec) {
 
   try {
     const id = 'diag-' + Date.now();
-    const { svg } = await mermaid.render(id, mermaidSrc);
+    let { svg } = await mermaid.render(id, mermaidSrc);
+    svg = fixSvgVoidTags(svg);
     renderedSvg = svg;
 
     diagramInner.innerHTML = svg;
@@ -1060,7 +1076,8 @@ mermaidEditor.addEventListener('input', () => {
 async function renderFromEditor(mermaidSrc) {
   try {
     const id = 'diag-edit-' + Date.now();
-    const { svg } = await mermaid.render(id, mermaidSrc);
+    let { svg } = await mermaid.render(id, mermaidSrc);
+    svg = fixSvgVoidTags(svg);
     renderedSvg = svg;
     currentMermaid = mermaidSrc;
 

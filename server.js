@@ -134,6 +134,31 @@ if (MMDC) {
   console.log(`  To enable SVG export: ${installHint}`);
 }
 
+// mmdc config: htmlLabels false, matching public/wizard.js and public/diagram.html.
+// Without this, mermaid's default renders multi-line node labels ("name\nrole\nip")
+// as an HTML <br> inside a foreignObject instead of an SVG <tspan>; mermaid doesn't
+// self-close that <br>, which is invalid XML. The exported network-diagram.svg is
+// opened directly by browsers using a strict XML parser, so a malformed file shows
+// a parser error instead of the diagram -- same underlying bug as the client-side
+// preview, fixed the same way here for the file mmdc writes to disk.
+const MMDC_CONFIG_PATH = path.join(os.tmpdir(), 'zero-to-hero-mermaid-config.json');
+try {
+  fs.writeFileSync(MMDC_CONFIG_PATH, JSON.stringify({ flowchart: { htmlLabels: false } }), 'utf8');
+} catch { /* ignore -- falls back to mermaid defaults if this couldn't be written */ }
+
+// Self-close any bare void HTML tag (<br>, <img>, <hr>, <input>, <meta>, <link>) left in
+// an SVG string. Mermaid's HTML labels can leave these unclosed -- valid loose HTML,
+// invalid XML -- and browsers open a standalone .svg file with a strict XML parser, so a
+// malformed file fails to render at all (blank page) instead of just looking odd.
+// Idempotent: already-self-closed tags pass through unchanged. Same fix as
+// public/wizard.js's fixSvgVoidTags(), duplicated here since this runs server-side.
+function fixSvgVoidTags(svgStr) {
+  return svgStr.replace(/<(br|img|hr|input|meta|link)((?:\s[^>]*)?)\/?>/gi, (m, tag, attrs) => {
+    const cleanAttrs = attrs.replace(/\/\s*$/, '');
+    return `<${tag}${cleanAttrs}/>`;
+  });
+}
+
 // Attempt to render a Mermaid string to SVG via mmdc.
 // Returns true if the SVG was written, false otherwise.
 function renderSvg(mermaidContent, outputPath) {
@@ -141,12 +166,17 @@ function renderSvg(mermaidContent, outputPath) {
   const tmpInput = path.join(os.tmpdir(), `mermaid-${Date.now()}.mmd`);
   try {
     fs.writeFileSync(tmpInput, mermaidContent, 'utf8');
-    const result = spawnSync(
-      MMDC,
-      ['-i', tmpInput, '-o', outputPath, '--theme', 'neutral', '--quiet'],
-      { timeout: 30000 }
-    );
-    return result.status === 0 && fs.existsSync(outputPath);
+    const args = ['-i', tmpInput, '-o', outputPath, '--theme', 'neutral', '--quiet'];
+    if (fs.existsSync(MMDC_CONFIG_PATH)) args.push('-c', MMDC_CONFIG_PATH);
+    const result = spawnSync(MMDC, args, { timeout: 30000 });
+    const ok = result.status === 0 && fs.existsSync(outputPath);
+    if (ok) {
+      try {
+        const raw = fs.readFileSync(outputPath, 'utf8');
+        fs.writeFileSync(outputPath, fixSvgVoidTags(raw), 'utf8');
+      } catch { /* ignore -- file still written by mmdc, just not post-processed */ }
+    }
+    return ok;
   } catch {
     return false;
   } finally {

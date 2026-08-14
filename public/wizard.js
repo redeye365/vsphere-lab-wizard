@@ -2182,6 +2182,17 @@ function waitForMermaid(timeoutMs = 3000) {
   });
 }
 
+// Self-close any bare void HTML tag (<br>, <img>, <hr>, <input>, <meta>, <link>) inside
+// a Mermaid-rendered SVG string. Mermaid's HTML node/edge labels (used for multi-line
+// "name\nrole\nip" text via a foreignObject) can leave these unclosed -- valid loose
+// HTML, invalid XML. Idempotent: already-self-closed tags pass through unchanged.
+function fixSvgVoidTags(svgStr) {
+  return svgStr.replace(/<(br|img|hr|input|meta|link)((?:\s[^>]*)?)\/?>/gi, (m, tag, attrs) => {
+    const cleanAttrs = attrs.replace(/\/\s*$/, '');
+    return `<${tag}${cleanAttrs}/>`;
+  });
+}
+
 async function renderReviewDiagram() {
   const section = document.getElementById('review-diagram-section');
   const inner   = document.getElementById('review-diagram-inner');
@@ -2198,7 +2209,14 @@ async function renderReviewDiagram() {
       empty.textContent = 'Diagram preview unavailable — your network-diagram.svg will still be included in the generated zip';
       return;
     }
-    mermaid.initialize({ startOnLoad: false, theme: 'dark', darkMode: true, securityLevel: 'antiscript', flowchart: { curve: 'basis' } });
+    // htmlLabels: false -- multi-line node labels ("name\nrole\nip") render as SVG
+    // <tspan> line breaks instead of an HTML <br> inside a foreignObject. Mermaid
+    // doesn't self-close that <br>, which is valid loose HTML but not valid XML, and
+    // this preview is parsed with DOMParser(..., 'image/svg+xml') below (XSS hardening,
+    // v0.6.6-beta) -- a strict XML parser rejects the malformed SVG outright and the
+    // browser inserts its own <parsererror> box in place of the diagram. Keeping labels
+    // as pure SVG avoids the whole class of bug.
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', darkMode: true, securityLevel: 'antiscript', flowchart: { curve: 'basis', htmlLabels: false } });
     reviewMermaidInit = true;
   }
 
@@ -2220,7 +2238,13 @@ async function renderReviewDiagram() {
     .then(async (data) => {
       if (!data.mermaid) throw new Error('No mermaid source returned');
       const id = 'review-diag-' + Date.now();
-      const { svg } = await mermaid.render(id, data.mermaid);
+      let { svg } = await mermaid.render(id, data.mermaid);
+      // Belt-and-suspenders: even with flowchart.htmlLabels:false (set above), force
+      // any stray unclosed void tag (<br>, <img>, <hr>...) closed. This SVG is about to
+      // go through a strict XML parser (DOMParser below) -- one unclosed <br> and the
+      // whole diagram is replaced by the browser's native parser-error box instead of
+      // rendering. Cheap and idempotent, so it's safe to always run.
+      svg = fixSvgVoidTags(svg);
       clearTimeout(renderTimeout);
       // Parse as SVG rather than injecting raw HTML string
       const svgDoc = new DOMParser().parseFromString(svg, 'image/svg+xml');
